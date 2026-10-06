@@ -27,6 +27,25 @@ final class Settings {
 	public const MODE_AUTO   = 'auto';
 	public const MODE_MANUAL = 'manual';
 
+	/** Providers known to V1. */
+	public const PROVIDER_IDS = array( 'translatex', 'microsoft', 'gemini' );
+
+	/** Never-translate terms kept (plan §13A.1). */
+	public const MAX_TERMS = 500;
+
+	/** Per-provider integer settings: key => [minimum, maximum]. 0 means unlimited or "provider cap". */
+	public const PROVIDER_INTS = array(
+		'requests_per_minute'   => array( 0, 10000 ),
+		'requests_per_day'      => array( 0, 10000000 ),
+		'chars_per_minute'      => array( 0, 100000000 ),
+		'max_items_per_request' => array( 0, 10000 ),
+		'max_chars_per_request' => array( 0, 1000000 ),
+		'concurrency'           => array( 1, 5 ),
+		'max_attempts'          => array( 1, 20 ),
+		'monthly_char_cap'      => array( 0, 1000000000000 ),
+		'timeout'               => array( 5, 120 ),
+	);
+
 	/**
 	 * Sanitised values.
 	 *
@@ -44,7 +63,13 @@ final class Settings {
 	 *     never_discover_paths: list<string>,
 	 *     discovery_cap_page_hour: int,
 	 *     discovery_cap_site_hour: int,
-	 *     max_string_length: int
+	 *     max_string_length: int,
+	 *     provider: string,
+	 *     fallback_provider: string,
+	 *     providers: array<string, array<string, int|string>>,
+	 *     never_translate_terms: list<string>,
+	 *     terms_case_insensitive: bool,
+	 *     terms_whole_word: bool
 	 * }
 	 */
 	private array $values;
@@ -166,6 +191,39 @@ final class Settings {
 	}
 
 	/**
+	 * Primary provider id, or '' when none is chosen.
+	 */
+	public function provider(): string {
+		return $this->values['provider'];
+	}
+
+	/**
+	 * Fallback provider id, or ''.
+	 */
+	public function fallbackProvider(): string {
+		return $this->values['fallback_provider'];
+	}
+
+	/**
+	 * Stored overrides of one provider; missing keys use the provider defaults.
+	 *
+	 * @param string $id Provider id.
+	 * @return array<string, int|string>
+	 */
+	public function providerSettings( string $id ): array {
+		return $this->values['providers'][ $id ] ?? array();
+	}
+
+	/**
+	 * Never-translate terms.
+	 *
+	 * @return list<string>
+	 */
+	public function neverTranslateTerms(): array {
+		return $this->values['never_translate_terms'];
+	}
+
+	/**
 	 * Validate raw values. Invalid entries fall back to defaults.
 	 *
 	 * @param array<string, mixed> $raw        Raw values.
@@ -184,7 +242,13 @@ final class Settings {
 	 *     never_discover_paths: list<string>,
 	 *     discovery_cap_page_hour: int,
 	 *     discovery_cap_site_hour: int,
-	 *     max_string_length: int
+	 *     max_string_length: int,
+	 *     provider: string,
+	 *     fallback_provider: string,
+	 *     providers: array<string, array<string, int|string>>,
+	 *     never_translate_terms: list<string>,
+	 *     terms_case_insensitive: bool,
+	 *     terms_whole_word: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -209,7 +273,76 @@ final class Settings {
 			'discovery_cap_page_hour' => self::readInt( $raw, 'discovery_cap_page_hour', 100, 100000 ),
 			'discovery_cap_site_hour' => self::readInt( $raw, 'discovery_cap_site_hour', 1000, 1000000 ),
 			'max_string_length'       => self::readInt( $raw, 'max_string_length', 2000, 50000 ),
+			'provider'                => self::readProviderId( $raw['provider'] ?? '' ),
+			'fallback_provider'       => self::readFallback( $raw ),
+			'providers'               => self::readProviders( $raw['providers'] ?? array() ),
+			'never_translate_terms'   => array_slice( self::readList( $raw, 'never_translate_terms', array() ), 0, self::MAX_TERMS ),
+			'terms_case_insensitive'  => self::readBool( $raw, 'terms_case_insensitive', true ),
+			'terms_whole_word'        => self::readBool( $raw, 'terms_whole_word', true ),
 		);
+	}
+
+	/**
+	 * A known provider id, or ''.
+	 *
+	 * @param mixed $value Raw value.
+	 */
+	private static function readProviderId( $value ): string {
+		return is_string( $value ) && in_array( $value, self::PROVIDER_IDS, true ) ? $value : '';
+	}
+
+	/**
+	 * Fallback provider: known, and different from the primary.
+	 *
+	 * @param array<string, mixed> $raw Raw values.
+	 */
+	private static function readFallback( array $raw ): string {
+		$fallback = self::readProviderId( $raw['fallback_provider'] ?? '' );
+
+		return self::readProviderId( $raw['provider'] ?? '' ) === $fallback ? '' : $fallback;
+	}
+
+	/**
+	 * Per-provider overrides. Only valid keys that were given are kept;
+	 * missing keys mean "use the provider default" (plan §8).
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array<string, array<string, int|string>>
+	 */
+	private static function readProviders( $value ): array {
+		$clean = array();
+		if ( ! is_array( $value ) ) {
+			return $clean;
+		}
+		foreach ( self::PROVIDER_IDS as $id ) {
+			$given = $value[ $id ] ?? null;
+			if ( ! is_array( $given ) ) {
+				continue;
+			}
+			foreach ( self::PROVIDER_INTS as $key => [ $min, $max ] ) {
+				if ( ! isset( $given[ $key ] ) ) {
+					continue;
+				}
+				$number = filter_var( $given[ $key ], FILTER_VALIDATE_INT );
+				if ( false !== $number && $number >= $min ) {
+					$clean[ $id ][ $key ] = min( $number, $max );
+				}
+			}
+			$plan = $given['plan'] ?? null;
+			if ( 'translatex' === $id && is_string( $plan ) && in_array( $plan, array( 'free', 'startup', 'business', 'enterprise' ), true ) ) {
+				$clean[ $id ]['plan'] = $plan;
+			}
+			$endpoint = $given['endpoint'] ?? null;
+			if ( 'microsoft' === $id && is_string( $endpoint ) && 1 === preg_match( '#^https://[a-z0-9.\-]+(/[\w./\-]*)?$#i', $endpoint ) ) {
+				$clean[ $id ]['endpoint'] = rtrim( $endpoint, '/' );
+			}
+			$model = $given['model'] ?? null;
+			if ( 'gemini' === $id && is_string( $model ) && 1 === preg_match( '/^[a-z0-9][a-z0-9.\-]{1,63}$/', $model ) ) {
+				$clean[ $id ]['model'] = $model;
+			}
+		}
+
+		return $clean;
 	}
 
 	/**

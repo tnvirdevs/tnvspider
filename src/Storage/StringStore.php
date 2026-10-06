@@ -249,8 +249,57 @@ final class StringStore {
 			)
 		);
 		wp_cache_delete( $lang . ':' . self::hash( $original ), self::CACHE_GROUP );
+		// A manual translation is final: nothing may machine-translate it later.
+		$this->query( $this->prepare( 'DELETE FROM %i WHERE string_id = %d AND lang = %s', $this->schema->table( 'queue' ), $id, $lang ) );
 
 		return $id;
+	}
+
+	/**
+	 * Store a machine translation. A manual translation (status 2) is never
+	 * overwritten (plan §8).
+	 *
+	 * @param int    $stringId    String id.
+	 * @param string $original    Normalised original, for the cache key.
+	 * @param string $lang        Target locale.
+	 * @param string $translation Validated translation.
+	 * @param string $provider    Provider that produced it.
+	 * @param int    $flags       Translation flags.
+	 * @return bool Whether the translation was stored (false when a manual one exists).
+	 */
+	public function saveMachine( int $stringId, string $original, string $lang, string $translation, string $provider, int $flags ): bool {
+		$this->query(
+			$this->prepare(
+				'INSERT INTO %i (string_id, lang, translated, status, provider, flags, updated_by, updated_at) VALUES (%d, %s, %s, %d, %s, %d, NULL, %s)
+				ON DUPLICATE KEY UPDATE translated = IF(status = %d, translated, VALUES(translated)), provider = IF(status = %d, provider, VALUES(provider)),
+				flags = IF(status = %d, flags, VALUES(flags)), updated_at = IF(status = %d, updated_at, VALUES(updated_at)), status = IF(status = %d, status, VALUES(status))',
+				$this->schema->table( 'translations' ),
+				$stringId,
+				$lang,
+				$translation,
+				self::STATUS_MACHINE,
+				substr( $provider, 0, 24 ),
+				$flags,
+				current_time( 'mysql', true ),
+				self::STATUS_MANUAL,
+				self::STATUS_MANUAL,
+				self::STATUS_MANUAL,
+				self::STATUS_MANUAL,
+				self::STATUS_MANUAL
+			)
+		);
+		wp_cache_delete( $lang . ':' . self::hash( $original ), self::CACHE_GROUP );
+
+		return 1 === (int) $this->value(
+			$this->prepare(
+				'SELECT COUNT(*) FROM %i WHERE string_id = %d AND lang = %s AND status = %d AND provider = %s',
+				$this->schema->table( 'translations' ),
+				$stringId,
+				$lang,
+				self::STATUS_MACHINE,
+				substr( $provider, 0, 24 )
+			)
+		);
 	}
 
 	/**
