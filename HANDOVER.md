@@ -6,7 +6,12 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 0 — Setup & spikes: done.** PHPStan level 8 is clean and provider facts are recorded from official sources (Gemini per-model free-tier limits are unpublished and stay unconfirmed). `wp-env` is configured but not run here (no Docker daemon); the container uses MariaDB + `php -S`.
 
-**Phase 1 — Core without providers: done** (awaiting owner approval to start Phase 2). Every §16 Phase 1 acceptance criterion passes; evidence in *Phase 1 acceptance*.
+**Phase 1 — Core without providers: done and approved by the owner.**
+
+**Phase 2 — Providers, queue, limiter, usage: started.**
+- Done: `bin/capture-translatex-fixtures.php` (key only in the `X-API-Key` header, never printed, a fixture containing the key is refused); keyless fixtures `tests/fixtures/providers/translatex/{missing-key,invalid-key}.json`.
+- Finding: TranslateX answers a missing **and** an invalid key with **HTTP 400** and `{"err":"invalid api key"}` (not 401/403). Under D11 the adapter must map this 400 + `err` to `AuthError`; plan §7.2's "classify by HTTP status first" does not hold for this case.
+- Blocked: `WST_TRANSLATEX_KEY` is not set in this session (environment variables reach new sessions only). API hosts are reachable: `api.translatex.com` (400 without key), `api.cognitive.microsofttranslator.com` (200), `generativelanguage.googleapis.com` (Google's own 403 without key).
 
 ## Completed (Phase 0)
 
@@ -42,7 +47,16 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 | P6 | A wildcard rule `/shop/*` matches `/shop` and everything below; `/sale*` matches any path starting with `/sale`; `{{home}}` is `/`. | Plan §9 path rules; shared with Phase 3. |
 | P7 | Saving a manual inline translation rejects any markup difference before sanitising (no silent stripping). | Fail loudly; found by a test where `<script>` was stripped and its text kept. |
 
-## Phase 1 acceptance (plan §16) — evidence
+## Phase 1 acceptance (plan §16) — one line per criterion
+
+- PASS — `/bn/` renders translated text from the DB: `Phase1AcceptanceTest::test_target_url_renders_translated_text_from_the_database` (real `/bn/hello/` request through Router + Pipeline output buffer), plus `PipelineTest::test_stored_translations_replace_text_inline_attributes_and_title`.
+- PASS — Default language unaffected: `Phase1AcceptanceTest::test_default_language_request_is_not_buffered_or_changed` (no buffer, output byte-identical), `RouterTest::test_default_language_is_untouched`.
+- PASS — Menus/links stay in the language: `Phase1AcceptanceTest::test_menus_and_hard_coded_links_stay_in_the_language` (`wp_nav_menu` post item, `home_url` item and a hard-coded `/contact/` item all prefixed), `RouterTest::test_canonical_redirect_keeps_the_prefix`, `RouterTest::test_internal_redirects_stay_in_the_language`.
+- PASS — RTL target flips `dir` and loads theme RTL CSS: `RouterTest::test_rtl_target_flips_direction_and_loads_rtl_stylesheets` (`is_rtl()`, `style-rtl.css`, `dir="rtl"`), `PipelineTest::test_rtl_target_sets_document_direction`.
+- PASS — Round-trip identity holds: `RoundTripTest` (30 saved pages + 6,813 html5lib cases), `PipelineTest::test_saved_pages_keep_every_byte_without_translations` (output = input except `<html>`), `PipelineTest::test_saved_pages_only_change_links_with_rewriting_on`.
+- PASS — Unit + integration tests green: `composer test:unit` 60 tests, `composer test:integration` 7,017 tests (WP 7.1.2); PHPCS clean; PHPStan level 8 no errors.
+
+## Phase 1 acceptance — live evidence
 
 Live checks on the dev site (WordPress 7.1.2, Twenty Twenty-One, WooCommerce and Elementor from source, `php -S` with opcache) plus the test suites:
 
@@ -165,4 +179,4 @@ The fixture site (Elementor and WooCommerce built from GitHub source, wp-cli via
 
 ## Exact next step
 
-Wait for the owner's Phase 2 approval. Then Phase 2, first task: **capture real TranslateX responses** with the owner's key as fixtures (success, invalid key, unsupported pair, empty input, malformed input, over-limit if testable) and resolve the open TranslateX items (error format/status codes, per-request limits, Bengali on the free plan). Keys come from environment variables, never committed.
+Phase 2, first task, as soon as `WST_TRANSLATEX_KEY` is available in the session: `php bin/capture-translatex-fixtures.php all`, then `php bin/capture-translatex-fixtures.php rate-limit`. Review the fixtures (no key inside), and record in this file: error format and status codes per case, per-request item/character limits (batch-100/101/500, chars-5000/20000/60000-total), whether `bn` and `ar` are in `/supported-languages` for this key's plan, and whether `html=` works on this plan. Then the provider interface, shared placeholder protection and the TranslateX adapter against those fixtures.
