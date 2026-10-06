@@ -1,0 +1,9 @@
+/vendor/
+/node_modules/
+/.phpunit.result.cache
+/.phpunit.cache/
+/tests/fixtures/pages/local/
+/dist/
+/composer.local.json
+/composer.local.lock
+/tests/fixtures/html5lib-tests/

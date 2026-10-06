@@ -1,0 +1,9 @@
+# PHPStan level 8 with WordPress stubs (szepeviktor/phpstan-wordpress,
+# loaded by phpstan/extension-installer).
+parameters:
+	level: 8
+	phpVersion: 80000
+	paths:
+		- wp-site-translator.php
+		- src
+	treatPhpDocTypesAsCertain: false

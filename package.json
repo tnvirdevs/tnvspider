@@ -1,0 +1,18 @@
+{
+	"name": "wp-site-translator",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Admin UI and front-end assets for WP Site Translator.",
+	"license": "GPL-2.0-or-later",
+	"scripts": {
+		"build": "wp-scripts build",
+		"start": "wp-scripts start",
+		"lint:js": "wp-scripts lint-js",
+		"lint:css": "wp-scripts lint-style",
+		"env": "wp-env"
+	},
+	"devDependencies": {
+		"@wordpress/env": "^11.16.0",
+		"@wordpress/scripts": "^36.0.0"
+	}
+}

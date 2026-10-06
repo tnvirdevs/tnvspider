@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<ruleset name="WP Site Translator">
+	<description>WordPress Coding Standards with the project's PSR-4 and naming decisions.</description>
+
+	<file>wp-site-translator.php</file>
+	<file>src</file>
+	<file>tests</file>
+
+	<exclude-pattern>/tests/fixtures/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg name="basepath" value="."/>
+	<arg name="parallel" value="8"/>
+	<arg value="ps"/>
+
+	<config name="testVersion" value="8.0-"/>
+	<config name="minimum_wp_version" value="6.7"/>
+
+	<rule ref="WordPress-Extra">
+		<!-- PSR-4: one class per file named after the class. -->
+		<exclude name="WordPress.Files.FileName"/>
+		<!-- camelCase methods, properties and variables (see HANDOVER decision log). -->
+		<exclude name="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid"/>
+		<exclude name="WordPress.NamingConventions.ValidVariableName"/>
+		<!-- Short array syntax is allowed. -->
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+	</rule>
+	<rule ref="WordPress-Docs">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="wp-site-translator"/>
+			</property>
+		</properties>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="WST_"/>
+				<element value="wst_"/>
+			</property>
+		</properties>
+		<!-- The namespace is WST (plan §0); WPCS requires prefixes of 4+ characters. -->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound"/>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound">
+		<!-- The WordPress test suite requires its own constant names. -->
+		<exclude-pattern>/tests/wp-tests-config.php</exclude-pattern>
+		<exclude-pattern>/tests/bootstrap-integration.php</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.WP.AlternativeFunctions">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+	<rule ref="PHPCompatibilityWP"/>
+</ruleset>
