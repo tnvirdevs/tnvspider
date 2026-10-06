@@ -7,3 +7,5 @@ parameters:
 		- wp-site-translator.php
 		- src
 	treatPhpDocTypesAsCertain: false
+	scanFiles:
+		- tests/phpstan/wp-cli-stubs.php

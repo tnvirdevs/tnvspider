@@ -186,6 +186,13 @@ final class Extractor {
 	private array $segments = array();
 
 	/**
+	 * Link attributes of the last extraction: [start, length, attribute, value].
+	 *
+	 * @var list<array{0: int, 1: int, 2: string, 3: string}>
+	 */
+	private array $links = array();
+
+	/**
 	 * Extract the translatable segments of a document or fragment.
 	 *
 	 * @param string $html Document or fragment.
@@ -196,6 +203,7 @@ final class Extractor {
 		$this->lexer    = new Lexer( $html );
 		$this->frames   = array();
 		$this->segments = array();
+		$this->links    = array();
 
 		while ( $this->lexer->next_token() ) {
 			switch ( $this->lexer->get_token_type() ) {
@@ -262,6 +270,7 @@ final class Extractor {
 		if ( ! $excluded ) {
 			$this->tagSegments( $tag, $start, $length );
 		}
+		$this->collectLink( $tag, $start, $length );
 
 		if ( isset( self::SINGLE_TOKEN_TAGS[ $tag ] ) && 'html' === $this->lexer->get_namespace() ) {
 			return;
@@ -279,6 +288,35 @@ final class Extractor {
 
 		if ( $frame->foreign ) {
 			$this->lexer->change_parsing_namespace( 'SVG' === $tag ? 'svg' : 'math' );
+		}
+	}
+
+	/**
+	 * Link targets of the last extract() call: href of A and AREA, action of
+	 * FORM, as [start, length, attribute, decoded value] of the tag token.
+	 * Links that carry hreflang point at a specific language and are left out.
+	 *
+	 * @return list<array{0: int, 1: int, 2: string, 3: string}>
+	 */
+	public function links(): array {
+		return $this->links;
+	}
+
+	/**
+	 * Record the link attribute of the current start tag, if any.
+	 *
+	 * @param string $tag    Upper-case tag name.
+	 * @param int    $start  Byte offset of the tag token.
+	 * @param int    $length Byte length of the tag token.
+	 */
+	private function collectLink( string $tag, int $start, int $length ): void {
+		$attribute = 'FORM' === $tag ? 'action' : ( 'A' === $tag || 'AREA' === $tag ? 'href' : null );
+		if ( null === $attribute || ! isset( $this->attributes[ $attribute ] ) || isset( $this->attributes['hreflang'] ) ) {
+			return;
+		}
+		$value = $this->lexer->get_attribute( $attribute );
+		if ( is_string( $value ) && '' !== $value ) {
+			$this->links[] = array( $start, $length, $attribute, $value );
 		}
 	}
 

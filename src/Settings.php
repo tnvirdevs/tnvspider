@@ -1,0 +1,272 @@
+<?php
+/**
+ * Plugin settings stored in one option (plan §4).
+ *
+ * @package WST
+ */
+
+declare(strict_types=1);
+
+namespace WST;
+
+use WST\Languages\Language;
+use WST\Languages\Registry;
+
+/**
+ * Validated, typed view of the wst_settings option. Only settings that
+ * have a real effect are defined here; later phases add theirs together
+ * with the behaviour.
+ */
+final class Settings {
+
+	public const OPTION = Config::PREFIX . 'settings';
+
+	/** Bump when the stored shape changes. */
+	public const SCHEMA = 1;
+
+	public const MODE_AUTO   = 'auto';
+	public const MODE_MANUAL = 'manual';
+
+	/**
+	 * Sanitised values.
+	 *
+	 * @var array{
+	 *     default_language: string,
+	 *     target_language: string,
+	 *     target_slug: string,
+	 *     site_mode: string,
+	 *     discover_on_visit: bool,
+	 *     block_crawlers: bool,
+	 *     force_language_links: bool,
+	 *     hreflang_x_default: bool,
+	 *     hreflang_drop_region: bool,
+	 *     discovery_query_args: list<string>,
+	 *     never_discover_paths: list<string>,
+	 *     discovery_cap_page_hour: int,
+	 *     discovery_cap_site_hour: int,
+	 *     max_string_length: int
+	 * }
+	 */
+	private array $values;
+
+	/**
+	 * Language registry.
+	 *
+	 * @var Registry
+	 */
+	private Registry $registry;
+
+	/**
+	 * Build settings from raw (stored or submitted) values.
+	 *
+	 * @param array<string, mixed> $raw        Raw values; unknown keys are dropped.
+	 * @param string               $siteLocale Site locale, the default for default_language.
+	 * @param Registry             $registry   Language registry.
+	 */
+	public function __construct( array $raw, string $siteLocale, Registry $registry ) {
+		$this->registry = $registry;
+		$this->values   = self::sanitize( $raw, $siteLocale );
+	}
+
+	/**
+	 * Settings from the stored option.
+	 */
+	public static function load(): self {
+		$raw = get_option( self::OPTION, array() );
+
+		return new self( is_array( $raw ) ? $raw : array(), self::siteLocale(), new Registry() );
+	}
+
+	/**
+	 * The site's configured locale, read the way core's get_locale() does but
+	 * without the 'locale' filter, which the Router changes on target requests.
+	 */
+	public static function siteLocale(): string {
+		$option = get_option( 'WPLANG' );
+		if ( is_string( $option ) && '' !== $option ) {
+			return $option;
+		}
+		if ( defined( 'WPLANG' ) && is_string( WPLANG ) && '' !== WPLANG ) {
+			return WPLANG;
+		}
+
+		return 'en_US';
+	}
+
+	/**
+	 * Values in storable form.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function toArray(): array {
+		return array( 'schema' => self::SCHEMA ) + $this->values;
+	}
+
+	/**
+	 * The site's own language.
+	 */
+	public function defaultLanguage(): Language {
+		return $this->registry->get( $this->values['default_language'] );
+	}
+
+	/**
+	 * The translation target, or null while none is configured.
+	 */
+	public function targetLanguage(): ?Language {
+		if ( '' === $this->values['target_language'] ) {
+			return null;
+		}
+		$language = $this->registry->get( $this->values['target_language'] );
+
+		return '' === $this->values['target_slug'] ? $language : $language->withSlug( $this->values['target_slug'] );
+	}
+
+	/**
+	 * Site-wide mode: auto or manual.
+	 */
+	public function siteMode(): string {
+		return $this->values['site_mode'];
+	}
+
+	/**
+	 * Boolean setting.
+	 *
+	 * @param string $key One of discover_on_visit, block_crawlers, force_language_links,
+	 *                    hreflang_x_default, hreflang_drop_region.
+	 */
+	public function flag( string $key ): bool {
+		return (bool) ( $this->values[ $key ] ?? false );
+	}
+
+	/**
+	 * Integer setting.
+	 *
+	 * @param string $key One of discovery_cap_page_hour, discovery_cap_site_hour, max_string_length.
+	 */
+	public function number( string $key ): int {
+		return (int) ( $this->values[ $key ] ?? 0 );
+	}
+
+	/**
+	 * Query arguments a URL may carry and still be discovered.
+	 *
+	 * @return list<string>
+	 */
+	public function discoveryQueryArgs(): array {
+		return $this->values['discovery_query_args'];
+	}
+
+	/**
+	 * Path rules excluded from discovery (trailing * wildcard, {{home}} token).
+	 *
+	 * @return list<string>
+	 */
+	public function neverDiscoverPaths(): array {
+		return $this->values['never_discover_paths'];
+	}
+
+	/**
+	 * Validate raw values. Invalid entries fall back to defaults.
+	 *
+	 * @param array<string, mixed> $raw        Raw values.
+	 * @param string               $siteLocale Site locale.
+	 * @return array{
+	 *     default_language: string,
+	 *     target_language: string,
+	 *     target_slug: string,
+	 *     site_mode: string,
+	 *     discover_on_visit: bool,
+	 *     block_crawlers: bool,
+	 *     force_language_links: bool,
+	 *     hreflang_x_default: bool,
+	 *     hreflang_drop_region: bool,
+	 *     discovery_query_args: list<string>,
+	 *     never_discover_paths: list<string>,
+	 *     discovery_cap_page_hour: int,
+	 *     discovery_cap_site_hour: int,
+	 *     max_string_length: int
+	 * }
+	 */
+	private static function sanitize( array $raw, string $siteLocale ): array {
+		$default = self::readLocale( $raw['default_language'] ?? '' );
+		$default = '' === $default ? self::readLocale( $siteLocale ) : $default;
+		$target  = self::readLocale( $raw['target_language'] ?? '' );
+		$slug    = isset( $raw['target_slug'] ) && is_string( $raw['target_slug'] ) ? strtolower( trim( $raw['target_slug'], '/ ' ) ) : '';
+		$mode    = $raw['site_mode'] ?? self::MODE_AUTO;
+
+		return array(
+			'default_language'        => '' === $default ? 'en_US' : $default,
+			'target_language'         => $target === $default ? '' : $target,
+			'target_slug'             => 1 === preg_match( '/^[a-z0-9][a-z0-9-]{0,19}$/', $slug ) ? $slug : '',
+			'site_mode'               => self::MODE_MANUAL === $mode ? self::MODE_MANUAL : self::MODE_AUTO,
+			'discover_on_visit'       => self::readBool( $raw, 'discover_on_visit', true ),
+			'block_crawlers'          => self::readBool( $raw, 'block_crawlers', true ),
+			'force_language_links'    => self::readBool( $raw, 'force_language_links', true ),
+			'hreflang_x_default'      => self::readBool( $raw, 'hreflang_x_default', true ),
+			'hreflang_drop_region'    => self::readBool( $raw, 'hreflang_drop_region', false ),
+			'discovery_query_args'    => self::readList( $raw, 'discovery_query_args', array( 'paged' ) ),
+			'never_discover_paths'    => self::readList( $raw, 'never_discover_paths', array() ),
+			'discovery_cap_page_hour' => self::readInt( $raw, 'discovery_cap_page_hour', 100, 100000 ),
+			'discovery_cap_site_hour' => self::readInt( $raw, 'discovery_cap_site_hour', 1000, 1000000 ),
+			'max_string_length'       => self::readInt( $raw, 'max_string_length', 2000, 50000 ),
+		);
+	}
+
+	/**
+	 * A well-formed locale, or ''.
+	 *
+	 * @param mixed $value Raw value.
+	 */
+	private static function readLocale( $value ): string {
+		return is_string( $value ) && 1 === preg_match( '/^[a-z]{2,3}(_[A-Za-z0-9]{2,8})*$/', $value ) ? $value : '';
+	}
+
+	/**
+	 * Boolean setting.
+	 *
+	 * @param array<string, mixed> $raw      Raw values.
+	 * @param string               $key      Setting key.
+	 * @param bool                 $fallback Default.
+	 */
+	private static function readBool( array $raw, string $key, bool $fallback ): bool {
+		return isset( $raw[ $key ] ) ? (bool) filter_var( $raw[ $key ], FILTER_VALIDATE_BOOLEAN ) : $fallback;
+	}
+
+	/**
+	 * Non-negative integer setting, clamped to $max.
+	 *
+	 * @param array<string, mixed> $raw      Raw values.
+	 * @param string               $key      Setting key.
+	 * @param int                  $fallback Default.
+	 * @param int                  $max      Upper bound.
+	 */
+	private static function readInt( array $raw, string $key, int $fallback, int $max ): int {
+		$value = isset( $raw[ $key ] ) ? filter_var( $raw[ $key ], FILTER_VALIDATE_INT ) : false;
+
+		return false === $value || $value < 0 ? $fallback : min( $value, $max );
+	}
+
+	/**
+	 * List of non-empty trimmed strings.
+	 *
+	 * @param array<string, mixed> $raw      Raw values.
+	 * @param string               $key      Setting key.
+	 * @param string[]             $fallback Default.
+	 * @phpstan-param list<string> $fallback
+	 * @return list<string>
+	 */
+	private static function readList( array $raw, string $key, array $fallback ): array {
+		if ( ! isset( $raw[ $key ] ) || ! is_array( $raw[ $key ] ) ) {
+			return $fallback;
+		}
+		$items = array();
+		foreach ( $raw[ $key ] as $item ) {
+			$item = is_scalar( $item ) ? trim( (string) $item ) : '';
+			if ( '' !== $item ) {
+				$items[] = $item;
+			}
+		}
+
+		return $items;
+	}
+}
