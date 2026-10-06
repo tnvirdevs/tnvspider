@@ -16,6 +16,15 @@ namespace WST\Providers;
 final class BatchResult {
 
 	/**
+	 * Error prefix for a response whose result count differs from the input;
+	 * the queue retries such rows one per request (see Worker).
+	 */
+	public const COUNT_MISMATCH = 'Result count mismatch';
+
+	/** Error prefix for a request the provider found too large; retried the same way. */
+	public const TOO_LARGE = 'Request too large';
+
+	/**
 	 * Translations by string id.
 	 *
 	 * @var array<int, string>

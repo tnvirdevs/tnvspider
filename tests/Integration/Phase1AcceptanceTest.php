@@ -16,6 +16,12 @@ use WST\Database\Schema;
 use WST\Languages\Current;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Providers\ProviderRegistry;
+use WST\Providers\ProviderState;
+use WST\Providers\Selector;
+use WST\Queue\AutoQueue;
+use WST\Queue\Queue;
+use WST\Queue\Scheduler;
 use WST\Render\DiscoveryGate;
 use WST\Render\Pipeline;
 use WST\Routing\Router;
@@ -48,8 +54,21 @@ final class Phase1AcceptanceTest extends WP_UnitTestCase {
 		$schema   = new Schema( $wpdb );
 		$logger   = new Logger( $wpdb, $schema );
 
-		$this->store    = new StringStore( $wpdb, $schema );
-		$this->pipeline = new Pipeline( $settings, $target, $this->store, new DiscoveryGate( $settings, $logger ), $logger, $urls );
+		$this->store = new StringStore( $wpdb, $schema );
+		// Phase 1 behaviour: no provider, so nothing is queued.
+		$queue          = new Queue( $wpdb, $schema );
+		$auto           = new AutoQueue(
+			$settings,
+			new Selector( $settings, new ProviderRegistry( array() ), new ProviderState() ),
+			$queue,
+			new Scheduler(
+				$queue,
+				static function (): \WST\Queue\Worker {
+					throw new \LogicException( 'Rendering must not run the worker.' );
+				}
+			)
+		);
+		$this->pipeline = new Pipeline( $settings, $target, $this->store, new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto );
 		( new Router( $settings, $target, $urls ) )->boot();
 		wp_cache_flush();
 	}

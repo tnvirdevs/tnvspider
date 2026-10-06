@@ -33,7 +33,9 @@ interface ProviderInterface {
 	public function capabilities(): Capabilities;
 
 	/**
-	 * Whether the provider can translate between two locales.
+	 * Whether the provider can translate between two locales. Called while
+	 * rendering pages, so it must answer from local data and never make a
+	 * network request.
 	 *
 	 * @param string $source Source locale.
 	 * @param string $target Target locale.

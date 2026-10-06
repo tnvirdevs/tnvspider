@@ -87,6 +87,8 @@ final class StringCommand {
 			\WP_CLI::error( $e->getMessage() );
 		}
 
+		/** This action is documented in src/Queue/Worker.php */
+		do_action( 'wst_strings_translated', array( $id ), $lang );
 		\WP_CLI::success( sprintf( 'Saved manual %s translation for string #%d (%s).', $kind, $id, $lang ) );
 	}
 

@@ -277,8 +277,8 @@ interface ProviderInterface {
 - Supports HTML mode → send `inline` strings with `textType=html`.
 - Free tier (F0): 2M characters per month (Azure pricing page), throttled at 2M characters per hour consumed evenly, about **33,300 characters per minute** (sliding window). S1: 40M characters per hour. No limit on concurrent requests. (Official docs, `service-limits`, 2026-08-11.)
 - **Hard caps per request (D12): 1,000 array elements and 50,000 characters in total**; `max_items_per_request` / `max_chars_per_request` can never exceed them. Default `chars_per_minute` for F0: 33,000.
-- Error codes (official `status-response-codes`): `401000` → `AuthError`; `403001` → `QuotaExceeded` (D11); `403000` → `AuthError`; `429000`–`429002` → `RateLimited`; `408001`, `500000`, `503000` → `TransientError`; `400050` (text too long), `400072` (too many elements), `400077` (request too large) → split the batch and retry; other `400xxx` → `PermanentError`.
-- `textType=html` requires well-formed, complete elements. Microsoft also honours `class="notranslate"` and `<mstrans:dictionary translation="…">`; whether to use these for never-translate terms instead of opaque tokens is decided in Phase 2 (D13).
+- Error codes (official `status-response-codes`): `401000` → `AuthError` (a missing or invalid key was observed as HTTP 401 code `401001`, fixtures `microsoft/{missing-key,invalid-key}.json`; the whole `401xxx`/`403xxx` class maps to `AuthError` except `403001`); `403001` → `QuotaExceeded` (D11); `403000` → `AuthError`; `429000`–`429002` → `RateLimited`; `408001`, `500000`, `503000` → `TransientError`; `400050` (text too long), `400072` (too many elements), `400077` (request too large) → split the batch and retry; other `400xxx` → `PermanentError`.
+- `textType=html` requires well-formed, complete elements. Microsoft also honours `class="notranslate"` and `<mstrans:dictionary translation="…">`; decided in Phase 2 (D13, HANDOVER P11): we keep the shared opaque tokens for every provider.
 - Settings: key, region, endpoint override (default global), limits (§8).
 
 ### 7.2 TranslateX

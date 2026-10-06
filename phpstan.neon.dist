@@ -9,3 +9,4 @@ parameters:
 	treatPhpDocTypesAsCertain: false
 	scanFiles:
 		- tests/phpstan/wp-cli-stubs.php
+		- tests/phpstan/cache-plugin-stubs.php

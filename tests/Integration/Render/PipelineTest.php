@@ -12,12 +12,19 @@ use WP_UnitTestCase;
 use WST\Database\Schema;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Providers\ProviderRegistry;
+use WST\Providers\ProviderState;
+use WST\Providers\Selector;
+use WST\Queue\AutoQueue;
+use WST\Queue\Queue;
+use WST\Queue\Scheduler;
 use WST\Render\DiscoveryGate;
 use WST\Render\PageContext;
 use WST\Render\Pipeline;
 use WST\Routing\Urls;
 use WST\Settings;
 use WST\Storage\StringStore;
+use WST\Tests\Support\FakeProvider;
 
 final class PipelineTest extends WP_UnitTestCase {
 
@@ -30,6 +37,8 @@ final class PipelineTest extends WP_UnitTestCase {
 		global $wpdb;
 		$this->schema = new Schema( $wpdb );
 		$this->store  = new StringStore( $wpdb, $this->schema );
+		delete_option( ProviderState::OPTION );
+		wp_clear_scheduled_hook( Scheduler::HOOK );
 		wp_cache_flush();
 	}
 
@@ -38,8 +47,24 @@ final class PipelineTest extends WP_UnitTestCase {
 	 */
 	private function pipeline( array $settings = array(), string $target = 'bn_BD', string $home = 'http://example.org' ): Pipeline {
 		global $wpdb;
-		$settings = new Settings( array( 'target_language' => $target ) + $settings, 'en_US', new Registry() );
-		$logger   = new Logger( $wpdb, $this->schema );
+		$settings  = new Settings(
+			$settings + array(
+				'target_language' => $target,
+				'provider'        => 'translatex',
+			),
+			'en_US',
+			new Registry()
+		);
+		$logger    = new Logger( $wpdb, $this->schema );
+		$queue     = new Queue( $wpdb, $this->schema );
+		$selector  = new Selector( $settings, new ProviderRegistry( array( 'translatex' => new FakeProvider( 'translatex' ) ) ), new ProviderState() );
+		$scheduler = new Scheduler(
+			$queue,
+			static function (): \WST\Queue\Worker {
+				throw new \LogicException( 'Rendering must not run the worker.' );
+			}
+		);
+		$scheduler->boot();
 
 		return new Pipeline(
 			$settings,
@@ -47,7 +72,8 @@ final class PipelineTest extends WP_UnitTestCase {
 			$this->store,
 			new DiscoveryGate( $settings, $logger ),
 			$logger,
-			Urls::fromHome( $home, 'wp-json' )
+			Urls::fromHome( $home, 'wp-json' ),
+			new AutoQueue( $settings, $selector, $queue, $scheduler )
 		);
 	}
 
@@ -196,6 +222,66 @@ final class PipelineTest extends WP_UnitTestCase {
 
 		$pipeline->process( '<body><p>Broken</p></body>', $this->page() );
 		$this->assertSame( 0, $pipeline->pending(), 'Failed rows never make a page uncacheable.' );
+	}
+
+	public function test_pending_rows_do_not_block_caching_without_a_usable_provider(): void {
+		global $wpdb;
+		$ids = $this->store->recordOnPage( array( 'Waiting' => 'text' ), '/shop/', null );
+		( new Queue( $wpdb, $this->schema ) )->enqueue( array( $ids['Waiting'] ), 'bn_BD', 'translatex', Queue::PRIORITY_VISITOR, time() );
+		$html = '<body><p>Waiting</p></body>';
+
+		$pipeline = $this->pipeline();
+		$pipeline->process( $html, $this->page() );
+		$this->assertSame( 1, $pipeline->pending(), 'Usable provider: the page waits for it.' );
+
+		$pipeline = $this->pipeline( array( 'provider' => '' ) );
+		$pipeline->process( $html, $this->page() );
+		$this->assertSame( 0, $pipeline->pending(), 'No provider selected.' );
+
+		( new ProviderState() )->pause( 'translatex', 'Key rejected.' );
+		$pipeline = $this->pipeline();
+		$pipeline->process( $html, $this->page() );
+		$this->assertSame( 0, $pipeline->pending(), 'Provider paused.' );
+	}
+
+	public function test_discoverable_page_queues_untranslated_strings_for_the_active_provider(): void {
+		global $wpdb;
+		$this->store->recordOnPage( array( 'Seen before' => 'text' ), '/other/', null );
+		$this->store->saveManual( 'Done', 'text', 'bn_BD', 'সম্পন্ন', 0 );
+
+		$pipeline = $this->pipeline();
+		$pipeline->process( '<body><p>Seen before</p><p>Brand new</p><p>Done</p></body>', $this->page( true ) );
+
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT s.original, q.provider, q.priority, q.state FROM %i q JOIN %i s ON s.id = q.string_id ORDER BY s.original', $this->schema->table( 'queue' ), $this->schema->table( 'strings' ) ), ARRAY_A );
+		$this->assertSame(
+			array(
+				array(
+					'original' => 'Brand new',
+					'provider' => 'translatex',
+					'priority' => '5',
+					'state'    => 'pending',
+				),
+				array(
+					'original' => 'Seen before',
+					'provider' => 'translatex',
+					'priority' => '5',
+					'state'    => 'pending',
+				),
+			),
+			$rows
+		);
+		$this->assertSame( 2, $pipeline->pending() );
+		$this->assertNotFalse( wp_next_scheduled( Scheduler::HOOK ), 'The cron runner is scheduled while work is queued.' );
+	}
+
+	public function test_nothing_is_queued_from_non_discoverable_pages_or_without_a_provider(): void {
+		global $wpdb;
+		$this->pipeline()->process( '<body><p>Private name</p></body>', $this->page( false ) );
+		$this->pipeline( array( 'provider' => '' ) )->process( '<body><p>No provider</p></body>', $this->page( true ) );
+
+		$this->assertNotNull( $this->store->find( 'No provider', 'bn_BD' ), 'Discovery still records strings.' );
+		$this->assertSame( '0', $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $this->schema->table( 'queue' ) ) ) );
+		$this->assertFalse( wp_next_scheduled( Scheduler::HOOK ) );
 	}
 
 	public function test_failure_is_logged_and_rethrown_under_wp_debug(): void {

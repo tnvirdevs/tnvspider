@@ -12,6 +12,7 @@ namespace WST\Queue;
 use WST\Config;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Providers\BatchResult;
 use WST\Providers\Errors\AuthError;
 use WST\Providers\Errors\PermanentError;
 use WST\Providers\Errors\ProviderError;
@@ -170,8 +171,13 @@ final class Worker {
 		}
 		++$report->batches;
 
-		$strings = array();
+		$strings  = array();
+		$maxItems = $limits->maxItems;
 		foreach ( $rows as $row ) {
+			// A batch that came back short or was too large is retried one item per request.
+			if ( $row['attempts'] > 0 && ( str_starts_with( $row['last_error'], BatchResult::COUNT_MISMATCH ) || str_starts_with( $row['last_error'], BatchResult::TOO_LARGE ) ) ) {
+				$maxItems = 1;
+			}
 			$strings[ $row['string_id'] ] = array(
 				'text'    => $row['text'],
 				'kind'    => $row['kind'],
@@ -183,7 +189,7 @@ final class Worker {
 			$strings,
 			$caps,
 			new Protector( $this->settings->neverTranslateTerms(), $this->settings->flag( 'terms_case_insensitive' ), $this->settings->flag( 'terms_whole_word' ), $caps->tokenFormat ),
-			$limits->maxItems,
+			$maxItems,
 			$limits->maxChars
 		);
 
@@ -282,7 +288,8 @@ final class Worker {
 
 		if ( array() !== $completed ) {
 			/**
-			 * Fires after machine translations were stored.
+			 * Fires after translations were stored (machine runs here, manual
+			 * saves elsewhere); page caches are purged from it.
 			 *
 			 * @param int[]  $stringIds String ids.
 			 * @param string $lang      Target locale.

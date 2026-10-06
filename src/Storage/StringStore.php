@@ -359,6 +359,34 @@ final class StringStore {
 	}
 
 	/**
+	 * Paths of pages that contain any of these strings and have no string
+	 * left waiting for automatic translation in $lang.
+	 *
+	 * @param int[]  $stringIds String ids.
+	 * @phpstan-param list<int> $stringIds
+	 * @param string $lang      Target locale.
+	 * @return list<string>
+	 */
+	public function finishedPages( array $stringIds, string $lang ): array {
+		if ( array() === $stringIds ) {
+			return array();
+		}
+		$rows = $this->results(
+			$this->prepare(
+				'SELECT DISTINCT p.path FROM %i p JOIN %i o ON o.page_key = p.page_key WHERE o.string_id IN (' . implode( ',', array_fill( 0, count( $stringIds ), '%d' ) ) . ')' // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				. " AND NOT EXISTS (SELECT 1 FROM %i w JOIN %i q ON q.string_id = w.string_id AND q.lang = %s AND q.state IN ('pending', 'processing') WHERE w.page_key = p.page_key)",
+				array_merge(
+					array( $this->schema->table( 'pages' ), $this->schema->table( 'occurrences' ) ),
+					$stringIds,
+					array( $this->schema->table( 'occurrences' ), $this->schema->table( 'queue' ), $lang )
+				)
+			)
+		);
+
+		return array_values( array_map( static fn( \stdClass $row ): string => (string) $row->path, $rows ) );
+	}
+
+	/**
 	 * Number of queue rows still waiting for automatic translation for these
 	 * strings, ignoring rows older than $maxAgeSeconds.
 	 *

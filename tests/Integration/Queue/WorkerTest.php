@@ -11,8 +11,10 @@ use WP_UnitTestCase;
 use WST\Database\Schema;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Providers\BatchResult;
 use WST\Providers\Capabilities;
 use WST\Providers\Errors\AuthError;
+use WST\Providers\Errors\PermanentError;
 use WST\Providers\Errors\QuotaExceeded;
 use WST\Providers\Errors\RateLimited;
 use WST\Providers\Errors\TransientError;
@@ -216,6 +218,23 @@ final class WorkerTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $this->worker()->run()->requests, 'Backoff: not due again yet.' );
 		$this->now += Queue::BACKOFF_BASE;
 		$this->assertSame( 1, $this->worker()->run()->translated );
+	}
+
+	public function test_result_count_mismatch_is_retried_one_item_per_request(): void {
+		$this->enqueue(
+			array(
+				'One' => 'text',
+				'Two' => 'text',
+			)
+		);
+		$this->primary->throw = array( new PermanentError( BatchResult::COUNT_MISMATCH . ': sent 2, got 1.' ) );
+
+		$this->assertSame( 2, $this->worker()->run()->failed );
+		$this->now += Queue::BACKOFF_BASE;
+		$report     = $this->worker()->run();
+
+		$this->assertSame( 2, $report->translated );
+		$this->assertSame( array( 2, 1, 1 ), array_map( static fn( array $call ): int => count( $call[0] ), $this->primary->calls ), 'Retried as single-item requests.' );
 	}
 
 	public function test_auth_error_pauses_the_primary_and_the_fallback_takes_over(): void {

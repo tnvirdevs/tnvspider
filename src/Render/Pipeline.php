@@ -16,13 +16,15 @@ use WST\Html\Segment;
 use WST\Languages\Current;
 use WST\Languages\Language;
 use WST\Log\Logger;
+use WST\Queue\AutoQueue;
 use WST\Routing\Urls;
 use WST\Settings;
 use WST\Storage\StringStore;
 
 /**
  * Buffers target-language HTML responses and replaces translatable strings
- * with stored translations. Never calls a provider; on any error the
+ * with stored translations. On discoverable pages, untranslated strings are
+ * queued for the active provider. Never calls a provider; on any error the
  * original HTML is returned untouched.
  */
 final class Pipeline {
@@ -53,6 +55,7 @@ final class Pipeline {
 	 * @param DiscoveryGate $gate     Discovery rules.
 	 * @param Logger        $logger   Plugin log.
 	 * @param Urls          $urls     URL helper.
+	 * @param AutoQueue     $auto     Queues untranslated strings.
 	 */
 	public function __construct(
 		private Settings $settings,
@@ -60,7 +63,8 @@ final class Pipeline {
 		private StringStore $store,
 		private DiscoveryGate $gate,
 		private Logger $logger,
-		private Urls $urls
+		private Urls $urls,
+		private AutoQueue $auto
 	) {
 	}
 
@@ -169,8 +173,11 @@ final class Pipeline {
 
 		if ( $context->discoverable ) {
 			$untranslated = array_merge( $untranslated, array_values( $this->discover( array_diff_key( $kinds, $found ), $context ) ) );
+			$this->auto->queue( $untranslated, $this->target );
 		}
-		$this->pending = $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
+		// Rows waiting for a provider that cannot run now (none selected,
+		// paused, out of budget) must not keep the page out of caches.
+		$this->pending = array() === $untranslated || '' === $this->auto->provider( $this->target ) ? 0 : $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
 
 		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
 
