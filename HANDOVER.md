@@ -7,6 +7,8 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 **Phase 0 — Setup & spikes: done.** PHPStan level 8 is clean and provider facts are recorded from official sources (Gemini per-model free-tier limits are unpublished and stay unconfirmed). `wp-env` is configured but not run here (no Docker daemon); the container uses MariaDB + `php -S`.
 
 **Phase 1 — Core without providers: in progress.**
+- Done: schema + activation. `src/Database/Schema.php` (all §4 tables via dbDelta, `wst_db_version` = 1, `install()` verifies every table afterwards and throws if one is missing, `maybeUpgrade()`), `src/Plugin.php` (activation hook + `plugins_loaded` upgrade check; the version option is autoloaded, so the check costs no query). Tests: `tests/Integration/Database/SchemaTest.php`, `tests/Integration/PluginTest.php`.
+- Remaining in Phase 1: language registry, router, render pipeline, hreflang/`lang`/`dir`/locale switch, link rewriting, minimal switcher, §6A discovery gate and cache headers, WP-CLI `wp wst string set|get|list`.
 
 ## Completed (Phase 0)
 
@@ -87,10 +89,10 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 15 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 6,856 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3).
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 6,877 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), including the Phase 1 schema/activation tests.
 - Same suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2).
 - `vendor/bin/phpcs`: clean.
-- PHPStan level 8: **no errors** (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
+- PHPStan level 8: **no errors** (container: `php <scratchpad>/phpstan/phpstan.phar analyse --memory-limit=1G`) (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
 - `npx wp-scripts`: installed; no entry points yet (first one comes with the Phase 1 switcher).
 
 ## Known issues
@@ -115,4 +117,4 @@ The fixture site (Elementor and WooCommerce built from GitHub source, wp-cli via
 
 ## Exact next step
 
-Phase 1, first unit: **schema + activation**. Create `src/Database/Schema.php` (dbDelta for `wst_strings`, `wst_translations`, `wst_occurrences`, `wst_pages`, `wst_queue`, `wst_usage`, `wst_log` exactly as plan §4, versioned by `wst_db_version`), a `src/Plugin.php` bootstrap that hooks activation and an upgrade check, and an integration test that installs the schema and checks the columns and unique keys. Then the language registry (§5), router, render pipeline (using `WST\Html\Extractor`/`Replacer`), the §6A discovery gate, and the WP-CLI `wp wst string set|get|list`.
+Phase 1, next unit: **language registry** (plan §5). `src/Languages/Registry.php` with a curated locale list (native name, English name, default slug, `dir`, provider code map incl. TranslateX `iw`/`tl`/`no`/`zh-CN`/`zh-TW` and Microsoft `zh-Hans`/`zh-Hant`), lookup by locale and by slug, and `src/Languages/Current.php` (the single active-language accessor). Unit tests for lookups, RTL detection and code mapping. Then the router (strip the prefix from `REQUEST_URI` before WordPress parses the request).

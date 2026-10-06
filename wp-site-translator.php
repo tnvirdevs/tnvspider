@@ -22,3 +22,4 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/src/Autoloader.php';
 
 \WST\Autoloader::register( __DIR__ . '/src' );
+\WST\Plugin::boot( __FILE__ );
