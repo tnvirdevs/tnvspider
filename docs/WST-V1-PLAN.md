@@ -13,6 +13,7 @@ Audience: an AI coding agent working inside the plugin repository. Read this who
 2. Create two repo-root files before writing code:
    - `CLAUDE.md`: short distillation of §1, §3, §15 plus the owner's working rules (surgical edits, no speculative features or dead UI controls, no silent catches, never commit unless asked, focused tests during work and one full run per batch).
    - `HANDOVER.md`: completed / remaining / files changed / validation status / known issues / exact next step. Update at the end of every phase and before context runs out.
+   - Commits (D14): commit and push at the end of each phase to the working branch only. No force-pushes, no merges, no commits mid-phase unless the owner asks.
 3. Work phase by phase (§16). Each phase has acceptance criteria. Do not start the next phase until they pass.
 4. **Decision gates** are marked `[GATE]`. At a gate, state the decision and the reason in one short paragraph in `HANDOVER.md`, then continue. Ask the owner only when the choice changes architecture, data, or security.
 5. Anything marked `VERIFY` is a fact I could not confirm (API limits, model names). Check the official docs before hardcoding. Never guess an API shape.
@@ -264,6 +265,7 @@ interface ProviderInterface {
 
 - `$items` = `[string_id => text]`. `BatchResult` returns per-item `text|error`, characters billed, and any rate-limit headers.
 - Typed failures the queue understands: `AuthError` (pause provider, notice), `RateLimited(retry_after)`, `QuotaExceeded`, `TransientError`, `PermanentError`.
+- **Error mapping is provider-specific (D11).** Each adapter maps its own error codes first and falls back to HTTP status only when the provider gives no specific code. Example: Microsoft `403001` (free quota exceeded) → `QuotaExceeded`, while Microsoft `401000` → `AuthError`.
 - **Placeholder protection** (shared helper): shortcode remnants, `%s`/`%1$s`, `{{…}}`, URLs, emails, user "never translate" terms (§13) are swapped for opaque tokens before sending and restored after; reject a result if any token is missing or duplicated.
 - **Tag placeholders for `inline` strings** (HTML-capable providers): never send real attributes. Send `Buy <a id="1">now</a>` instead of `Buy <a href="…" class="…">now</a>`, keeping a map `id → original opening tag`; restore afterwards. Providers cannot alter links or classes, fewer characters are billed, and the check "same tag sequence and ids" is trivial. Reject and retry/segment on mismatch; set flag `4` when a repair was applied.
 - **Providers without HTML support**: do not send tags. Split an `inline` string at its tags, translate segments separately, rejoin. Set `flags` bit `1` on such translations so the editor can warn about possible word-order issues.
@@ -273,7 +275,10 @@ interface ProviderInterface {
 ### 7.1 Microsoft Translator
 - REST v3 text translation (`api.cognitive.microsofttranslator.com`). Headers: `Ocp-Apim-Subscription-Key`, and `Ocp-Apim-Subscription-Region` when the resource is regional. Body: JSON array of `{ "Text": … }`; query: `from`, `to`, `textType=plain|html`.
 - Supports HTML mode → send `inline` strings with `textType=html`.
-- Free tier is 2M characters/month (reported). `VERIFY` current per-request element/character limits and per-minute character limits in the official docs before setting defaults.
+- Free tier (F0): 2M characters per month (Azure pricing page), throttled at 2M characters per hour consumed evenly, about **33,300 characters per minute** (sliding window). S1: 40M characters per hour. No limit on concurrent requests. (Official docs, `service-limits`, 2026-08-11.)
+- **Hard caps per request (D12): 1,000 array elements and 50,000 characters in total**; `max_items_per_request` / `max_chars_per_request` can never exceed them. Default `chars_per_minute` for F0: 33,000.
+- Error codes (official `status-response-codes`): `401000` → `AuthError`; `403001` → `QuotaExceeded` (D11); `403000` → `AuthError`; `429000`–`429002` → `RateLimited`; `408001`, `500000`, `503000` → `TransientError`; `400050` (text too long), `400072` (too many elements), `400077` (request too large) → split the batch and retry; other `400xxx` → `PermanentError`.
+- `textType=html` requires well-formed, complete elements. Microsoft also honours `class="notranslate"` and `<mstrans:dictionary translation="…">`; whether to use these for never-translate terms instead of opaque tokens is decided in Phase 2 (D13).
 - Settings: key, region, endpoint override (default global), limits (§8).
 
 ### 7.2 TranslateX
@@ -286,7 +291,9 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 |---|---|
 | Translate | `POST https://api.translatex.com/translate?sl={src}&tl={tgt}&key={API_KEY}` |
 | Body | `application/x-www-form-urlencoded`, **one `text=` pair per string, repeated** (not JSON): `text=<rawurlencode(string)>&text=<…>`. Input strings are `html_entity_decode`d first (treated as plain text). Set the `Content-Type` header explicitly. |
-| Headers | `accept: *`, `x-api-client: <client id>`. The reference plugin sends `TX-For-TranslatePress`; we send `WP-Site-Translator/{version}`. `VERIFY` the API does not whitelist client ids; if it rejects ours, ask GTranslate to register one. |
+| Headers | `accept: *`, `x-api-client: <client id>`. The reference plugin sends `TX-For-TranslatePress`; we send `WP-Site-Translator/{version}`. `VERIFY` the API does not whitelist client ids; if it rejects ours, ask GTranslate to register one. **The key goes in the `X-API-Key` header** (official docs allow the `key` query parameter or this header), so it never appears in a URL. |
+| HTML mode | Official docs: send `html=<string>` instead of repeated `text=`; the response `translation` is then a single string, not an array. One HTML document per request. Plan-gated (Enterprise only). |
+| Rate-limit headers | Every response carries `X-TX-RateLimit` (e.g. `50/min`) and `X-TX-RateLimit-Remaining`; the limiter uses them to correct its own bucket. |
 | Success | HTTP 200, JSON `{"translation": ["…", "…"]}`; results are **positional** (index *i* = input *i*). |
 | Failure | JSON `{"err": "message"}`. Reference code treats HTTP ≠ 200 and any `err` as failure, and reads `err` for the message. |
 | Languages | `GET https://api.translatex.com/supported-languages?key={API_KEY}` → `{"languages":[{"language":"en", …}, …]}`. Cache 24 h (transient). Use it for `supportsPair()` and for the *Test connection* result. |
@@ -298,19 +305,21 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 **Behaviours our adapter must add (the reference plugin does not)**
 - **Empty translation entry ⇒ failure for that item**, never "use the original as the translation" (the reference plugin does this and would cache untranslated text as machine-translated). Retry or mark failed.
 - **Length check**: result array length must equal the input length, else treat the batch as failed and retry in smaller batches.
-- **Secret hygiene**: the key travels in the query string. **Redact `key=` in every log line, exception message and admin notice.** Never include the full request URL in `wst_log`. `VERIFY` whether the key may be sent in a header instead; prefer the header if supported.
+- **Secret hygiene**: the key is sent in the `X-API-Key` header, never in the query string. Still **redact `key=` and the key value in every log line, exception message and admin notice**, and never include full request URLs or headers in `wst_log`.
 - **Error mapping** (`VERIFY` each against real responses): 401/403 → `AuthError`; 429 → `RateLimited` (use `Retry-After` if present, otherwise back off ≥ 60 s since limits are per minute); other 4xx → `PermanentError` for that batch; 5xx / network / timeout → `TransientError`. Classify by HTTP status first; use `err` text only for the message shown to the user, not for control flow.
 - **Fixture capture at the start of Phase 2** (needs an owner-supplied key; Phase 0 does not depend on keys): record real responses for success, invalid key, unsupported pair, empty input, malformed input, and (if testable) over-limit. Store them as test fixtures and resolve the `VERIFY` items above.
 
 **Plan facts (from the vendor's pricing page)**
-- Free plan: small neural model, **50 calls/min**, unlimited translations, **no commercial use**, no privacy mode (submitted content and translations may be stored and used by the vendor to improve its service), **no HTML translation**, no language detection. Paid plans: large model, GPU hosting, privacy mode (processed in memory, never stored), higher call limits; **HTML translation only on Enterprise**. The parameter that enables HTML mode is **not** visible in the reference plugin → `VERIFY` from the docs.
+- Free plan: small neural model, **35 languages**, **50 calls/min**, unlimited translations, **no commercial use**, no privacy mode (submitted content and translations may be stored and used to improve the service and train models), **no HTML translation**, no language detection. Startup ($19.99/mo): large model, 50 languages, 50 calls/min, commercial use, privacy mode (processed in memory, never stored). Business ($29.99/mo): as Startup plus language detection, 75 calls/min. Enterprise ($39.99/mo): as Business plus **HTML translation**, 100 calls/min. More throughput = more API keys (vendor FAQ). (translatex.com pricing, checked 2026-10-06.)
+- Whether **Bengali is in the free plan's 35 languages** is not stated; `VERIFY` with `/supported-languages` and a free key during the Phase 2 fixture capture.
 - **English-centric**: non-English pairs are routed through English internally.
-- Capabilities: `supports_html = false` unless the user selects the Enterprise plan **and** the HTML parameter is verified. Provider settings: API key, plan (free / startup / business / enterprise) which drives defaults (`requests_per_minute`: 50 / 50 / 75 / 100).
+- Capabilities: `supports_html = false` unless the user selects the Enterprise plan (the `html` parameter is documented; confirm its behaviour on a real Enterprise key before enabling it by default). Provider settings: API key, plan (free / startup / business / enterprise) which drives defaults (`requests_per_minute`: 50 / 50 / 75 / 100).
 - UI warnings: (a) free plan on a site marked commercial, (b) neither language is English, (c) free-plan data retention.
 
 ### 7.3 Gemini (free tier via Google AI Studio key)
 - REST `generateContent` with the key in a header; ask for **structured JSON output** (response MIME type + schema).
-- `VERIFY` the current model with a free tier, its RPM/TPM/daily limits, and the free-tier data-use terms. Model name is a user-editable field with a sensible default. Show a short privacy note in the UI about free-tier data handling.
+- Confirmed (ai.google.dev, 2026-10-06): key header `x-goog-api-key`; limits are RPM, input TPM and RPD, applied **per Google Cloud project, not per key**; RPD resets at midnight Pacific; exceeding any limit returns `429 RESOURCE_EXHAUSTED`; retry 429/408/5xx with exponential backoff, never 400/402/403. Free tier is "free of charge" for current Flash and Flash-Lite text models (e.g. `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`); **free-tier content is used to improve Google's products, paid-tier content is not**.
+- **Not published:** per-model free-tier RPM/TPM/RPD numbers ("view your active rate limits in AI Studio"). Defaults must therefore be conservative and user-editable, and the UI points to AI Studio. Model name is a user-editable field with a sensible default. Show the privacy note in the UI.
 - Prompting rules: system instruction = professional website/UI translation from X to Y; keep tokens/tags unchanged; keep brevity of UI labels; use the glossary terms; temperature ≈ 0; input = JSON array `[{id, text}]`; output = JSON array `[{id, text}]`.
 - Validate: same ids, same count, tokens preserved, no extra commentary. On invalid output retry once with a smaller batch, then per item; otherwise mark failed.
 - Batch by **characters** (token budget), not just item count.
@@ -323,19 +332,20 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 
 | Setting | Meaning |
 |---|---|
-| `requests_per_minute` | Integer ≥ 0. **`0` = unlimited**: the limiter is bypassed and batches are sent back-to-back (still sequential per `concurrency`). Any provider-side `429` / `Retry-After` is **always** honoured, even at `0`. Defaults: TranslateX by plan (50 / 50 / 75 / 100), Microsoft and Gemini `VERIFY`. UI helper text: "0 = no limit". |
-| `requests_per_day` | Integer ≥ 0, `0` = unlimited. Mainly for Gemini's free tier (`VERIFY` whether it applies). |
+| `requests_per_minute` | Integer ≥ 0. **`0` = unlimited**: the limiter is bypassed and batches are sent back-to-back (still sequential per `concurrency`). Any provider-side `429` / `Retry-After` is **always** honoured, even at `0`. Defaults: TranslateX by plan (50 / 50 / 75 / 100); Microsoft none (it throttles by characters, see `chars_per_minute`); Gemini conservative user-editable values (limits are per project and not published). UI helper text: "0 = no limit". |
+| `requests_per_day` | Integer ≥ 0, `0` = unlimited. Gemini's free tier has a per-project RPD limit (confirmed; value shown in AI Studio, not published). |
+| `chars_per_minute` | Integer ≥ 0, **`0` = unlimited** (D10). Characters sent per rolling minute. Microsoft throttles by characters (F0 ≈ 33,300/min); for Gemini it approximates input TPM. A batch larger than the remaining budget waits; a single item larger than the whole budget is sent alone when the window is empty. |
 | `max_items_per_request`, `max_chars_per_request` | Effective value = `min(user value, provider hard cap)`; `0` = use the provider cap. |
 | `concurrency` | Default 1. |
 | `max_attempts` | Default 5. |
 | `monthly_char_cap` | `0` = unlimited. Warn at 80 % (admin notice + Overview, optional email), **hard stop at 100 %**, resets with the calendar month. |
 
-Validation: reject negative or non-integer values, clamp absurd values (e.g. > 10,000 RPM), show the *effective* limits and the estimated time for the current queue next to the inputs.
+Validation: reject negative or non-integer values, clamp absurd values (e.g. > 10,000 RPM, > provider caps), show the *effective* limits and the estimated time for the current queue next to the inputs.
 
 **Worker cycle**
 1. Take a worker lock (DB-based, with expiry) so only `concurrency` workers run.
 2. Loop until time budget (~20 s or `max_execution_time` minus margin) is used:
-   - `RateLimiter::acquire(provider)` → proceed, or return seconds to wait (then reschedule and exit). With `requests_per_minute = 0` (and `requests_per_day = 0`) it always proceeds.
+   - `RateLimiter::acquire(provider)` → proceed, or return seconds to wait (then reschedule and exit). It checks requests per minute, requests per day and characters per minute for the packed batch; each dimension set to `0` is skipped, and with all three at `0` it always proceeds.
    - Check monthly budget; stop when the cap is hit.
    - Select due `pending` rows ordered by `priority, id`, pack a batch within item/char limits, mark `processing` with `locked_until`.
    - Call provider. On success: upsert `wst_translations` as status 1 (**never overwrite status 2**), delete queue rows, add to `wst_usage`.
@@ -349,7 +359,7 @@ Validation: reject negative or non-integer values, clamp absurd values (e.g. > 1
 - Return to the primary automatically at the next budget period or when the key is fixed. The Overview shows "Using fallback: X (reason)".
 - The UI warns that site text may be sent to both vendors.
 
-**Rate limiter**: token bucket per provider, correct across concurrent PHP processes (MySQL `GET_LOCK` or atomic compare-and-swap on one row), supporting both per-minute and per-day windows and the `0 = unlimited` bypass. Interface + one implementation + a concurrency unit test.
+**Rate limiter**: token bucket per provider, correct across concurrent PHP processes (MySQL `GET_LOCK` or atomic compare-and-swap on one row), supporting request-per-minute, request-per-day and character-per-minute windows, each with the `0 = unlimited` bypass. Interface + one implementation + a concurrency unit test.
 
 **Triggers**
 - WP-Cron event (custom 1-minute interval) active only while the queue is non-empty.
@@ -638,3 +648,8 @@ Translated slugs · JSON-LD/schema translation · image/media replacement · per
 | D7 | Phase 0 needs no API keys; TranslateX fixture capture moves to the start of Phase 2. | §16 |
 | D8 | Inline block = whole subtree inline; no hreflang for `off` pages; trusted-proxy setting for `/lookup` rate limits; PHPStan level 8 with WP stubs; no model name in the plan. | §5, §6, §13A.5, §15 |
 | D9 | Repo layout: plugin at the repo root, release zip built with `.distignore`. | §3 |
+| D10 | Rate limiter gains `chars_per_minute` (0 = unlimited) next to RPM and RPD. | §8 |
+| D11 | Error mapping is provider-specific and wins over generic HTTP-status mapping; Microsoft `403001` = `QuotaExceeded`. | §7, §7.1 |
+| D12 | Microsoft hard caps per request: 1,000 strings and 50,000 characters. | §7.1, §8 |
+| D13 | Whether Microsoft's own term protection (`notranslate`, `mstrans:dictionary`) replaces opaque tokens is decided in Phase 2. | §7.1 |
+| D14 | Commits: commit and push at the end of each phase to the working branch only; no force-pushes, no merges. An empty initial `main` is the base branch for the draft PR. | §0 |

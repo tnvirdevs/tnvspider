@@ -4,12 +4,9 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 ## Status
 
-**Phase 0 — Setup & spikes: done, with three open items** (see *Known issues*):
-- PHPStan is configured but could not be installed or run in the cloud container.
-- Provider facts are recorded from official docs for Microsoft only; TranslateX and Gemini docs were unreachable.
-- `wp-env` is configured but not run here (no Docker daemon); the container used MariaDB + `php -S`.
+**Phase 0 — Setup & spikes: done.** PHPStan level 8 is clean and provider facts are recorded from official sources (Gemini per-model free-tier limits are unpublished and stay unconfirmed). `wp-env` is configured but not run here (no Docker daemon); the container uses MariaDB + `php -S`.
 
-Phase 1 has not started.
+**Phase 1 — Core without providers: in progress.**
 
 ## Completed (Phase 0)
 
@@ -55,29 +52,32 @@ Phase 1 has not started.
 
 The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our walk. A 200 KB page is estimated at ~30 ms. Re-measure with opcache in Phase 1 as plan §15 asks.
 
-## Provider facts
+## Provider facts (checked 2026-10-06 against official sources)
 
-**Microsoft Translator** (official docs, MicrosoftDocs/azure-ai-docs on GitHub, `service-limits.md` dated 2026-08-11, `status-response-codes.md`, `v3/translate.md`):
-- `POST https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=…&to=…`. Headers `Ocp-Apim-Subscription-Key`, `Ocp-Apim-Subscription-Region` (regional resources), `Content-Type: application/json; charset=UTF-8`. Body `[{"Text": …}]`.
-- Per request: **≤ 1,000 array elements, ≤ 50,000 characters in total** (per element ≤ 50,000).
-- Throughput is limited by **characters per hour, spread evenly**: F0 (free) 2M/hour, which is about **33,300 characters/minute** (sliding window); S1 40M/hour. No limit on concurrent requests. Monthly free allowance: 2M characters (pricing page, unverified).
-- `textType=html` requires well-formed, complete elements; supports `class="notranslate"` and `<mstrans:dictionary translation="…">`.
-- Errors: 400xxx bad input (e.g. 400050 text too long, 400072 too many elements, 400077 request too large); 401000 bad credentials; **403001 = free quota exceeded** (403000 = operation not allowed); 408001 retry in minutes; 429000–429002 rate limited; 500000/503000 transient. Latency up to 15 s.
+**Microsoft Translator** — confirmed (learn.microsoft.com `service-limits`, ms.date 2026-08-11; `status-response-codes`; `v3/translate`; Azure pricing page):
+- `POST https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=…&to=…[&textType=html]`; headers `Ocp-Apim-Subscription-Key`, `Ocp-Apim-Subscription-Region` (regional resources), `Content-Type: application/json; charset=UTF-8`; body `[{"Text": …}]`.
+- Per request ≤ 1,000 elements and ≤ 50,000 characters in total (D12).
+- F0: 2M characters free per month; throttle 2M characters/hour consumed evenly, about 33,300/min sliding. S1 40M/hour. No concurrency limit. Latency up to 15 s.
+- Error codes and their mapping are in plan §7.1 (D11: `403001` → `QuotaExceeded`).
+- `textType=html` needs well-formed complete elements; supports `class="notranslate"` and `<mstrans:dictionary>` (D13, decide in Phase 2).
 
-**TranslateX**: `translatex.com` is blocked by this environment's network policy. The plan §7.2 contract (from the bridge plugin) stands; every `VERIFY` there is still open.
+**TranslateX** — confirmed (translatex.com/api-documentation and pricing):
+- `POST https://api.translatex.com/translate?sl=…&tl=…` (`sl=auto` allowed), form-encoded repeated `text=`; or `html=<string>` for HTML (response `translation` is then a string). Key via `key` query parameter **or `X-API-Key` header** (we use the header).
+- `GET /supported-languages` → `{"languages":[{"language","name"}]}`; `POST /detect` exists (not used).
+- Response headers `X-TX-RateLimit` (e.g. `50/min`) and `X-TX-RateLimit-Remaining`.
+- Plans: Free (35 languages, small model, 50 calls/min, no commercial use, no privacy mode, no detection, no HTML); Startup $19.99 (50 languages, large model, 50/min, commercial, privacy mode); Business $29.99 (+ detection, 75/min); Enterprise $39.99 (+ HTML, 100/min). Free-plan content may be stored and used for training. English-centric routing.
+- **Still unconfirmed** (not documented): error body and HTTP status codes, per-request string/character limits, whether Bengali is in the free plan's 35 languages, client-id whitelisting. Resolve with the Phase 2 fixture capture.
 
-**Gemini**: `ai.google.dev` is blocked. Third-party summaries (unverified, not to be hardcoded) say that since April 2026 the free tier covers Flash / Flash-Lite only (Pro is paid-only), at about 10 RPM / 250 RPD for Flash and 30 RPM / 1,000 RPD for Flash-Lite, with limits per Google Cloud project shown in AI Studio. Still `VERIFY`.
+**Gemini** — ai.google.dev rate-limits, pricing, structured-output and troubleshooting pages:
+- Confirmed: key header `x-goog-api-key`; limits are RPM, input TPM and RPD **per project, not per key**; RPD resets at midnight Pacific; any exceeded limit → `429 RESOURCE_EXHAUSTED`; retry 429/408/5xx with exponential backoff, never 400/402/403. Free tier ("free of charge") exists for current Flash and Flash-Lite text models, including `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, and also `gemini-2.5-pro`; `gemini-3.1-pro-preview` is paid-only. Free-tier content **is used to improve Google's products**; paid-tier content is not.
+- **Unconfirmed:** per-model free-tier RPM/TPM/RPD numbers. Google no longer publishes them ("view your active rate limits in AI Studio"). The earlier third-party figures (10 RPM / 250 RPD Flash, 30 RPM / 1,000 RPD Flash-Lite) remain unconfirmed, and their claim that Pro is paid-only is **contradicted** for `gemini-2.5-pro`. Defaults must be conservative and editable; the UI points to AI Studio.
 
-## Proposed plan adjustments (need owner OK; not applied to the plan)
+## Plan adjustments
 
-1. **Characters-per-minute limit** (plan §8): add `chars_per_minute` (0 = unlimited) next to RPM/RPD. Microsoft throttles by characters (F0 ≈ 33,300/min), not requests, and Gemini by tokens per minute. Request counting alone would hit 429s on large batches.
-2. **Error mapping per provider** (plan §7, §8): Microsoft returns **403001 for an exhausted free quota**. That must map to `QuotaExceeded` (stop until next period, try the fallback), not `AuthError`. Map by provider-specific code, not only by HTTP status.
-3. Microsoft defaults: `max_items_per_request` ≤ 1,000 and `max_chars_per_request` ≤ 50,000 are hard caps.
-4. Optional: for Microsoft, never-translate terms could use `<mstrans:dictionary>` / `class="notranslate"` instead of opaque tokens. Keep the shared token approach (plan §7) as the default; decide in Phase 2.
+D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, §7.1, §7.2, §7.3, §8, §20).
 
 ## Remaining
 
-- Phase 0 leftovers: run `composer analyse` (PHPStan) where packages can be installed; TranslateX and Gemini facts from official docs.
 - Phases 1–7 per plan §16.
 
 ## Files changed (Phase 0)
@@ -90,13 +90,13 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 - `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 6,856 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3).
 - Same suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2).
 - `vendor/bin/phpcs`: clean.
-- PHPStan: **not run** (see Known issues).
+- PHPStan level 8: **no errors** (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
 - `npx wp-scripts`: installed; no entry points yet (first one comes with the Phase 1 switcher).
 
 ## Known issues
 
-1. **PHPStan not run.** `phpstan/phpstan` is distributed only as a GitHub zipball, which this cloud environment cannot download (403). The committed `composer.json`/`composer.lock` are complete; run `composer install && composer analyse` on a normal machine. In the container, dev tools were installed from a gitignored `composer.local.json` without the three PHPStan packages.
-2. **Network policy** blocks `wordpress.org`, `downloads.wordpress.org`, `translatex.com`, `learn.microsoft.com`, `ai.google.dev`, `docs.azure.cn`. The owner can allow them under the environment's Network access settings (Custom → Allowed domains), or supply the docs.
+1. **PHPStan in the cloud container.** `composer install` cannot fetch `phpstan/phpstan` here: the package is only distributed as a GitHub API zipball (`api.github.com/repos/phpstan/phpstan/zipball/…`), which returns 403 for this session even after the network change, because GitHub API access is limited to repositories attached to the session. Workaround used: the official release asset `github.com/phpstan/phpstan/releases/download/2.3.0/phpstan.phar` (SHA-256 `64a1e773…ec83f`, identical to the phar in the official `2.3.0` git tag; the GPG signature could not be checked because the keyserver returned no key), plus a gitignored `composer.local.json` that declares `provide: phpstan/phpstan 2.3.0` so the WordPress stubs install. On a normal machine `composer install && composer analyse` works with the committed files.
+2. **Network policy**: the WebFetch tool is still blocked for the docs hosts; `curl` works and was used.
 3. WP 6.7–6.9 core lexer warning on input ending in `<!---` (G2). Harmless for real pages. A CI matrix on those versions must expect it.
 4. Node in the container is 22.22.0; `@wordpress/scripts` 36 asks for ≥ 22.22.2 (npm warns only).
 5. Extractor limits to address in Phase 1: user exclude selectors (§13); entity canonicalisation of inline originals (`&#8217;` vs `’` currently hash differently); `<a>` text and `href` rewriting; a runtime self-check for the bookmark-span dependency (G1a) that fails loudly.

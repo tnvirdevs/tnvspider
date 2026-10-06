@@ -21,7 +21,7 @@ WPCS (`phpcs.xml.dist`) with project exceptions: PSR-4 file names, camelCase met
 - Build only what is asked; no speculative features, placeholder settings or dead controls. Reuse existing code before adding new abstractions; explain new dependencies, schema changes and big refactors first.
 - Surgical edits; never rewrite a large file for a small change. Preserve behaviour unless the task changes it.
 - Errors fail loudly. Never weaken security, RTL or layout guardrails to get green tests; never edit a test just to make code pass.
-- **Never commit unless the owner asks.** No destructive git commands without confirmation.
+- **Commits (D14):** commit and push at the end of each phase to the working branch only; otherwise only when the owner asks. No force-pushes, no merges, no destructive git commands without confirmation.
 - Focused tests while working; the full suite once per batch/phase. Never run two test/build processes at once, never edit while the suite runs.
 - At `[GATE]`s, record the decision and reason in `HANDOVER.md`. Ask the owner only for architecture, data or security changes. `VERIFY` items must be checked against official docs, never guessed.
 - Update `HANDOVER.md` at the end of every phase and before context runs out.
