@@ -165,17 +165,29 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 6. The dev site's WooCommerce (built from GitHub without its JS build) shows an empty shop loop in both languages; product pages render. Not a plugin issue.
 7. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
 
-## Cloud container dev setup (when Docker is unavailable)
+## Dev environment setup (scripted)
 
+`bin/setup-env.sh` rebuilds everything the tests need; it is idempotent.
+- Installs and starts MariaDB if missing (root only; `WST_SKIP_DB=1` to use an existing server), creates `wst_tests` with user `wst`/`wst` (override with `WST_TEST_DB_*`).
+- Runs `composer install`. Where `phpstan/phpstan` cannot be downloaded (cloud container: GitHub API zipballs are blocked), it writes a gitignored `composer.local.json` that `provide`s PHPStan and downloads the official release phar to `.tools/phpstan.phar`, checked against a pinned SHA-256.
+- Fetches the html5lib tests; `--node` also runs `npm install`.
+- Prints the test, PHPCS and PHPStan commands for the machine it ran on.
+
+Environment **Setup script** field (Claude Code cloud environment settings; runs when a new session starts):
+```bash
+#!/bin/bash
+set -euo pipefail
+# WP Site Translator: database server and dev tools for tests.
+if [ -x bin/setup-env.sh ]; then
+  bin/setup-env.sh
+else
+  apt-get update -q
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q mariadb-server
+fi
 ```
-apt-get install -y mariadb-server && service mariadb start
-mysql -e "CREATE DATABASE wst_tests; CREATE USER 'wst'@'localhost' IDENTIFIED BY 'wst'; GRANT ALL ON wst_tests.* TO 'wst'@'localhost';"
-# composer: phpstan cannot be downloaded here -> composer.local.json without the phpstan packages
-COMPOSER=composer.local.json COMPOSER_ALLOW_SUPERUSER=1 composer install --prefer-source
-bin/fetch-html5lib-tests.sh
-WST_TEST_DB_USER=wst WST_TEST_DB_PASSWORD=wst vendor/bin/phpunit -c phpunit-integration.xml.dist
-```
-The fixture site (Elementor and WooCommerce built from GitHub source, wp-cli via Composer, `php -S` with a router) is only needed to re-capture fixtures; the steps are in this session's history, and `bin/capture-fixtures.sh` lists the URLs.
+The repo script also starts MariaDB, which does not survive a container restart; run `bin/setup-env.sh` again at the start of a resumed session.
+
+The fixture site (WordPress with theme unit test data, Elementor and WooCommerce from GitHub source, wp-cli via Composer, `php -S` with a router) is only needed to re-capture page fixtures; `bin/capture-fixtures.sh` lists the URLs.
 
 ## Exact next step
 

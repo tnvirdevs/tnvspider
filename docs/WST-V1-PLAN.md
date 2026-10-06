@@ -295,7 +295,7 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 | HTML mode | Official docs: send `html=<string>` instead of repeated `text=`; the response `translation` is then a single string, not an array. One HTML document per request. Plan-gated (Enterprise only). |
 | Rate-limit headers | Every response carries `X-TX-RateLimit` (e.g. `50/min`) and `X-TX-RateLimit-Remaining`; the limiter uses them to correct its own bucket. |
 | Success | HTTP 200, JSON `{"translation": ["…", "…"]}`; results are **positional** (index *i* = input *i*). |
-| Failure | JSON `{"err": "message"}`. Reference code treats HTTP ≠ 200 and any `err` as failure, and reads `err` for the message. |
+| Failure | JSON `{"err": "message"}`. Reference code treats HTTP ≠ 200 and any `err` as failure, and reads `err` for the message. **Observed:** a missing or invalid key returns **HTTP 400** with `{"err":"invalid api key"}` (fixtures `missing-key.json`, `invalid-key.json`), not 401/403. |
 | Languages | `GET https://api.translatex.com/supported-languages?key={API_KEY}` → `{"languages":[{"language":"en", …}, …]}`. Cache 24 h (transient). Use it for `supportsPair()` and for the *Test connection* result. |
 | Test call | `en → it`, one string `"Hello World!"`. |
 | Timeout | Reference uses 45 s for translate, 10 s for languages. Ours: configurable, default 30 s; the worker time budget must exceed it. |
@@ -306,7 +306,7 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 - **Empty translation entry ⇒ failure for that item**, never "use the original as the translation" (the reference plugin does this and would cache untranslated text as machine-translated). Retry or mark failed.
 - **Length check**: result array length must equal the input length, else treat the batch as failed and retry in smaller batches.
 - **Secret hygiene**: the key is sent in the `X-API-Key` header, never in the query string. Still **redact `key=` and the key value in every log line, exception message and admin notice**, and never include full request URLs or headers in `wst_log`.
-- **Error mapping** (`VERIFY` each against real responses): 401/403 → `AuthError`; 429 → `RateLimited` (use `Retry-After` if present, otherwise back off ≥ 60 s since limits are per minute); other 4xx → `PermanentError` for that batch; 5xx / network / timeout → `TransientError`. Classify by HTTP status first; use `err` text only for the message shown to the user, not for control flow.
+- **Error mapping** (provider-specific per D11; confirmed cases cite their fixture): **HTTP 400 with `err` = "invalid api key" → `AuthError`** (TranslateX reports auth failure as 400, so the adapter must read `err` for this case); 401/403 → `AuthError`; 429 → `RateLimited` (use `Retry-After` if present, otherwise back off ≥ 60 s since limits are per minute); other 4xx → `PermanentError` for that batch; 5xx / network / timeout → `TransientError`. Apart from the documented auth case, classify by HTTP status and use `err` only for the message shown to the user. Each further `err` text that changes the class must be backed by a recorded fixture.
 - **Fixture capture at the start of Phase 2** (needs an owner-supplied key; Phase 0 does not depend on keys): record real responses for success, invalid key, unsupported pair, empty input, malformed input, and (if testable) over-limit. Store them as test fixtures and resolve the `VERIFY` items above.
 
 **Plan facts (from the vendor's pricing page)**

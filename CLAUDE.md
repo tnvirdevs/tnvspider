@@ -28,9 +28,10 @@ WPCS (`phpcs.xml.dist`) with project exceptions: PSR-4 file names, camelCase met
 
 ## Commands
 ```
+bin/setup-env.sh                     # database + dev tools; idempotent (see HANDOVER "Dev environment setup")
 composer install                     # dev tools (PHPUnit, PHPCS, PHPStan, WP core for tests)
 composer lint                        # PHPCS
-composer analyse                     # PHPStan level 8
+composer analyse                     # PHPStan level 8 (cloud container: php .tools/phpstan.phar analyse --memory-limit=1G)
 composer test:unit                   # no WordPress, no DB
 composer test:integration            # WordPress test suite; DB from WST_TEST_DB_* env vars
 bin/fetch-html5lib-tests.sh          # html5lib inputs for RoundTripTest (gitignored)
