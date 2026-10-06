@@ -101,6 +101,102 @@ final class TranslateXTest extends WP_UnitTestCase {
 		$this->adapter()->translate( array( 7 => 'Hello World!' ), 'en', 'bn', false );
 	}
 
+	public function test_recorded_success_batch_and_language_list(): void {
+		$this->responses[] = self::fixture( 'translatex', 'supported-languages' );
+		$this->responses[] = self::fixture( 'translatex', 'success-batch' );
+		$adapter           = $this->adapter();
+
+		$codes = $adapter->loadLanguages();
+		$this->assertCount( 35, $codes, 'Free plan: 35 languages.' );
+		$this->assertTrue( $adapter->supportsPair( 'en', 'bn' ) );
+		$this->assertTrue( $adapter->supportsPair( 'en', 'ar' ) );
+
+		$result = $adapter->translate(
+			array(
+				3 => 'Shop now',
+				9 => 'Add to cart',
+				4 => 'Free shipping on orders over 1,500.',
+			),
+			'en',
+			'bn',
+			false
+		);
+		$this->assertSame( array( 3, 9, 4 ), array_keys( $result->translations ) );
+		$this->assertSame( 'এখনই কেনাকাটা করুন', $result->translations[3] );
+		$this->assertSame( 45, $result->rateLimitRemaining );
+	}
+
+	public function test_recorded_empty_entry_is_not_a_translation(): void {
+		$this->languagesLoaded();
+		$this->responses[] = self::fixture( 'translatex', 'mixed-empty-text' );
+
+		$result = $this->adapter()->translate(
+			array(
+				1 => 'Shop now',
+				2 => 'Sale',
+				3 => 'Add to cart',
+			),
+			'en',
+			'bn',
+			false
+		);
+
+		$this->assertSame( array( 1, 3 ), array_keys( $result->translations ) );
+		$this->assertSame( array( 2 ), array_keys( $result->errors ) );
+	}
+
+	public function test_recorded_failures_map_to_their_classes(): void {
+		$this->languagesLoaded();
+		$cases = array(
+			'unsupported-pair' => PermanentError::class,
+			'no-text-param'    => PermanentError::class,
+			'html-param'       => PermanentError::class,
+			'chars-5000'       => PermanentError::class,
+			'rate-limited'     => RateLimited::class,
+		);
+		foreach ( $cases as $fixture => $class ) {
+			$this->responses[] = self::fixture( 'translatex', $fixture );
+			try {
+				$this->adapter()->translate( array( 1 => 'Hello' ), 'en', 'bn', false );
+				$this->fail( 'Expected ' . $class . ' for ' . $fixture );
+			} catch ( \Throwable $e ) {
+				$this->assertInstanceOf( $class, $e, $fixture );
+				if ( 'chars-5000' === $fixture ) {
+					$this->assertStringStartsWith( BatchResult::TOO_LARGE, $e->getMessage() );
+				}
+				if ( $e instanceof RateLimited ) {
+					$this->assertSame( 60, $e->retryAfter(), 'No Retry-After header: wait a minute.' );
+				}
+			}
+		}
+	}
+
+	public function test_texts_over_the_byte_limit_are_failed_without_sending_them(): void {
+		$this->languagesLoaded();
+		$long              = str_repeat( 'স্বাগতম ', 100 );
+		$this->responses[] = self::response( 200, array( 'translation' => array( 'এক' ) ) );
+
+		$result = $this->adapter()->translate(
+			array(
+				1 => 'One',
+				2 => $long,
+			),
+			'en',
+			'bn',
+			false
+		);
+
+		$this->assertGreaterThan( TranslateX::MAX_TEXT_BYTES, strlen( $long ) );
+		$this->assertLessThan( TranslateX::MAX_TEXT_BYTES, mb_strlen( $long ), 'The limit is bytes, not characters.' );
+		$this->assertSame( array( 1 => 'এক' ), $result->translations );
+		$this->assertSame( array( 2 ), array_keys( $result->errors ) );
+		$this->assertSame( 'text=One', $this->requests[0][1]['body'] );
+
+		$only = $this->adapter()->translate( array( 5 => $long ), 'en', 'bn', false );
+		$this->assertSame( array( 5 ), array_keys( $only->errors ) );
+		$this->assertCount( 1, $this->requests, 'Nothing to send: no request.' );
+	}
+
 	public function test_no_key_configured_fails_without_a_request(): void {
 		if ( false !== getenv( TranslateX::SECRET ) || defined( TranslateX::SECRET ) ) {
 			$this->markTestSkipped( TranslateX::SECRET . ' is set in the environment; it overrides the stored option.' );
@@ -304,6 +400,7 @@ final class TranslateXTest extends WP_UnitTestCase {
 		$enterprise = $this->adapter( array( 'plan' => 'enterprise' ) )->capabilities();
 		$this->assertSame( 100, $enterprise->defaultRpm );
 		$this->assertFalse( $enterprise->supportsHtml );
+		$this->assertSame( '{%d}', $enterprise->tokenFormat, 'TranslateX keeps "{1}" intact (tokens-format fixtures).' );
 	}
 
 	public function test_connection_test_reports_failure_without_the_key(): void {

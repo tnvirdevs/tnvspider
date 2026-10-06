@@ -1,0 +1,167 @@
+{
+    "case": "supported-languages",
+    "captured_at": "2026-10-06T16:26:02+00:00",
+    "request": {
+        "method": "GET",
+        "path": "/supported-languages",
+        "query": [],
+        "key": "valid",
+        "fields": [],
+        "items": 0,
+        "chars": 0,
+        "body": []
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "content-type": "application/json",
+            "x-tx-ratelimit-remaining": "49"
+        },
+        "body_json": {
+            "languages": [
+                {
+                    "language": "ro",
+                    "name": "Romanian"
+                },
+                {
+                    "language": "ar",
+                    "name": "Arabic"
+                },
+                {
+                    "language": "no",
+                    "name": "Norwegian"
+                },
+                {
+                    "language": "iw",
+                    "name": "Hebrew"
+                },
+                {
+                    "language": "vi",
+                    "name": "Vietnamese"
+                },
+                {
+                    "language": "ko",
+                    "name": "Korean"
+                },
+                {
+                    "language": "bg",
+                    "name": "Bulgarian"
+                },
+                {
+                    "language": "cs",
+                    "name": "Czech"
+                },
+                {
+                    "language": "hr",
+                    "name": "Croatian"
+                },
+                {
+                    "language": "th",
+                    "name": "Thai"
+                },
+                {
+                    "language": "lt",
+                    "name": "Lithuanian"
+                },
+                {
+                    "language": "uk",
+                    "name": "Ukrainian"
+                },
+                {
+                    "language": "fi",
+                    "name": "Finnish"
+                },
+                {
+                    "language": "hi",
+                    "name": "Hindi"
+                },
+                {
+                    "language": "hu",
+                    "name": "Hungarian"
+                },
+                {
+                    "language": "bn",
+                    "name": "Bengali"
+                },
+                {
+                    "language": "sk",
+                    "name": "Slovak"
+                },
+                {
+                    "language": "sl",
+                    "name": "Slovenian"
+                },
+                {
+                    "language": "id",
+                    "name": "Indonesian"
+                },
+                {
+                    "language": "fr",
+                    "name": "French"
+                },
+                {
+                    "language": "es",
+                    "name": "Spanish"
+                },
+                {
+                    "language": "de",
+                    "name": "German"
+                },
+                {
+                    "language": "nl",
+                    "name": "Dutch"
+                },
+                {
+                    "language": "ru",
+                    "name": "Russian"
+                },
+                {
+                    "language": "pt",
+                    "name": "Portuguese"
+                },
+                {
+                    "language": "ja",
+                    "name": "Japanese"
+                },
+                {
+                    "language": "tr",
+                    "name": "Turkish"
+                },
+                {
+                    "language": "en",
+                    "name": "English"
+                },
+                {
+                    "language": "it",
+                    "name": "Italian"
+                },
+                {
+                    "language": "pl",
+                    "name": "Polish"
+                },
+                {
+                    "language": "sv",
+                    "name": "Swedish"
+                },
+                {
+                    "language": "da",
+                    "name": "Danish"
+                },
+                {
+                    "language": "zh-CN",
+                    "name": "Chinese (Simplified)"
+                },
+                {
+                    "language": "zh-TW",
+                    "name": "Chinese (Traditional)"
+                },
+                {
+                    "language": "el",
+                    "name": "Greek"
+                }
+            ]
+        },
+        "body_raw": null,
+        "ms": 376
+    }
+}

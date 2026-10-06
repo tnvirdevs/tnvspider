@@ -31,8 +31,10 @@ final class ProtectedText {
 
 	/**
 	 * The translation with tokens replaced by their originals, or null when a
-	 * token is missing, repeated or unknown. Whitespace a provider adds inside
-	 * a token is tolerated.
+	 * token is missing, repeated or unknown, or when token punctuation was
+	 * left behind outside a token (TranslateX returned "[ [ 3]]]]" for
+	 * "[[3]]", fixture translatex/tokens-format-bn.json). Whitespace a provider
+	 * adds inside a token is tolerated.
 	 *
 	 * @param string $translation Provider output.
 	 */
@@ -58,7 +60,30 @@ final class ProtectedText {
 			$translation
 		);
 
-		return $valid && null !== $restored && count( $seen ) === count( $this->tokens ) ? $restored : null;
+		return $valid && null !== $restored && count( $seen ) === count( $this->tokens ) && $this->sameStrayPunctuation( $translation ) ? $restored : null;
+	}
+
+	/**
+	 * Whether the translation has, outside its tokens, as many of each
+	 * punctuation character of the token format as the sent text has.
+	 *
+	 * @param string $translation Provider output.
+	 */
+	private function sameStrayPunctuation( string $translation ): bool {
+		$marks = array_unique( array_filter( mb_str_split( str_replace( '%d', '', $this->format ) ), static fn( string $c ): bool => 1 !== preg_match( '/[\p{L}\p{N}\s]/u', $c ) ) );
+		if ( array() === $marks ) {
+			return true;
+		}
+		$pattern = self::pattern( $this->format );
+		$sent    = (string) preg_replace( $pattern, '', $this->text );
+		$got     = (string) preg_replace( $pattern, '', $translation );
+		foreach ( $marks as $mark ) {
+			if ( mb_substr_count( $sent, $mark ) !== mb_substr_count( $got, $mark ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**

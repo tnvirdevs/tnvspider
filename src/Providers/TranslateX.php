@@ -36,9 +36,24 @@ final class TranslateX implements ProviderInterface {
 		'enterprise' => 100,
 	);
 
-	/** Default batch limits until the per-request caps are measured (plan §7.2). */
+	/**
+	 * Batch limits. Measured (fixtures batch-500, chars-60000-total): 500
+	 * texts and 60,000 characters per request are accepted, but latency grows
+	 * to about one second per 1,000 characters, so batches stay small enough
+	 * for the request timeout.
+	 */
 	private const MAX_ITEMS = 100;
 	private const MAX_CHARS = 10000;
+
+	/** Longest accepted text, in UTF-8 bytes (fixtures chars-2000/2001, bytes-bn-2000/2001). */
+	public const MAX_TEXT_BYTES = 2000;
+
+	/**
+	 * Placeholder token format. TranslateX keeps "{1}" unchanged in bn and ar
+	 * but turns "[[1]]" into "[ [ 1]]" and sometimes adds brackets
+	 * (fixtures tokens-format-*.json, probe recorded in HANDOVER).
+	 */
+	private const TOKEN_FORMAT = '{%d}';
 
 	/** Seconds to wait after a 429 without Retry-After; limits are per minute. */
 	private const RATE_LIMIT_WAIT = 60;
@@ -86,7 +101,7 @@ final class TranslateX implements ProviderInterface {
 	public function capabilities(): Capabilities {
 		$plan = (string) ( $this->settings->providerSettings( self::ID )['plan'] ?? 'free' );
 
-		return new Capabilities( false, self::MAX_ITEMS, self::MAX_CHARS, self::PLAN_RPM[ $plan ] ?? self::PLAN_RPM['free'] );
+		return new Capabilities( false, self::MAX_ITEMS, self::MAX_CHARS, self::PLAN_RPM[ $plan ] ?? self::PLAN_RPM['free'], 0, 0, 'UTC', self::TOKEN_FORMAT );
 	}
 
 	/**
@@ -116,6 +131,12 @@ final class TranslateX implements ProviderInterface {
 			throw new \LogicException( 'TranslateX is used in plain-text mode only.' );
 		}
 		$result = new BatchResult();
+		foreach ( $items as $unit => $text ) {
+			if ( strlen( $text ) > self::MAX_TEXT_BYTES ) {
+				$result->errors[ $unit ] = sprintf( 'Text is longer than the %d bytes TranslateX accepts.', self::MAX_TEXT_BYTES );
+				unset( $items[ $unit ] );
+			}
+		}
 		if ( array() === $items ) {
 			return $result;
 		}
@@ -240,8 +261,17 @@ final class TranslateX implements ProviderInterface {
 		if ( 200 === $status && '' === $err ) {
 			return $response;
 		}
+		$errText = strtolower( trim( $err ) );
+		// Fixture long text: HTTP 400 "long text in request"; the retry sends the rows one by one.
+		if ( 'long text in request' === $errText ) {
+			throw new PermanentError( esc_html( BatchResult::TOO_LARGE . ': TranslateX: ' . $message ) );
+		}
+		// Fixture html-param: a plan restriction answered with 403, not an auth failure.
+		if ( 403 === $status && str_contains( $errText, 'not available for your api key' ) ) {
+			throw new PermanentError( esc_html( 'TranslateX refused the request: ' . $message ) );
+		}
 		// Fixtures missing-key.json and invalid-key.json: auth failure is HTTP 400.
-		if ( 'invalid api key' === strtolower( trim( $err ) ) || 401 === $status || 403 === $status ) {
+		if ( 'invalid api key' === $errText || 401 === $status || 403 === $status ) {
 			throw new AuthError( esc_html( 'TranslateX rejected the API key: ' . $message ) );
 		}
 		if ( 429 === $status ) {

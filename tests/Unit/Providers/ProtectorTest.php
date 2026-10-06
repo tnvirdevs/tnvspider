@@ -51,7 +51,33 @@ final class ProtectorTest extends TestCase {
 			'lost'       => array( '[[1]] দেখুন' ),
 			'duplicated' => array( '[[1]] [[1]] [[2]]' ),
 			'unknown'    => array( '[[1]] [[2]] [[3]]' ),
+			'stray'      => array( '[ [ 2]] এবং [ [ 1]]]] দেখুন' ),
 		);
+	}
+
+	public function test_stray_token_punctuation_seen_from_translatex_is_rejected(): void {
+		// Real output for "Price: [[1]] per item, shipping [[2]], total [[3]]." (fixture translatex/tokens-format-bn.json).
+		$protected = ( new Protector() )->protect( 'Price: %s per item, shipping %d, total %.2f.' );
+
+		$this->assertNull( $protected->restore( 'মূল্য: [ [ 1]] প্রতি আইটেম, শিপিং [ [ 2]], মোট [ [ 3]]]]' ) );
+		$this->assertSame( 'মূল্য: %s প্রতি আইটেম, শিপিং %d, মোট %.2f।', $protected->restore( 'মূল্য: [ [ 1]] প্রতি আইটেম, শিপিং [ [ 2]], মোট [ [ 3]]।' ) );
+	}
+
+	public function test_punctuation_of_the_original_text_is_not_counted_as_stray(): void {
+		$protected = ( new Protector( array(), true, true, '{%d}' ) )->protect( 'Sizes {S, M} for %s' );
+
+		$this->assertSame( 'Sizes {S, M} for {1}', $protected->text );
+		$this->assertSame( '%s এর জন্য সাইজ {S, M}', $protected->restore( '{1} এর জন্য সাইজ {S, M}' ) );
+		$this->assertNull( $protected->restore( '{1} এর জন্য সাইজ S, M}' ) );
+	}
+
+	public function test_brace_format_with_real_translatex_output(): void {
+		// Fixture translatex/tokens-format-*.json probe: "{1}" survived unchanged in bn and ar.
+		$protected = ( new Protector( array(), true, true, '{%d}' ) )->protect( 'Visit %s and %d now' );
+
+		$this->assertSame( 'Visit {1} and {2} now', $protected->text );
+		$this->assertSame( 'এখন %s এবং %d দেখুন', $protected->restore( 'এখন {1} এবং {2} দেখুন' ) );
+		$this->assertSame( 'قم بزيارة %s و %d الآن', $protected->restore( 'قم بزيارة {1} و {2} الآن' ) );
 	}
 
 	public function test_text_that_already_looks_like_a_token_is_protected(): void {

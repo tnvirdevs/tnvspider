@@ -6,6 +6,8 @@
  *   php bin/capture-translatex-fixtures.php keyless      # cases that need no key
  *   php bin/capture-translatex-fixtures.php all          # needs WST_TRANSLATEX_KEY
  *   php bin/capture-translatex-fixtures.php rate-limit   # needs the key; bursts tiny requests until HTTP 429
+ *   php bin/capture-translatex-fixtures.php tokens       # needs the key; placeholder formats in bn and ar
+ *   php bin/capture-translatex-fixtures.php limits       # needs the key; longest accepted single text
  *
  * The key is read from WST_TRANSLATEX_KEY, sent only in the X-API-Key header,
  * never printed, and a fixture that would contain it is refused. Only
@@ -21,8 +23,8 @@ declare(strict_types=1);
 const WST_TX_BASE = 'https://api.translatex.com';
 
 $mode = $argv[1] ?? '';
-if ( ! in_array( $mode, array( 'keyless', 'all', 'rate-limit' ), true ) ) {
-	fwrite( STDERR, "Usage: php bin/capture-translatex-fixtures.php keyless|all|rate-limit\n" );
+if ( ! in_array( $mode, array( 'keyless', 'all', 'rate-limit', 'tokens', 'limits' ), true ) ) {
+	fwrite( STDERR, "Usage: php bin/capture-translatex-fixtures.php keyless|all|rate-limit|tokens|limits\n" );
 	exit( 2 );
 }
 
@@ -169,7 +171,30 @@ $cases = array(
 	),
 );
 
-$run = 'all' === $mode ? array_merge( $cases['keyless'], $cases['all'] ) : ( 'keyless' === $mode ? $cases['keyless'] : array() );
+// Placeholder tokens exactly as Protector sends them (format [[%d]]).
+$tokenTexts = array(
+	'Buy [[1]] today',
+	'Visit [[1]] and [[2]] now',
+	'[[1]] is our best seller',
+	'Price: [[1]] per item, shipping [[2]], total [[3]].',
+	'Contact [[12]] for help',
+);
+foreach ( array( 'bn', 'ar' ) as $tl ) {
+	$cases['tokens'][ 'tokens-format-' . $tl ] = array( 'POST', '/translate', array( 'sl' => 'en', 'tl' => $tl ), wst_tx_texts( $tokenTexts ), 'valid' );
+}
+$cases['all'] += $cases['tokens'];
+foreach ( array( 2000, 2001, 2048, 2049, 2500 ) as $size ) {
+	$cases['limits'][ 'chars-' . $size ] = array( 'POST', '/translate', array( 'sl' => 'en', 'tl' => 'bn' ), wst_tx_texts( array( substr( str_repeat( $lorem, 120 ), 0, $size ) ) ), 'valid' );
+}
+// Characters or bytes? Bengali is three bytes per character in UTF-8.
+$bengali = 'আমাদের দোকানে স্বাগতম। ';
+foreach ( array( 2000, 2001 ) as $bytes ) {
+	$text = mb_strcut( str_repeat( $bengali, 200 ), 0, $bytes );
+	$cases['limits'][ 'bytes-bn-' . $bytes ] = array( 'POST', '/translate', array( 'sl' => 'bn', 'tl' => 'en' ), wst_tx_texts( array( $text . str_repeat( '.', $bytes - strlen( $text ) ) ) ), 'valid' );
+}
+$cases['all'] += $cases['limits'];
+
+$run = 'all' === $mode ? array_merge( $cases['keyless'], $cases['all'] ) : ( 'keyless' === $mode ? $cases['keyless'] : ( $cases[ $mode ] ?? array() ) );
 
 foreach ( $run as $name => [ $method, $path, $query, $body, $keyMode ] ) {
 	$apiKey   = 'valid' === $keyMode ? $key : ( 'invalid' === $keyMode ? 'invalid-key-for-fixture' : null );

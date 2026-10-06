@@ -1,14 +1,14 @@
 {
-    "case": "missing-key",
-    "captured_at": "2026-10-06T16:25:58+00:00",
+    "case": "unsupported-pair",
+    "captured_at": "2026-10-06T16:26:13+00:00",
     "request": {
         "method": "POST",
         "path": "/translate",
         "query": {
             "sl": "en",
-            "tl": "bn"
+            "tl": "xx"
         },
-        "key": "none",
+        "key": "valid",
         "fields": [
             "text"
         ],
@@ -27,9 +27,9 @@
             "content-type": "application/json"
         },
         "body_json": {
-            "err": "invalid api key"
+            "err": "invalid source or target language code"
         },
         "body_raw": null,
-        "ms": 749
+        "ms": 264
     }
 }

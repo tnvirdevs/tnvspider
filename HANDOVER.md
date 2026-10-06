@@ -8,10 +8,16 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 1 — Core without providers: done and approved by the owner.**
 
-**Phase 2 — Providers, queue, limiter, usage: code complete; live provider checks pending (keys).**
+**Phase 2 — Providers, queue, limiter, usage: code complete; TranslateX verified live; Microsoft and Gemini live checks pending (keys).**
 - Done and tested (fake provider + recorded/stubbed HTTP): provider contract and typed errors, placeholder protection (never-translate terms) and tag placeholders, segmentation for plain-text providers, rate limiter (rpm / rpd / chars-per-minute, `0` = unlimited, `GET_LOCK`, 4-process concurrency test), monthly usage and budget (80 % warning, 100 % stop), queue and worker (priorities, backoff, `max_attempts`, fallback switch and return, 429 always honoured, manual translations never overwritten), visitor auto-queue (priority 5) with the §6A cache rules, WP-Cron one-minute event that exists only while work is queued, `POST /wst/v1/queue/run` (one batch, `manage_options` + REST nonce), WP-CLI `wp wst queue run|status|retry-failed|clear` and `wp wst provider test <id>` (lifts a pause on success), page-cache purge (LiteSpeed `litespeed_purge_url`, WP Rocket `rocket_clean_files()`, generic `wst_purge_url`), adapters for TranslateX, Microsoft and Gemini.
 - Recorded keyless fixtures (`bin/capture-provider-fixtures.php`, `bin/capture-translatex-fixtures.php`): TranslateX missing/invalid key → HTTP 400 `{"err":"invalid api key"}`; Microsoft missing/invalid key → HTTP 401 code **401001** (plan listed 401000; both are mapped by the 401xxx class), language list (138 languages incl. `bn` and `ar`); Gemini invalid key → HTTP 400 `INVALID_ARGUMENT` with `details[].reason = API_KEY_INVALID`, missing key → HTTP 403 `PERMISSION_DENIED`.
-- Blocked on keys: `WST_TRANSLATEX_KEY`, `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource) and `WST_GEMINI_KEY` are **not set in this session** (environment variables reach new sessions only). Still open for TranslateX: error format of the remaining cases, per-request item/character limits, rate-limit behaviour, whether `bn`/`ar` are in this key's plan.
+- **TranslateX verified with the owner's free key** (2026-10-06; the key was given in chat, kept in a mode-600 file outside the repo, passed only via the environment; no fixture, log or commit contains it; the owner was advised to rotate it). Fixtures in `tests/fixtures/providers/translatex/` (`all`, `tokens`, `limits`, `rate-limit` modes). Facts now in plan §7.2:
+  - Errors are JSON `{"err": "…"}`: 400 `invalid api key` (missing/invalid key), 400 `invalid source or target language code`, 400 `no texts found`, 400 `long text in request`, 403 `HTML translation feature is not available for your api key`, 429 `too many requests` (no `Retry-After`; `X-TX-RateLimit: 50/min`). Success responses carry `X-TX-RateLimit-Remaining`.
+  - Limits: each text ≤ **2,000 UTF-8 bytes** (≈ 700 Bengali characters); 500 texts and 60,000 characters per request accepted (58 s for 60,000). 429 reached on the 51st request of a burst.
+  - Free plan: 35 languages, **`bn` and `ar` included**. `x-api-client: WP-Site-Translator/0.1.0` accepted.
+  - Placeholders: `[[1]]` came back as `[ [ 1]]` and once as `[ [ 3]]]]`; `{1}` survived in `bn` and `ar` (P16).
+  - Live end to end (real `Worker` → `TranslateX` → `wst_translations`, scratch test not committed): `testConnection` OK; 5/5 strings translated and stored as machine translations for `bn_BD` and `ar` (printf placeholder, URL and the never-translate term "WooCommerce" preserved; the inline string was segmented, flag 1). Our limiter held the second request for its 1.2 s spacing as configured.
+- Blocked on keys: `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource) and `WST_GEMINI_KEY` are not set.
 
 ## Decision log (Phase 2)
 
@@ -25,6 +31,8 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 | P13 | Gemini: default model `gemini-3.5-flash-lite` (free tier, "optimized for … translation", no shutdown date); defaults 5 RPM, 100 RPD, 50 items / 5,000 characters per request, day in `America/Los_Angeles`; structured output via `generationConfig.responseFormat.text` (the API reference marks `responseSchema` deprecated); 402 → `QuotaExceeded`. | Per-model free limits are unpublished; values are conservative and editable. |
 | P14 | Visitor queueing: on a discoverable page (auto mode, §6A gate) every untranslated string of the page is queued at priority 5 for the active provider, including strings recorded earlier. With no usable provider nothing is queued and existing rows do not make the page uncacheable. | Strings recorded before a provider was set up would otherwise never be translated; §6A: paused/over-budget providers must not block caching. |
 | P15 | Providers are registered only when their key is set, and built lazily. | A missing key shows "not configured" instead of failing per request; ordinary requests never read the secrets option. |
+| P16 | TranslateX uses the placeholder format `{%d}`; `ProtectedText::restore()` also rejects a translation that leaves token punctuation outside a token. | Probe on the free key: `[[1]]`, `[1]`, `__1__`, `#1#`, `⟦1⟧` were altered or dropped in `bn` or `ar`; `{1}` and `XQ1QX` survived. Stray `]]` would otherwise end up in stored text. |
+| P17 | TranslateX texts over 2,000 UTF-8 bytes fail in the adapter without being sent; `long text in request` maps to the one-per-request retry; 403 "not available for your api key" is a `PermanentError`, not an auth pause. | One oversized text would otherwise fail its whole batch; a plan restriction must not pause the provider. After `max_attempts` such rows move to the fallback provider. |
 
 ## Plan adjustments
 
@@ -33,7 +41,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Remaining
 
 - Phases 2–7 per plan §16.
-- Phase 2 acceptance items that need keys: each real provider passes `wp wst provider test <id>` and a live batch; TranslateX `all` + `rate-limit` fixture capture; Microsoft and Gemini `all` capture.
+- Phase 2 acceptance items that need keys: Microsoft and Gemini `testConnection` + live batch and their `all` fixture capture.
 - Deferred by design (built together with their phases, no dead settings now): page and path modes and `off` behaviour (Phase 3); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
 
 ## Files changed (Phase 2)
@@ -50,8 +58,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Validation status
 
-- `vendor/bin/phpunit` (unit): 80 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,107 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 2 included.
+- `vendor/bin/phpunit` (unit): 84 tests green.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,111 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 2 included.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). The Phase 1 suite has not been re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean.
 - PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`) (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
@@ -65,7 +73,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 4. Node in the container is 22.22.0; `@wordpress/scripts` 36 asks for ≥ 22.22.2 (npm warns only).
 5. Open extractor items: user exclude selectors (§13, Phase 4); entity canonicalisation of inline originals (`&#8217;` vs `’` hash differently); a runtime self-check for the bookmark-span dependency (G1a) that fails loudly (Phase 7 hardening).
 6. The dev site's WooCommerce (built from GitHub without its JS build) shows an empty shop loop in both languages; product pages render. Not a plugin issue.
-7. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
+7. Segmented inline strings (plain-text providers such as TranslateX) translate each piece alone, so word order and short pieces suffer (live: "Read" → a poor Arabic fragment). Flag 1 marks them for the editor (Phase 5) to review.
+8. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
 
 ## Dev environment setup (scripted)
 
@@ -93,7 +102,7 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-Phase 2 live checks, in a **new session** where the keys are present (environment variables are read at session start):
-1. `bin/setup-env.sh`, then `php bin/capture-translatex-fixtures.php all` and `php bin/capture-translatex-fixtures.php rate-limit`. Check no fixture contains the key. Record in this file: status codes and `err` texts per case, item/character limits (batch-100/101/500, chars-5000/20000/60000-total), whether `bn` and `ar` are in `/supported-languages` for the key's plan. If a case changes the error class, add a fixture-backed test to `tests/Integration/Providers/TranslateXTest.php`; if the limits differ from 100 items / 10,000 characters, change `TranslateX::MAX_ITEMS`/`MAX_CHARS`.
-2. With `WST_AZURE_KEY` (+ `WST_AZURE_REGION`): `php bin/capture-provider-fixtures.php microsoft all`; with `WST_GEMINI_KEY`: `php bin/capture-provider-fixtures.php gemini all` (confirms the `responseFormat` request shape).
-3. On a WordPress install with the plugin active: `wp wst provider test translatex|microsoft|gemini`, then queue a page (visit `/bn/…` logged out) and `wp wst queue run`; record the results as Phase 2 acceptance lines (one per §16 criterion) and ask the owner to approve Phase 2.
+Phase 2 live checks for the remaining providers, in a session where the keys are present (environment variables are read at session start):
+1. With `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource): `php bin/capture-provider-fixtures.php microsoft all`; then a live `testConnection` and worker batch for `bn_BD` and `ar` (same scratch test pattern as TranslateX: `ProviderRegistry::configured()` → `Worker::run()`; do not commit it).
+2. With `WST_GEMINI_KEY`: `php bin/capture-provider-fixtures.php gemini all` (confirms the `responseFormat` request shape), then the same live check.
+3. Add fixture-backed tests for anything that changes an error class, write one Phase 2 acceptance line per §16 criterion, update the PR description, and ask the owner to approve Phase 2.
