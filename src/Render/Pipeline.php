@@ -135,23 +135,35 @@ final class Pipeline {
 		$extractor     = new Extractor();
 		$segments      = $extractor->extract( $html );
 
-		$kinds = array();
+		// Inline originals are stored language-neutral: internal links in
+		// them lose the language prefix, so the slug never changes a hash.
+		$kinds   = array();
+		$neutral = array();
 		foreach ( $segments as $segment ) {
-			$kinds[ $segment->text ] = $kinds[ $segment->text ] ?? $segment->kind;
+			if ( ! isset( $neutral[ $segment->text ] ) ) {
+				$neutral[ $segment->text ] = Segment::INLINE === $segment->kind ? $this->withLinks( $segment->text, false ) : $segment->text;
+			}
+			$kinds[ $neutral[ $segment->text ] ] = $kinds[ $neutral[ $segment->text ] ] ?? $segment->kind;
 		}
 		$lang  = $this->target->locale();
 		$found = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $lang );
 
-		$translations = array();
+		$byNeutral    = array();
 		$untranslated = array();
 		foreach ( $found as $text => $entry ) {
 			if ( null === $entry['translated'] ) {
 				$untranslated[] = $entry['id'];
 				continue;
 			}
-			$translation = $this->checkedTranslation( $text, $kinds[ $text ], $entry['translated'] );
+			$translation = $this->checkedTranslation( (string) $text, $kinds[ $text ], $entry['translated'] );
 			if ( null !== $translation ) {
-				$translations[ $text ] = $translation;
+				$byNeutral[ $text ] = $translation;
+			}
+		}
+		$translations = array();
+		foreach ( $neutral as $actual => $key ) {
+			if ( isset( $byNeutral[ $key ] ) ) {
+				$translations[ $actual ] = $byNeutral[ $key ];
 			}
 		}
 
@@ -208,15 +220,29 @@ final class Pipeline {
 
 			return null;
 		}
-		if ( ! $this->settings->flag( 'force_language_links' ) ) {
-			return $translation;
-		}
 
-		$processor = new \WP_HTML_Tag_Processor( $translation );
+		return $this->settings->flag( 'force_language_links' ) ? $this->withLinks( $translation, true ) : $translation;
+	}
+
+	/**
+	 * Add or remove the language prefix on internal links of an HTML fragment.
+	 *
+	 * @param string $html   Fragment.
+	 * @param bool   $prefix True to add the prefix, false to remove it.
+	 */
+	private function withLinks( string $html, bool $prefix ): string {
+		if ( ! str_contains( $html, 'href' ) ) {
+			return $html;
+		}
+		$processor = new \WP_HTML_Tag_Processor( $html );
 		while ( $processor->next_tag( array( 'tag_name' => 'A' ) ) ) {
 			$href = $processor->get_attribute( 'href' );
-			if ( is_string( $href ) && null === $processor->get_attribute( 'hreflang' ) ) {
-				$processor->set_attribute( 'href', $this->urls->addPrefix( $href, $this->target->slug() ) );
+			if ( ! is_string( $href ) || null !== $processor->get_attribute( 'hreflang' ) ) {
+				continue;
+			}
+			$changed = $prefix ? $this->urls->addPrefix( $href, $this->target->slug() ) : $this->urls->removePrefix( $href, $this->target->slug() );
+			if ( $changed !== $href ) {
+				$processor->set_attribute( 'href', $changed );
 			}
 		}
 

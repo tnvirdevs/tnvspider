@@ -98,6 +98,14 @@ final class UrlsTest extends TestCase {
 		);
 	}
 
+	public function test_remove_prefix(): void {
+		$this->assertSame( 'https://example.com/shop/?x=1', $this->root()->removePrefix( 'https://example.com/bn/shop/?x=1', 'bn' ) );
+		$this->assertSame( '/', $this->root()->removePrefix( '/bn/', 'bn' ) );
+		$this->assertSame( '/bngla/', $this->root()->removePrefix( '/bngla/', 'bn' ) );
+		$this->assertSame( 'https://other.com/bn/x/', $this->root()->removePrefix( 'https://other.com/bn/x/', 'bn' ) );
+		$this->assertSame( 'https://example.com/blog/a/', $this->subdir()->removePrefix( 'https://example.com/blog/bn/a/', 'bn' ) );
+	}
+
 	public function test_add_prefix_in_subdirectory_install(): void {
 		$this->assertSame( 'https://example.com/blog/bn/a/', $this->subdir()->addPrefix( 'https://example.com/blog/a/', 'bn' ) );
 		$this->assertSame( 'https://example.com/other/', $this->subdir()->addPrefix( 'https://example.com/other/', 'bn' ) );

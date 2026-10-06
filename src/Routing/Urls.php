@@ -156,6 +156,27 @@ final class Urls {
 	}
 
 	/**
+	 * Remove the language prefix from an internal URL or path. Other URLs are
+	 * returned unchanged.
+	 *
+	 * @param string $url  Absolute URL, protocol-relative URL or root-relative path.
+	 * @param string $slug Language slug.
+	 */
+	public function removePrefix( string $url, string $slug ): string {
+		$split = $this->splitInternal( $url );
+		if ( null === $split ) {
+			return $url;
+		}
+		[ $origin, $path, $suffix ] = $split;
+		$relative                   = $this->relativePath( $path );
+		if ( null === $relative || ! $this->hasPrefix( $relative, $slug ) ) {
+			return $url;
+		}
+
+		return $origin . $this->homePath . '/' . substr( $relative, strlen( $slug ) + 1 ) . $suffix;
+	}
+
+	/**
 	 * Split an internal URL into origin, path and query/fragment suffix.
 	 * Null for external, relative-to-document or non-HTTP URLs.
 	 *

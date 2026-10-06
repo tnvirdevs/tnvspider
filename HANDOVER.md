@@ -6,9 +6,7 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 0 — Setup & spikes: done.** PHPStan level 8 is clean and provider facts are recorded from official sources (Gemini per-model free-tier limits are unpublished and stay unconfirmed). `wp-env` is configured but not run here (no Docker daemon); the container uses MariaDB + `php -S`.
 
-**Phase 1 — Core without providers: in progress.**
-- Done: schema + activation. `src/Database/Schema.php` (all §4 tables via dbDelta, `wst_db_version` = 1, `install()` verifies every table afterwards and throws if one is missing, `maybeUpgrade()`), `src/Plugin.php` (activation hook + `plugins_loaded` upgrade check; the version option is autoloaded, so the check costs no query). Tests: `tests/Integration/Database/SchemaTest.php`, `tests/Integration/PluginTest.php`.
-- Remaining in Phase 1: language registry, router, render pipeline, hreflang/`lang`/`dir`/locale switch, link rewriting, minimal switcher, §6A discovery gate and cache headers, WP-CLI `wp wst string set|get|list`.
+**Phase 1 — Core without providers: done** (awaiting owner approval to start Phase 2). Every §16 Phase 1 acceptance criterion passes; evidence in *Phase 1 acceptance*.
 
 ## Completed (Phase 0)
 
@@ -17,6 +15,49 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - HTML spike, which is also the Phase 1 extraction core: `src/Html/{Lexer,Extractor,Frame,Segment,Replacer,Text}.php`.
 - Fixtures: 30 saved pages in `tests/fixtures/pages/` produced by `bin/capture-fixtures.sh` from a local site with Theme Unit Test data, block test data, Elementor (2 pages incl. Bengali) and WooCommerce sample products, under Twenty Twenty-One / Twenty Twenty-Five / Twenty Twenty. html5lib tokenizer inputs via `bin/fetch-html5lib-tests.sh` (pinned commit, gitignored).
 - Tests: `tests/Unit/Html/TextTest.php`, `tests/Integration/Html/{LexerTest,ExtractorTest,RoundTripTest}.php`.
+
+## Completed (Phase 1)
+
+- `src/Database/Schema.php` — §4 tables via dbDelta, `wst_db_version`, post-install table check; `src/Plugin.php` — activation, upgrade check, wiring.
+- `src/Settings.php` — `wst_settings` with only the settings that have an effect now: languages, target slug, site mode, discovery switches and caps, link rewriting, hreflang options.
+- `src/Languages/{Language,Registry,Current}.php` — 56 curated locales with native names, slugs, RTL and provider code overrides (TranslateX `iw`/`no`/`zh-CN`/`zh-TW`, Microsoft `zh-Hans`/`zh-Hant`/`pt-pt`/`sr-Cyrl`/`fil`); unknown locales get derived defaults.
+- `src/Routing/{Urls,Router,PathRules,LanguageUrls}.php` — prefix detection before `parse_request` (stripped for routing, restored after, so canonical redirects keep `/bn/`); locale switch; text direction forced through core's `ltr`/"text direction" string so `is_rtl()` and theme RTL CSS work without a core language pack; `home_url` and `wp_redirect` prefixing (REST, admin, assets, PHP entry points exempt); AJAX/REST language from `wst_lang` or the referer.
+- `src/Storage/StringStore.php` — batched lookup (one query + object cache), discovery writes (strings, occurrences, pages, `is_global` at 20 pages), manual saves (inline markup must match, then `wp_kses`), search, pending count.
+- `src/Log/Logger.php` — `wst_log` ring buffer (1,000 rows).
+- `src/Render/{Pipeline,PageContext,DiscoveryGate,HeadTags}.php` — output buffer on target HTML pages, offset replacement, inline validation, link rewriting, `<html lang dir>`, failure guard (original HTML returned, logged, rethrown under `WP_DEBUG`), §6A gate with hourly caps, uncacheable-while-pending headers, hreflang + `x-default`, drop-region option.
+- `src/Switcher/Switcher.php` — `[wst_switcher]`.
+- `src/Cli/StringCommand.php` — `wp wst string set|get|list` (permanent).
+- `src/Html/InlineMarkup.php` — tag-signature comparison and per-original `wp_kses` allowlist.
+- Tests: `tests/Unit/Routing/{UrlsTest,PathRulesTest}.php`, `tests/Integration/{SettingsTest,PluginTest}.php`, `tests/Integration/{Languages,Routing,Storage,Log,Render,Database}/*Test.php`; `tests/phpstan/wp-cli-stubs.php` (local WP-CLI stubs for PHPStan; `php-stubs/wp-cli-stubs` does not support WordPress 7 stubs).
+
+## Decision log (Phase 1)
+
+| # | Decision | Reason |
+|---|---|---|
+| P1 | **Inline merge needs at least two text runs.** `<li><a href="…">Design</a></li>` is a plain text segment "Design"; `Read <a>more</a>` and `<a>Design</a> (3)` merge. Refines plan §6.2 / G1b. | Found on the live site: every menu and category link became its own inline string containing its URL, so the same word was translated once per link. Merging only helps when text on both sides of a tag can be reordered. |
+| P2 | **Inline originals are stored language-neutral**: internal links inside them lose the `/{slug}/` prefix before hashing; translations get the prefix back when rendered. | WordPress builds prefixed links on target pages; without this, changing the slug would orphan every inline translation. |
+| P3 | Attributes of `<link>` elements are not translated. | Feed/oEmbed titles in `<head>` are never displayed; they only cost budget. |
+| P4 | `block_crawlers` (default on) decides whether bots may discover; §6A's "not a bot" is that default. | §13 defines the setting; no dead option. |
+| P5 | An inline translation whose markup no longer matches is not used (original shown, warning logged). Per-segment fallback (§6.5) needs per-segment translations, which arrive with providers in Phase 2. | No silent partial output. |
+| P6 | A wildcard rule `/shop/*` matches `/shop` and everything below; `/sale*` matches any path starting with `/sale`; `{{home}}` is `/`. | Plan §9 path rules; shared with Phase 3. |
+| P7 | Saving a manual inline translation rejects any markup difference before sanitising (no silent stripping). | Fail loudly; found by a test where `<script>` was stripped and its text kept. |
+
+## Phase 1 acceptance (plan §16) — evidence
+
+Live checks on the dev site (WordPress 7.1.2, Twenty Twenty-One, WooCommerce and Elementor from source, `php -S` with opcache) plus the test suites:
+
+| Criterion | Result |
+|---|---|
+| `/bn/` renders translated text from the DB | Translations seeded with `wp wst string set` (text, inline with link, submit-button attribute) render on `/bn/hello-world/`; the inline translation's author link is prefixed. A tampered inline translation (changed `href`) is rejected by the CLI. `PipelineTest` covers text, inline, attributes, `<title>`. |
+| Default language unaffected | With the plugin active and no target, default pages are byte-identical to the plugin-inactive baseline (after removing the site's own nondeterminism: category-order ties and Elementor's CSS `ver`). With target `bn_BD`, the only change is the three intended `hreflang` link tags. TTFB median of 25 (opcache): `/hello-world/` 109 ms active vs 103 ms inactive; `/` 101 vs 115 ms — within noise. |
+| Menus/links stay in the language | 93 internal links on `/bn/hello-world/` are prefixed (menus via `home_url`, hard-coded links via rewriting); the only unprefixed internal link is the `hreflang` alternate. Canonical is `/bn/hello-world/`; `/bn/hello-world` → 301 `/bn/hello-world/`; `/bn` → 301 `/bn/`; 404 stays 404; REST `/wp-json/` unprefixed. |
+| RTL target flips `dir` and loads theme RTL CSS | Target `ar`: `/ar/hello-world/` has `<html dir="rtl" lang="ar">`, body class `rtl`, and Twenty Twenty-One loads `style-rtl.css`; the default page stays `ltr` with `style.css`. `RouterTest` covers the same. |
+| Round-trip identity holds | `RoundTripTest` (30 pages + html5lib) and `PipelineTest`: with no translations and link rewriting off, the pipeline output equals the input except the `<html>` element; with rewriting on, only `href`/`action` values change. |
+| Unit + integration tests green | Unit 60, integration 7,014 (WP 7.1.2); PHPCS clean; PHPStan level 8 no errors. |
+
+Also verified live: discovery records strings for an anonymous browser visit (cap of 100 per page per hour reached on the first visit, as configured), not for curl's bot user agent; a pending queue row sends `Cache-Control: no-cache, must-revalidate, max-age=0` and `X-WST-Pending: 1`, a failed row does not; the switcher links each language's equivalent URL with `hreflang`/`lang`/`aria-current`.
+
+**Performance** (opcache on): `Pipeline::process()` without discovery — 311 KB page 55 ms, 277 KB 42 ms, 66 KB Elementor page 13 ms. Uncached target-page TTFB overhead 28 ms (`/bn/hello-world/`) to 66 ms (`/bn/` home with many untranslated strings). Page caches serve target pages without running the pipeline.
 
 ## Decision log (Phase 0 gates)
 
@@ -80,7 +121,12 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Remaining
 
-- Phases 1–7 per plan §16.
+- Phases 2–7 per plan §16.
+- Deferred from Phase 1 by design (built together with their phases, no dead settings now): enqueueing discovered strings and cache purging (Phase 2, needs providers); page and path modes and `off` behaviour (Phase 3); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+
+## Files changed (Phase 1)
+
+`wp-site-translator.php`, `src/Plugin.php`, `src/Settings.php`, `src/Database/Schema.php`, `src/Languages/*`, `src/Routing/*`, `src/Storage/StringStore.php`, `src/Log/Logger.php`, `src/Render/*`, `src/Switcher/Switcher.php`, `src/Cli/StringCommand.php`, `src/Html/{Extractor,Frame,Replacer,InlineMarkup}.php`, `phpstan.neon.dist`, `tests/phpstan/wp-cli-stubs.php`, tests listed above, `CLAUDE.md`, `HANDOVER.md`, `docs/WST-V1-PLAN.md` (D10–D14).
 
 ## Files changed (Phase 0)
 
@@ -88,12 +134,12 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Validation status
 
-- `vendor/bin/phpunit` (unit): 15 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 6,877 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), including the Phase 1 schema/activation tests.
-- Same suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2).
+- `vendor/bin/phpunit` (unit): 60 tests green.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,014 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3).
+- Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). The Phase 1 suite has not been re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean.
 - PHPStan level 8: **no errors** (container: `php <scratchpad>/phpstan/phpstan.phar analyse --memory-limit=1G`) (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
-- `npx wp-scripts`: installed; no entry points yet (first one comes with the Phase 1 switcher).
+- `npx wp-scripts`: installed; no entry points yet (the Phase 1 switcher needs no JavaScript; the first build comes with Phase 4).
 
 ## Known issues
 
@@ -101,7 +147,9 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 2. **Network policy**: the WebFetch tool is still blocked for the docs hosts; `curl` works and was used.
 3. WP 6.7–6.9 core lexer warning on input ending in `<!---` (G2). Harmless for real pages. A CI matrix on those versions must expect it.
 4. Node in the container is 22.22.0; `@wordpress/scripts` 36 asks for ≥ 22.22.2 (npm warns only).
-5. Extractor limits to address in Phase 1: user exclude selectors (§13); entity canonicalisation of inline originals (`&#8217;` vs `’` currently hash differently); `<a>` text and `href` rewriting; a runtime self-check for the bookmark-span dependency (G1a) that fails loudly.
+5. Open extractor items: user exclude selectors (§13, Phase 4); entity canonicalisation of inline originals (`&#8217;` vs `’` hash differently); a runtime self-check for the bookmark-span dependency (G1a) that fails loudly (Phase 7 hardening).
+6. The dev site's WooCommerce (built from GitHub without its JS build) shows an empty shop loop in both languages; product pages render. Not a plugin issue.
+7. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
 
 ## Cloud container dev setup (when Docker is unavailable)
 
@@ -117,4 +165,4 @@ The fixture site (Elementor and WooCommerce built from GitHub source, wp-cli via
 
 ## Exact next step
 
-Phase 1, next unit: **language registry** (plan §5). `src/Languages/Registry.php` with a curated locale list (native name, English name, default slug, `dir`, provider code map incl. TranslateX `iw`/`tl`/`no`/`zh-CN`/`zh-TW` and Microsoft `zh-Hans`/`zh-Hant`), lookup by locale and by slug, and `src/Languages/Current.php` (the single active-language accessor). Unit tests for lookups, RTL detection and code mapping. Then the router (strip the prefix from `REQUEST_URI` before WordPress parses the request).
+Wait for the owner's Phase 2 approval. Then Phase 2, first task: **capture real TranslateX responses** with the owner's key as fixtures (success, invalid key, unsupported pair, empty input, malformed input, over-limit if testable) and resolve the open TranslateX items (error format/status codes, per-request limits, Bengali on the free plan). Keys come from environment variables, never committed.

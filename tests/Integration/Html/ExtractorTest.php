@@ -37,6 +37,20 @@ final class ExtractorTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_a_single_text_run_inside_inline_tags_stays_plain_text(): void {
+		$this->assertSame(
+			array( array( 'text', 'Design' ), array( 'text', 'Bold' ) ),
+			$this->extract( '<ul><li><a href="/category/design/">Design</a></li></ul><p><strong>Bold</strong></p>' )
+		);
+	}
+
+	public function test_two_text_runs_around_a_tag_merge(): void {
+		$this->assertSame(
+			array( array( 'inline', '<a href="/c/">Design</a> (3)' ) ),
+			$this->extract( '<ul><li><a href="/c/">Design</a> (3)</li></ul>' )
+		);
+	}
+
 	public function test_block_children_keep_text_nodes_separate(): void {
 		$this->assertSame(
 			array( array( 'text', 'Intro' ), array( 'text', 'Body' ) ),
@@ -70,7 +84,8 @@ final class ExtractorTest extends WP_UnitTestCase {
 
 	public function test_attributes_title_and_meta_are_extracted(): void {
 		$html = '<head><title>Shop &amp; more</title><meta name="description" content="Natural soap">'
-			. '<meta property="og:title" content="Our shop"><meta name="viewport" content="width=device-width"></head>'
+			. '<meta property="og:title" content="Our shop"><meta name="viewport" content="width=device-width">'
+			. '<link rel="alternate" type="application/rss+xml" title="Site Feed" href="/feed/"></head>'
 			. '<img src="a.jpg" alt="A cat"><input type="submit" value="Send"><input type="text" value="Typed" placeholder="Your name">'
 			. '<a href="#" aria-label="Close" title="https://example.com">×</a>';
 

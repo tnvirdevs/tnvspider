@@ -74,6 +74,19 @@ final class PipelineTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'ltr' ), $this->attributeValues( $out, 'HTML', 'dir' ) );
 	}
 
+	public function test_inline_originals_are_stored_without_the_language_prefix(): void {
+		$page = '<p>Read <a href="http://example.org/bn/story/">our story</a> now</p>';
+
+		$this->pipeline()->process( $page, $this->page( true ) );
+		$this->assertNotNull( $this->store->find( 'Read <a href="http://example.org/story/">our story</a> now', 'bn_BD' ) );
+		$this->assertNull( $this->store->find( 'Read <a href="http://example.org/bn/story/">our story</a> now', 'bn_BD' ) );
+
+		$this->store->saveManual( 'Read <a href="http://example.org/story/">our story</a> now', 'inline', 'bn_BD', 'এখন <a href="http://example.org/story/">আমাদের গল্প</a> পড়ুন', 0 );
+		$out = $this->pipeline()->process( $page, $this->page() );
+
+		$this->assertSame( '<p>এখন <a href="http://example.org/bn/story/">আমাদের গল্প</a> পড়ুন</p>', $out );
+	}
+
 	public function test_internal_links_are_prefixed_and_others_are_not(): void {
 		$html = '<body><a href="/about/">A</a><a href="http://example.org/shop/?x=1">B</a><a href="https://other.example/">C</a>'
 			. '<a href="/wp-admin/">D</a><a href="/bn/already/">E</a><a href="/" hreflang="en-US">F</a>'

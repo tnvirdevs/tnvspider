@@ -43,6 +43,13 @@ final class Frame {
 	public bool $hasInlineTag = false;
 
 	/**
+	 * Non-whitespace text nodes found inside.
+	 *
+	 * @var int
+	 */
+	public int $textNodes = 0;
+
+	/**
 	 * Open an element.
 	 *
 	 * @param string $tag          Upper-case tag name.

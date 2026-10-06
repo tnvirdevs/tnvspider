@@ -347,6 +347,9 @@ final class Extractor {
 		if ( '' === $normalized || ( null !== $frame && $frame->excluded ) ) {
 			return;
 		}
+		if ( null !== $frame ) {
+			++$frame->textNodes;
+		}
 		if ( ! Text::isTranslatable( $normalized ) ) {
 			return;
 		}
@@ -392,6 +395,11 @@ final class Extractor {
 			if ( is_string( $key ) && isset( self::META_KEYS[ strtolower( $key ) ] ) ) {
 				$this->addAttributeSegment( Segment::META, 'content', $start, $length );
 			}
+			return;
+		}
+
+		if ( 'LINK' === $tag ) {
+			// Titles of feed, oEmbed and other head links are never displayed.
 			return;
 		}
 
@@ -614,11 +622,14 @@ final class Extractor {
 			$parent->inlineOnly   = $parent->inlineOnly && $frame->inlineOnly;
 			$parent->hasText      = $parent->hasText || $frame->hasText;
 			$parent->hasInlineTag = $parent->hasInlineTag || $frame->hasInlineTag;
+			$parent->textNodes   += $frame->textNodes;
 		}
 		if ( $frame->foreign && ! $this->insideForeign() ) {
 			$this->lexer->change_parsing_namespace( 'html' );
 		}
-		if ( $frame->excluded || ! $frame->inlineOnly || ! $frame->hasText || ! $frame->hasInlineTag ) {
+		// Merging only helps when text runs on both sides of a tag can be
+		// reordered; a lone link or bold word stays a plain text segment.
+		if ( $frame->excluded || ! $frame->inlineOnly || ! $frame->hasText || ! $frame->hasInlineTag || $frame->textNodes < 2 ) {
 			return;
 		}
 
