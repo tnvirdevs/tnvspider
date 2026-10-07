@@ -63,6 +63,14 @@ final class RequestPlan {
 	private array $resolved = array();
 
 	/**
+	 * Strings that can never be stored (see InlineMarkup::survivesSanitize()):
+	 * string id => reason. Nothing is sent for them.
+	 *
+	 * @var array<int, string>
+	 */
+	private array $rejected = array();
+
+	/**
 	 * Build the plan.
 	 *
 	 * @param array<int, array{text: string, kind: string, segment?: bool}> $strings String id => original, kind and
@@ -90,6 +98,10 @@ final class RequestPlan {
 					'translation' => $string['text'],
 					'flags'       => 0,
 				);
+				continue;
+			}
+			if ( Segment::INLINE === $string['kind'] && ! InlineMarkup::survivesSanitize( $string['text'] ) ) {
+				$this->rejected[ $id ] = InlineMarkup::UNSTORABLE;
 				continue;
 			}
 			if ( Segment::INLINE === $string['kind'] && $caps->supportsHtml && ! $segmentInline && ! ( $string['segment'] ?? false ) ) {
@@ -165,6 +177,15 @@ final class RequestPlan {
 	}
 
 	/**
+	 * Whether a string was refused without a request; retrying cannot help.
+	 *
+	 * @param int $stringId String id.
+	 */
+	public function isRejected( int $stringId ): bool {
+		return isset( $this->rejected[ $stringId ] );
+	}
+
+	/**
 	 * Characters that will be sent, for budgets and rate limits.
 	 */
 	public function chars(): int {
@@ -184,7 +205,7 @@ final class RequestPlan {
 	 */
 	public function complete( array $unitTranslations ): array {
 		$translated = $this->resolved;
-		$failed     = array();
+		$failed     = $this->rejected;
 
 		foreach ( $this->strings as $id => $plan ) {
 			$restored = array();

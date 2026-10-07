@@ -209,6 +209,9 @@ final class StringStore {
 			throw new \InvalidArgumentException( 'Original and translation must not be empty.' );
 		}
 		if ( Segment::INLINE === $kind ) {
+			if ( ! InlineMarkup::survivesSanitize( $original ) ) {
+				throw new \InvalidArgumentException( InlineMarkup::UNSTORABLE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Fixed message.
+			}
 			// Reject extra or changed markup instead of silently stripping it;
 			// sanitising afterwards is a second line of defence.
 			if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {

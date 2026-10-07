@@ -302,7 +302,9 @@ final class Worker {
 			$units = $plan->unitsOf( $sid );
 			if ( array() === array_diff( $units, array_keys( $sent ) ) ) {
 				$message = $this->firstError( $units, $unitErrors ) ?? ( $outcome['failed'][ $sid ] ?? ( '' === $requestError ? 'Translation failed.' : $requestError ) );
-				$this->queue->fail( $row, $message, $limits->maxAttempts, $fallback, $now );
+				// A string refused by the plan fails at once: no retry or other provider can store it.
+				$rejected = $plan->isRejected( $sid );
+				$this->queue->fail( $row, $message, $rejected ? 1 : $limits->maxAttempts, $rejected ? '' : $fallback, $now );
 				++$report->failed;
 				++$failedHere;
 				continue;

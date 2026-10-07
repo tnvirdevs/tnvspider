@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace WST\Tests\Integration\Queue;
 
 use WP_UnitTestCase;
+use WST\Html\InlineMarkup;
 use WST\Database\Schema;
 use WST\Languages\Registry;
 use WST\Log\Logger;
@@ -455,6 +456,33 @@ final class WorkerTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'BN: Go <b>BN: now</b>', $this->translation( 'Go <b>now</b>' )['translated'] ?? null );
 		$this->assertSame( RequestPlan::FLAG_SEGMENTED, $this->translationFlags( 'Go <b>now</b>' ) );
+	}
+
+	public function test_comment_reply_string_with_a_hidden_link_is_stored_in_one_run(): void {
+		// Known issue 11: failed five times on live TranslateX before the fix.
+		$original = 'Leave a comment <small><a rel="nofollow" id="cancel-comment-reply-link" href="/hello-world/#respond" style="display:none;">Cancel reply</a></small>';
+		$this->enqueue( array( $original => 'inline' ) );
+		$this->primary->translator = static fn( string $text, string $target ): string => strtoupper( $target ) . ': ' . $text;
+
+		$this->worker()->run();
+
+		$this->assertSame(
+			'BN: Leave a comment <small><a rel="nofollow" id="cancel-comment-reply-link" href="/hello-world/#respond" style="display:none">Cancel reply</a></small>',
+			$this->translation( $original )['translated'] ?? null
+		);
+		$this->assertSame( 0, $this->translationFlags( $original ), 'Whole sentence, no segment fallback.' );
+	}
+
+	public function test_original_that_kses_would_change_fails_at_once_without_a_request(): void {
+		$original = 'Drag <span style="user-select:none">here</span>';
+		$ids      = $this->enqueue( array( $original => 'inline' ) );
+
+		$this->worker( array( 'fallback_provider' => 'microsoft' ) )->run();
+
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT state, attempts, provider, last_error FROM %i WHERE string_id = %d', $this->schema->table( 'queue' ), $ids[ $original ] ) );
+		$this->assertSame( array( 'failed', '1', 'translatex', InlineMarkup::UNSTORABLE ), array( $row->state, $row->attempts, $row->provider, $row->last_error ), 'No retries, no fallback.' );
+		$this->assertSame( array(), $this->primary->calls );
 	}
 
 	private function translationFlags( string $text ): ?int {

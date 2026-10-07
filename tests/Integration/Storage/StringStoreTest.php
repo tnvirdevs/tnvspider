@@ -8,6 +8,7 @@ declare(strict_types=1);
 namespace WST\Tests\Integration\Storage;
 
 use WP_UnitTestCase;
+use WST\Html\InlineMarkup;
 use WST\Database\Schema;
 use WST\Storage\StringStore;
 
@@ -147,5 +148,20 @@ final class StringStoreTest extends WP_UnitTestCase {
 	public function test_page_key_normalisation(): void {
 		$this->assertSame( StringStore::pageKey( '/shop' ), StringStore::pageKey( 'shop/?orderby=price' ) );
 		$this->assertSame( '/', StringStore::normalizePath( '/' ) );
+	}
+
+	public function test_manual_translation_of_a_styled_inline_string_is_accepted(): void {
+		$original = 'Leave a comment <small><a href="#respond" style="display:none;">Cancel reply</a></small>';
+
+		$this->store->saveManual( $original, 'inline', 'bn_BD', 'মন্তব্য করুন <small><a href="#respond" style="display:none;">বাতিল</a></small>', 1 );
+
+		$this->assertSame( 'মন্তব্য করুন <small><a href="#respond" style="display:none">বাতিল</a></small>', $this->store->find( $original, 'bn_BD' )['translated'] ?? null );
+	}
+
+	public function test_manual_translation_of_an_unstorable_original_is_refused_with_the_reason(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( InlineMarkup::UNSTORABLE );
+
+		$this->store->saveManual( 'Drag <span style="user-select:none">here</span>', 'inline', 'bn_BD', 'টানুন <span style="user-select:none">এখানে</span>', 1 );
 	}
 }

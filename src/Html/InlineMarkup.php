@@ -16,9 +16,14 @@ namespace WST\Html;
  */
 final class InlineMarkup {
 
+	/** Reason given for an original that wp_kses() would alter (see survivesSanitize()). */
+	public const UNSTORABLE = 'The original uses markup that WordPress removes when saving HTML (wp_kses, for example an unsupported CSS property), so no translation can be stored without changing the page. Exclude the element or translate it in the theme.';
+
 	/**
 	 * Tag sequence of an HTML fragment: openers with their sorted attributes
-	 * and closers, e.g. ['A href="/x"', '/A'].
+	 * and closers, e.g. ['A href="/x"', '/A']. Style values are compared by
+	 * their declarations, because wp_kses() (sanitize()) rewrites
+	 * "display:none;" as "display:none" (known issue 11).
 	 *
 	 * @param string $html Fragment.
 	 * @return list<string>
@@ -39,7 +44,10 @@ final class InlineMarkup {
 			sort( $names );
 			foreach ( $names as $name ) {
 				$value = $processor->get_attribute( $name );
-				$tag  .= ' ' . $name . ( true === $value ? '' : '="' . (string) $value . '"' );
+				if ( 'style' === $name && is_string( $value ) ) {
+					$value = self::declarations( $value );
+				}
+				$tag .= ' ' . $name . ( true === $value ? '' : '="' . (string) $value . '"' );
 			}
 			$tags[] = $tag;
 		}
@@ -63,6 +71,36 @@ final class InlineMarkup {
 		sort( $sorted );
 
 		return $a === $sorted && self::wellNested( $b );
+	}
+
+	/**
+	 * Whether wp_kses() keeps the original's markup as it is (up to style
+	 * formatting). When it does not (for example an unsupported CSS property
+	 * such as user-select), no translation of the string can be stored
+	 * without changing how the page behaves.
+	 *
+	 * @param string $original Original inline HTML.
+	 */
+	public static function survivesSanitize( string $original ): bool {
+		return self::signature( $original ) === self::signature( self::sanitize( $original, $original ) );
+	}
+
+	/**
+	 * A style value as its declarations: trimmed, empty ones dropped,
+	 * joined with ";" (the form safecss_filter_attr() produces).
+	 *
+	 * @param string $style Style attribute value.
+	 */
+	private static function declarations( string $style ): string {
+		$parts = array();
+		foreach ( explode( ';', $style ) as $declaration ) {
+			$declaration = trim( $declaration );
+			if ( '' !== $declaration ) {
+				$parts[] = $declaration;
+			}
+		}
+
+		return implode( ';', $parts );
 	}
 
 	/**
