@@ -22,3 +22,10 @@
 /phpstan.neon.dist
 /CLAUDE.md
 /HANDOVER.md
+/.tools
+/dist
+/.phpunit.result.cache
+/.phpunit.cache
+/composer.local.json
+/composer.local.lock
+/build/*-rtl.css
