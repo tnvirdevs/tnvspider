@@ -91,4 +91,57 @@ final class SettingsTest extends WP_UnitTestCase {
 		$this->assertSame( Settings::MODE_MANUAL, $settings->siteMode() );
 		$this->assertSame( Settings::SCHEMA, $settings->toArray()['schema'] );
 	}
+
+	public function test_phase4_keys_default_and_validate(): void {
+		$defaults = new Settings( array( 'target_language' => 'bn_BD' ), 'en_US', new Registry() );
+		$this->assertSame( 'native', $defaults->choice( 'name_style' ) );
+		$this->assertSame( 'names', $defaults->choice( 'switcher_style' ) );
+		$this->assertSame( 'bottom-right', $defaults->choice( 'switcher_position' ) );
+		$this->assertSame( 'inherit', $defaults->choice( 'switcher_theme' ) );
+		$this->assertSame( 'warning', $defaults->choice( 'log_level' ) );
+		$this->assertSame( Settings::SWITCHER_COLORS, $defaults->switcherColors() );
+		$this->assertFalse( $defaults->flag( 'switcher_floating' ) );
+		$this->assertFalse( $defaults->flag( 'delete_on_uninstall' ) );
+		$this->assertNull( $defaults->defaultPrefix() );
+
+		$settings = new Settings(
+			array(
+				'target_language'   => 'bn_BD',
+				'default_slug'      => 'english',
+				'prefix_default'    => true,
+				'name_style'        => 'english',
+				'switcher_style'    => 'flags',
+				'switcher_colors'   => array(
+					'text'   => '#ABC',
+					'accent' => 'blue',
+				),
+				'exclude_selectors' => array( '.a', 'div > p', '#b [data-x="1"]' ),
+				'log_level'         => 'debug',
+			),
+			'en_US',
+			new Registry()
+		);
+		$this->assertSame( 'english', $settings->defaultPrefix() );
+		$this->assertSame( 'english', $settings->defaultLanguage()->slug() );
+		$this->assertSame( 'english', $settings->choice( 'name_style' ) );
+		$this->assertSame( 'names', $settings->choice( 'switcher_style' ), 'Flags are not offered (text-only styles).' );
+		$this->assertSame( '#abc', $settings->switcherColors()['text'] );
+		$this->assertSame( Settings::SWITCHER_COLORS['accent'], $settings->switcherColors()['accent'] );
+		$this->assertSame( array( '.a', '#b [data-x="1"]' ), $settings->excludeSelectors() );
+		$this->assertSame( 'warning', $settings->choice( 'log_level' ) );
+	}
+
+	public function test_default_prefix_is_off_when_it_would_equal_the_target_prefix(): void {
+		$settings = new Settings(
+			array(
+				'target_language' => 'bn_BD',
+				'target_slug'     => 'en',
+				'prefix_default'  => true,
+			),
+			'en_US',
+			new Registry()
+		);
+
+		$this->assertNull( $settings->defaultPrefix() );
+	}
 }

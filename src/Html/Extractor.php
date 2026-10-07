@@ -16,6 +16,17 @@ namespace WST\Html;
  */
 final class Extractor {
 
+	/**
+	 * Create an extractor.
+	 *
+	 * @param Selectors|null $exclude User exclude selectors (plan §13), or null.
+	 */
+	public function __construct( private ?Selectors $exclude = null ) {
+		if ( null !== $this->exclude && $this->exclude->isEmpty() ) {
+			$this->exclude = null;
+		}
+	}
+
 	/** Tags whose content may be merged into one inline segment. */
 	private const INLINE_TAGS = array(
 		'A'      => true,
@@ -260,6 +271,16 @@ final class Extractor {
 		$parent         = $this->current();
 		$parentExcluded = null !== $parent && $parent->excluded;
 		$excluded       = $parentExcluded || isset( self::EXCLUDED_TAGS[ $tag ] ) || $this->hasNoTranslateMarker();
+		$info           = null === $this->exclude ? null : $this->elementInfo( $tag );
+		if ( ! $excluded && null !== $info && null !== $this->exclude ) {
+			$ancestors = array();
+			foreach ( $this->frames as $open ) {
+				if ( null !== $open->info ) {
+					$ancestors[] = $open->info;
+				}
+			}
+			$excluded = $this->exclude->matches( $info, $ancestors );
+		}
 
 		if ( $excluded || ! isset( self::INLINE_TAGS[ $tag ] ) ) {
 			$this->breakInline();
@@ -284,6 +305,7 @@ final class Extractor {
 
 		$frame          = new Frame( $tag, $start + $length, count( $this->segments ), $excluded );
 		$frame->foreign = 'SVG' === $tag || 'MATH' === $tag;
+		$frame->info    = $info;
 		$this->frames[] = $frame;
 
 		if ( $frame->foreign ) {
@@ -447,6 +469,37 @@ final class Extractor {
 		if ( Text::isTranslatable( $normalized ) ) {
 			$this->segments[] = new Segment( $kind, $normalized, $start, $length, '', '', $attribute );
 		}
+	}
+
+	/**
+	 * Tag, id, classes and the attributes the exclude selectors read, of the
+	 * current start tag.
+	 *
+	 * @param string $tag Upper-case tag name.
+	 * @return array{tag: string, id: string, classes: list<string>, attrs: array<string, string>}
+	 */
+	private function elementInfo( string $tag ): array {
+		$id      = $this->lexer->get_attribute( 'id' );
+		$classes = array();
+		if ( isset( $this->attributes['class'] ) ) {
+			foreach ( $this->lexer->class_list() as $class ) {
+				$classes[] = (string) $class;
+			}
+		}
+		$attrs = array();
+		foreach ( null === $this->exclude ? array() : $this->exclude->attributeNames() as $name ) {
+			$value = isset( $this->attributes[ $name ] ) ? $this->lexer->get_attribute( $name ) : null;
+			if ( null !== $value ) {
+				$attrs[ $name ] = true === $value ? '' : (string) $value;
+			}
+		}
+
+		return array(
+			'tag'     => $tag,
+			'id'      => is_string( $id ) ? $id : '',
+			'classes' => $classes,
+			'attrs'   => $attrs,
+		);
 	}
 
 	/**

@@ -497,6 +497,121 @@ final class StringStore {
 	}
 
 	/**
+	 * Delete machine translations (status 1); manual ones stay.
+	 *
+	 * @param string|null $lang Only this locale, or all.
+	 * @return int Rows deleted.
+	 */
+	public function deleteMachineTranslations( ?string $lang ): int {
+		$sql = null === $lang
+			? $this->prepare( 'DELETE FROM %i WHERE status = %d', $this->schema->table( 'translations' ), self::STATUS_MACHINE )
+			: $this->prepare( 'DELETE FROM %i WHERE status = %d AND lang = %s', $this->schema->table( 'translations' ), self::STATUS_MACHINE, $lang );
+		$this->query( $sql );
+		self::flushCache();
+
+		return (int) $this->db->rows_affected;
+	}
+
+	/**
+	 * Site-wide coverage in one language: known strings, and how many have a
+	 * machine or a manual translation.
+	 *
+	 * @param string $lang Target locale.
+	 * @return array{total: int, machine: int, manual: int}
+	 */
+	public function siteCoverage( string $lang ): array {
+		$row = $this->first(
+			$this->prepare(
+				'SELECT (SELECT COUNT(*) FROM %i) AS total, COALESCE(SUM(status = %d), 0) AS machine, COALESCE(SUM(status = %d), 0) AS manual FROM %i WHERE lang = %s',
+				$this->schema->table( 'strings' ),
+				self::STATUS_MACHINE,
+				self::STATUS_MANUAL,
+				$this->schema->table( 'translations' ),
+				$lang
+			)
+		);
+
+		return array(
+			'total'   => null === $row ? 0 : (int) $row->total,
+			'machine' => null === $row ? 0 : (int) $row->machine,
+			'manual'  => null === $row ? 0 : (int) $row->manual,
+		);
+	}
+
+	/**
+	 * Orphan strings (plan §4): no occurrence, not global, no manual
+	 * translation, recorded more than $days ago.
+	 *
+	 * @param int $days Minimum age in days.
+	 * @return array{count: int, chars: int}
+	 */
+	public function orphans( int $days ): array {
+		$row = $this->first( $this->prepare( 'SELECT COUNT(*) AS n, COALESCE(SUM(s.char_count), 0) AS chars ' . self::ORPHAN_SQL, $this->orphanArgs( $days ) ) );
+
+		return array(
+			'count' => null === $row ? 0 : (int) $row->n,
+			'chars' => null === $row ? 0 : (int) $row->chars,
+		);
+	}
+
+	/**
+	 * Delete orphan strings with their machine translations and queue rows.
+	 *
+	 * @param int $days Minimum age in days.
+	 * @return int Strings deleted.
+	 */
+	public function deleteOrphans( int $days ): int {
+		$ids = array_map( static fn( \stdClass $row ): int => (int) $row->id, $this->results( $this->prepare( 'SELECT s.id ' . self::ORPHAN_SQL, $this->orphanArgs( $days ) ) ) );
+		foreach ( array_chunk( $ids, 500 ) as $chunk ) {
+			$list = implode( ',', array_fill( 0, count( $chunk ), '%d' ) );
+			foreach ( array(
+				'translations' => 'string_id',
+				'queue'        => 'string_id',
+				'strings'      => 'id',
+			) as $table => $column ) {
+				$this->query( $this->prepare( 'DELETE FROM %i WHERE ' . $column . ' IN (' . $list . ')', array_merge( array( $this->schema->table( $table ) ), $chunk ) ) ); // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Column names are fixed; placeholder list built above.
+			}
+		}
+		self::flushCache();
+
+		return count( $ids );
+	}
+
+	/**
+	 * Drop cached translations after a bulk delete; caches without group
+	 * flushing are flushed entirely (rare admin action, correctness first).
+	 */
+	private static function flushCache(): void {
+		if ( wp_cache_supports( 'flush_group' ) ) {
+			wp_cache_flush_group( self::CACHE_GROUP );
+
+			return;
+		}
+		wp_cache_flush();
+	}
+
+	/** FROM/WHERE of the orphan query; placeholders filled by orphanArgs(). */
+	private const ORPHAN_SQL = 'FROM %i s WHERE s.is_global = 0 AND s.created_at < %s'
+		. ' AND NOT EXISTS (SELECT 1 FROM %i o WHERE o.string_id = s.id)'
+		. ' AND NOT EXISTS (SELECT 1 FROM %i t WHERE t.string_id = s.id AND t.status = %d)';
+
+	/**
+	 * Arguments for ORPHAN_SQL.
+	 *
+	 * @param int $days Minimum age in days.
+	 * @return list<int|string>
+	 */
+	private function orphanArgs( int $days ): array {
+		return array(
+			$this->schema->table( 'strings' ),
+			gmdate( 'Y-m-d H:i:s', time() - max( 0, $days ) * DAY_IN_SECONDS ),
+			$this->schema->table( 'occurrences' ),
+			$this->schema->table( 'translations' ),
+			self::STATUS_MANUAL,
+		);
+	}
+
+	/**
 	 * Number of queue rows still waiting for automatic translation for these
 	 * strings, ignoring rows older than $maxAgeSeconds.
 	 *

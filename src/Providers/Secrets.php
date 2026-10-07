@@ -56,6 +56,24 @@ final class Secrets {
 	}
 
 	/**
+	 * Where a secret comes from: constant, env, option, or '' when not set.
+	 * The admin shows this instead of any part of the value.
+	 *
+	 * @param string $name Secret name.
+	 */
+	public function source( string $name ): string {
+		if ( ! $this->has( $name ) ) {
+			return '';
+		}
+		if ( defined( $name ) ) {
+			return 'constant';
+		}
+		$env = getenv( $name );
+
+		return is_string( $env ) && '' !== trim( $env ) ? 'env' : 'option';
+	}
+
+	/**
 	 * Whether a secret is configured.
 	 *
 	 * @param string $name Secret name.

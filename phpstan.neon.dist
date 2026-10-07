@@ -5,6 +5,7 @@ parameters:
 	phpVersion: 80000
 	paths:
 		- wp-site-translator.php
+		- uninstall.php
 		- src
 	treatPhpDocTypesAsCertain: false
 	scanFiles:

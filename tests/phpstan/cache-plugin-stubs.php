@@ -19,3 +19,13 @@
 function rocket_clean_files( $urls, $filesystem = null, $run_actions = true ) {
 	return array();
 }
+
+/**
+ * WP Rocket 3.23.5.1, inc/functions/files.php.
+ *
+ * @param string      $lang       Language code.
+ * @param object|null $filesystem Filesystem handler.
+ * @return void
+ */
+function rocket_clean_domain( $lang = '', $filesystem = null ) {
+}

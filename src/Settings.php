@@ -10,7 +10,9 @@ declare(strict_types=1);
 namespace WST;
 
 use WST\Languages\Language;
+use WST\Html\Selectors;
 use WST\Languages\Registry;
+use WST\Log\Logger;
 
 /**
  * Validated, typed view of the wst_settings option. Only settings that
@@ -34,6 +36,28 @@ final class Settings {
 	/** What a target-language URL of an "off" page does: redirect to the original URL, or show the original text. */
 	public const OFF_REDIRECT = 'redirect';
 	public const OFF_ORIGINAL = 'original';
+
+	/** A URL slug: lowercase letters, digits and hyphens, up to 20 characters. */
+	public const SLUG_PATTERN = '/^[a-z0-9][a-z0-9-]{0,19}$/';
+
+	/** Language names in the switcher: in the language itself, or in English. */
+	public const NAME_STYLES = array( 'native', 'english' );
+
+	/** Switcher labels: full names, short codes (EN, BN), or both. Text only (flags: HANDOVER gate). */
+	public const SWITCHER_STYLES = array( 'names', 'codes', 'codes_names' );
+
+	/** Corner of the floating switcher. */
+	public const SWITCHER_POSITIONS = array( 'bottom-right', 'bottom-left', 'top-right', 'top-left' );
+
+	/** Switcher colours: follow the theme, light, dark, or custom colours. */
+	public const SWITCHER_THEMES = array( 'inherit', 'light', 'dark', 'custom' );
+
+	/** Default custom colours. */
+	public const SWITCHER_COLORS = array(
+		'text'       => '#1e1e1e',
+		'background' => '#ffffff',
+		'accent'     => '#2271b1',
+	);
 
 	/** Most path rules kept. */
 	public const MAX_PATH_RULES = 200;
@@ -64,6 +88,14 @@ final class Settings {
 	 *     default_language: string,
 	 *     target_language: string,
 	 *     target_slug: string,
+	 *     default_slug: string,
+	 *     prefix_default: bool,
+	 *     name_style: string,
+	 *     switcher_style: string,
+	 *     switcher_floating: bool,
+	 *     switcher_position: string,
+	 *     switcher_theme: string,
+	 *     switcher_colors: array{text: string, background: string, accent: string},
 	 *     site_mode: string,
 	 *     discover_on_visit: bool,
 	 *     block_crawlers: bool,
@@ -72,6 +104,9 @@ final class Settings {
 	 *     hreflang_drop_region: bool,
 	 *     discovery_query_args: list<string>,
 	 *     never_discover_paths: list<string>,
+	 *     exclude_selectors: list<string>,
+	 *     log_level: string,
+	 *     delete_on_uninstall: bool,
 	 *     path_rules: list<array{path: string, mode: string}>,
 	 *     off_behavior: string,
 	 *     discovery_cap_page_hour: int,
@@ -144,7 +179,20 @@ final class Settings {
 	 * The site's own language.
 	 */
 	public function defaultLanguage(): Language {
-		return $this->registry->get( $this->values['default_language'] );
+		$language = $this->registry->get( $this->values['default_language'] );
+
+		return '' === $this->values['default_slug'] ? $language : $language->withSlug( $this->values['default_slug'] );
+	}
+
+	/**
+	 * Slug of the default language's URL prefix when "prefix the default
+	 * language" is on and the slug differs from the target's, else null.
+	 */
+	public function defaultPrefix(): ?string {
+		$target = $this->targetLanguage();
+		$slug   = $this->defaultLanguage()->slug();
+
+		return $this->values['prefix_default'] && ( null === $target || $target->slug() !== $slug ) ? $slug : null;
 	}
 
 	/**
@@ -228,6 +276,38 @@ final class Settings {
 	}
 
 	/**
+	 * A choice setting (name_style, switcher_style, switcher_position, switcher_theme).
+	 *
+	 * @param string $key Setting key.
+	 * @throws \InvalidArgumentException For a key that is not a choice.
+	 */
+	public function choice( string $key ): string {
+		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level' ), true ) ) {
+			throw new \InvalidArgumentException( 'Not a choice setting: ' . esc_html( $key ) );
+		}
+
+		return (string) $this->values[ $key ];
+	}
+
+	/**
+	 * Custom switcher colours.
+	 *
+	 * @return array{text: string, background: string, accent: string}
+	 */
+	public function switcherColors(): array {
+		return $this->values['switcher_colors'];
+	}
+
+	/**
+	 * User exclude selectors (supported subset only, plan §13).
+	 *
+	 * @return list<string>
+	 */
+	public function excludeSelectors(): array {
+		return $this->values['exclude_selectors'];
+	}
+
+	/**
 	 * Path rules in order; the first match wins (plan §9).
 	 *
 	 * @return list<array{path: string, mode: string}>
@@ -261,6 +341,14 @@ final class Settings {
 	 *     default_language: string,
 	 *     target_language: string,
 	 *     target_slug: string,
+	 *     default_slug: string,
+	 *     prefix_default: bool,
+	 *     name_style: string,
+	 *     switcher_style: string,
+	 *     switcher_floating: bool,
+	 *     switcher_position: string,
+	 *     switcher_theme: string,
+	 *     switcher_colors: array{text: string, background: string, accent: string},
 	 *     site_mode: string,
 	 *     discover_on_visit: bool,
 	 *     block_crawlers: bool,
@@ -269,6 +357,9 @@ final class Settings {
 	 *     hreflang_drop_region: bool,
 	 *     discovery_query_args: list<string>,
 	 *     never_discover_paths: list<string>,
+	 *     exclude_selectors: list<string>,
+	 *     log_level: string,
+	 *     delete_on_uninstall: bool,
 	 *     path_rules: list<array{path: string, mode: string}>,
 	 *     off_behavior: string,
 	 *     discovery_cap_page_hour: int,
@@ -287,12 +378,21 @@ final class Settings {
 		$default = '' === $default ? self::readLocale( $siteLocale ) : $default;
 		$target  = self::readLocale( $raw['target_language'] ?? '' );
 		$slug    = isset( $raw['target_slug'] ) && is_string( $raw['target_slug'] ) ? strtolower( trim( $raw['target_slug'], '/ ' ) ) : '';
+		$dslug   = isset( $raw['default_slug'] ) && is_string( $raw['default_slug'] ) ? strtolower( trim( $raw['default_slug'], '/ ' ) ) : '';
 		$mode    = $raw['site_mode'] ?? self::MODE_AUTO;
 
 		return array(
 			'default_language'        => '' === $default ? 'en_US' : $default,
 			'target_language'         => $target === $default ? '' : $target,
-			'target_slug'             => 1 === preg_match( '/^[a-z0-9][a-z0-9-]{0,19}$/', $slug ) ? $slug : '',
+			'target_slug'             => 1 === preg_match( self::SLUG_PATTERN, $slug ) ? $slug : '',
+			'default_slug'            => 1 === preg_match( self::SLUG_PATTERN, $dslug ) ? $dslug : '',
+			'prefix_default'          => self::readBool( $raw, 'prefix_default', false ),
+			'name_style'              => self::readChoice( $raw, 'name_style', self::NAME_STYLES ),
+			'switcher_style'          => self::readChoice( $raw, 'switcher_style', self::SWITCHER_STYLES ),
+			'switcher_floating'       => self::readBool( $raw, 'switcher_floating', false ),
+			'switcher_position'       => self::readChoice( $raw, 'switcher_position', self::SWITCHER_POSITIONS ),
+			'switcher_theme'          => self::readChoice( $raw, 'switcher_theme', self::SWITCHER_THEMES ),
+			'switcher_colors'         => self::readColors( $raw['switcher_colors'] ?? array() ),
 			'site_mode'               => self::MODE_MANUAL === $mode ? self::MODE_MANUAL : self::MODE_AUTO,
 			'discover_on_visit'       => self::readBool( $raw, 'discover_on_visit', true ),
 			'block_crawlers'          => self::readBool( $raw, 'block_crawlers', true ),
@@ -301,6 +401,9 @@ final class Settings {
 			'hreflang_drop_region'    => self::readBool( $raw, 'hreflang_drop_region', false ),
 			'discovery_query_args'    => self::readList( $raw, 'discovery_query_args', array( 'paged' ) ),
 			'never_discover_paths'    => self::readList( $raw, 'never_discover_paths', array() ),
+			'log_level'               => self::readChoice( $raw, 'log_level', Logger::LEVELS ),
+			'delete_on_uninstall'     => self::readBool( $raw, 'delete_on_uninstall', false ),
+			'exclude_selectors'       => array_slice( array_values( array_filter( self::readList( $raw, 'exclude_selectors', array() ), array( Selectors::class, 'isValid' ) ) ), 0, Selectors::MAX ),
 			'path_rules'              => self::readPathRules( $raw['path_rules'] ?? array() ),
 			'off_behavior'            => self::OFF_ORIGINAL === ( $raw['off_behavior'] ?? '' ) ? self::OFF_ORIGINAL : self::OFF_REDIRECT,
 			'discovery_cap_page_hour' => self::readInt( $raw, 'discovery_cap_page_hour', 100, 100000 ),
@@ -339,6 +442,38 @@ final class Settings {
 		}
 
 		return array_slice( $rules, 0, self::MAX_PATH_RULES );
+	}
+
+	/**
+	 * One of $choices (the first is the default).
+	 *
+	 * @param array<string, mixed> $raw     Raw values.
+	 * @param string               $key     Key.
+	 * @param string[]             $choices Allowed values (first = default).
+	 * @phpstan-param list<string> $choices
+	 */
+	private static function readChoice( array $raw, string $key, array $choices ): string {
+		$value = $raw[ $key ] ?? null;
+
+		return is_string( $value ) && in_array( $value, $choices, true ) ? $value : $choices[0];
+	}
+
+	/**
+	 * Custom switcher colours: #rgb or #rrggbb, defaults for anything else.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array{text: string, background: string, accent: string}
+	 */
+	private static function readColors( $value ): array {
+		$colors = self::SWITCHER_COLORS;
+		foreach ( array_keys( $colors ) as $key ) {
+			$given = is_array( $value ) ? ( $value[ $key ] ?? null ) : null;
+			if ( is_string( $given ) && 1 === preg_match( '/^#(?:[0-9a-f]{3}){1,2}$/i', $given ) ) {
+				$colors[ $key ] = strtolower( $given );
+			}
+		}
+
+		return $colors;
 	}
 
 	/**

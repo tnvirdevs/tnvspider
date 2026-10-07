@@ -189,6 +189,7 @@ final class PostPanelTest extends WP_UnitTestCase {
 	}
 
 	public function test_missing_build_is_reported_not_silent(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		set_current_screen( 'post' );
 
 		$this->panel( '/nonexistent/wp-site-translator.php' )->enqueueBlockEditor();

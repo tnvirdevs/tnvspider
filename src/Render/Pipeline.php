@@ -13,6 +13,7 @@ use WST\Html\Extractor;
 use WST\Html\InlineMarkup;
 use WST\Html\Replacer;
 use WST\Html\Segment;
+use WST\Html\Selectors;
 use WST\Languages\Current;
 use WST\Languages\Language;
 use WST\Log\Logger;
@@ -141,7 +142,7 @@ final class Pipeline {
 	 */
 	public function process( string $html, PageContext $context ): string {
 		$this->pending = 0;
-		$extractor     = new Extractor();
+		$extractor     = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
 		$segments      = $extractor->extract( $html );
 		if ( Settings::MODE_OFF === $context->mode ) {
 			// "Off" page shown with its original text: links stay in the

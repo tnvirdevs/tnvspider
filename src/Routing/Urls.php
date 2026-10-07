@@ -18,14 +18,16 @@ final class Urls {
 	/**
 	 * Create the helper.
 	 *
-	 * @param string $homePath   Path of the home URL without trailing slash, '' for the domain root.
-	 * @param string $homeHost   Host of the home URL, lower case.
-	 * @param string $restPrefix REST URL prefix, usually wp-json.
+	 * @param string      $homePath   Path of the home URL without trailing slash, '' for the domain root.
+	 * @param string      $homeHost   Host of the home URL, lower case.
+	 * @param string      $restPrefix    REST URL prefix, usually wp-json.
+	 * @param string|null $defaultPrefix Slug prefixing default-language URLs, or null.
 	 */
 	public function __construct(
 		private string $homePath,
 		private string $homeHost,
-		private string $restPrefix
+		private string $restPrefix,
+		private ?string $defaultPrefix = null
 	) {
 		$this->homePath = rtrim( $homePath, '/' );
 		$this->homeHost = strtolower( $homeHost );
@@ -34,14 +36,22 @@ final class Urls {
 	/**
 	 * Build from a home URL.
 	 *
-	 * @param string $homeUrl    Unfiltered home URL.
-	 * @param string $restPrefix REST URL prefix.
+	 * @param string      $homeUrl       Unfiltered home URL.
+	 * @param string      $restPrefix    REST URL prefix.
+	 * @param string|null $defaultPrefix Slug prefixing default-language URLs (Settings::defaultPrefix()), or null.
 	 */
-	public static function fromHome( string $homeUrl, string $restPrefix ): self {
+	public static function fromHome( string $homeUrl, string $restPrefix, ?string $defaultPrefix = null ): self {
 		$parts = wp_parse_url( $homeUrl );
 		$parts = is_array( $parts ) ? $parts : array();
 
-		return new self( (string) ( $parts['path'] ?? '' ), (string) ( $parts['host'] ?? '' ), $restPrefix );
+		return new self( (string) ( $parts['path'] ?? '' ), (string) ( $parts['host'] ?? '' ), $restPrefix, $defaultPrefix );
+	}
+
+	/**
+	 * Slug prefixing default-language URLs, or null when they have none.
+	 */
+	public function defaultPrefix(): ?string {
+		return $this->defaultPrefix;
 	}
 
 	/**
@@ -119,16 +129,22 @@ final class Urls {
 	 * query string, e.g. /blog/shop/ for /blog/bn/shop/?x=1. Null when the URI
 	 * is outside the home path or exempt.
 	 *
-	 * @param string $uri  Request URI.
-	 * @param string $slug Language slug.
+	 * @param string $uri      Request URI.
+	 * @param string ...$slugs Language slugs that may prefix the path (the first match is stripped).
 	 */
-	public function unprefixedPath( string $uri, string $slug ): ?string {
+	public function unprefixedPath( string $uri, string ...$slugs ): ?string {
 		$relative = $this->relativePath( $uri );
 		if ( null === $relative || $this->isExempt( $relative ) ) {
 			return null;
 		}
-		if ( $this->hasPrefix( $relative, $slug ) ) {
-			$relative = substr( $relative, strlen( $slug ) + 1 );
+		if ( null !== $this->defaultPrefix ) {
+			$slugs[] = $this->defaultPrefix;
+		}
+		foreach ( $slugs as $slug ) {
+			if ( $this->hasPrefix( $relative, $slug ) ) {
+				$relative = substr( $relative, strlen( $slug ) + 1 );
+				break;
+			}
 		}
 
 		return $this->homePath . '/' . $relative;
@@ -150,6 +166,10 @@ final class Urls {
 		$relative                   = $this->relativePath( $path );
 		if ( null === $relative || $this->isExempt( $relative ) || $this->hasPrefix( $relative, $slug ) ) {
 			return $url;
+		}
+		// Another language's prefix is replaced, never stacked (/en/x -> /bn/x).
+		if ( null !== $this->defaultPrefix && $slug !== $this->defaultPrefix && $this->hasPrefix( $relative, $this->defaultPrefix ) ) {
+			$relative = substr( $relative, strlen( $this->defaultPrefix ) + 1 );
 		}
 
 		return $origin . $this->homePath . '/' . $slug . '/' . $relative . $suffix;

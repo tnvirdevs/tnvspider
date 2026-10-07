@@ -52,7 +52,7 @@ final class OffPagesTest extends WP_UnitTestCase {
 		return array(
 			new OffPages( $settings, $modes, $byLang ),
 			new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ),
-			new Switcher( $settings->defaultLanguage(), $target, $byLang, $modes ),
+			new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, dirname( __DIR__, 3 ) . '/wp-site-translator.php' ),
 		);
 	}
 
@@ -111,12 +111,14 @@ final class OffPagesTest extends WP_UnitTestCase {
 		$this->assertTrue( true, 'No redirect.' );
 	}
 
-	public function test_off_pages_have_no_alternates_and_no_switcher(): void {
+	public function test_off_pages_have_no_alternates_and_the_switcher_links_the_other_language_home(): void {
 		[ , $head, $switcher ] = $this->boot();
 
 		$this->go_to( '/private-offer/' );
 		$this->assertNull( $head->alternates() );
-		$this->assertSame( '', $switcher->render() );
+		$html = $switcher->render();
+		$this->assertStringContainsString( 'href="http://example.org/bn/" hreflang="bn-BD"', $html, 'Plan §12: no counterpart, so the language home.' );
+		$this->assertStringContainsString( 'href="http://example.org/private-offer/" hreflang="en-US"', $html );
 
 		[ , $head, $switcher ] = $this->boot();
 		$this->go_to( '/public-page/' );

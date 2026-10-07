@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WST\Admin;
 
 use WST\Access;
+use WST\Assets;
 use WST\Config;
 use WST\Languages\Language;
 use WST\Modes\Resolver;
@@ -180,28 +181,10 @@ final class PostPanel {
 		if ( null === $screen || ! in_array( $screen->post_type, PagesController::postTypes(), true ) ) {
 			return;
 		}
-		$dir   = dirname( $this->pluginFile ) . '/build/';
-		$asset = $dir . 'post-panel.asset.php';
-		if ( ! is_readable( $asset ) ) {
-			// A packaging error, not a runtime condition: say so where it shows.
-			add_action(
-				'admin_notices',
-				static function (): void {
-					echo '<div class="notice notice-error"><p>' . esc_html__( 'WP Site Translator: build/post-panel.js is missing. Run "npm run build".', 'wp-site-translator' ) . '</p></div>';
-				}
-			);
-
+		if ( ! Assets::registerScript( self::SCRIPT_HANDLE, 'post-panel', $this->pluginFile ) ) {
 			return;
 		}
-		$meta = require $asset;
-		wp_enqueue_script(
-			self::SCRIPT_HANDLE,
-			plugins_url( 'build/post-panel.js', $this->pluginFile ),
-			is_array( $meta ) && isset( $meta['dependencies'] ) ? (array) $meta['dependencies'] : array(),
-			is_array( $meta ) && isset( $meta['version'] ) ? (string) $meta['version'] : Config::VERSION,
-			true
-		);
-		wp_set_script_translations( self::SCRIPT_HANDLE, 'wp-site-translator' );
+		wp_enqueue_script( self::SCRIPT_HANDLE );
 		wp_add_inline_script(
 			self::SCRIPT_HANDLE,
 			'window.wstPostPanel = ' . wp_json_encode(

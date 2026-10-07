@@ -10,6 +10,8 @@ module.exports = [
 		settings: {
 			'import/core-modules': [
 				'@wordpress/api-fetch',
+				'@wordpress/block-editor',
+				'@wordpress/blocks',
 				'@wordpress/components',
 				'@wordpress/core-data',
 				'@wordpress/data',
@@ -17,6 +19,8 @@ module.exports = [
 				'@wordpress/element',
 				'@wordpress/i18n',
 				'@wordpress/plugins',
+				'@wordpress/server-side-render',
+				'@wordpress/url',
 			],
 		},
 	},

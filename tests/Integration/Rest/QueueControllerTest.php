@@ -63,7 +63,7 @@ final class QueueControllerTest extends WP_UnitTestCase {
 		// Only this controller: the plugin booted its own one with the real (keyless) registry.
 		remove_all_actions( 'rest_api_init' );
 		$wp_rest_server = new \WP_REST_Server(); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's REST server global.
-		( new QueueController( $this->queue, $scheduler, $worker ) )->boot();
+		( new QueueController( $this->queue, $scheduler, $worker, $settings, new Selector( $settings, $registry, $state ), $registry ) )->boot();
 		do_action( 'rest_api_init', $wp_rest_server ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
 	}
 

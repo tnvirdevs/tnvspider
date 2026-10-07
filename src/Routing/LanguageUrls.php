@@ -57,12 +57,12 @@ final class LanguageUrls {
 		if ( null === $path ) {
 			return null;
 		}
-		$query   = strpbrk( (string) strtok( $uri, '#' ), '?' );
-		$default = $this->origin . $path . ( $keepQuery && false !== $query ? $query : '' );
+		$query = strpbrk( (string) strtok( $uri, '#' ), '?' );
+		$plain = $this->origin . $path . ( $keepQuery && false !== $query ? $query : '' );
 
 		return array(
-			'default' => $default,
-			'target'  => $this->urls->addPrefix( $default, $this->target->slug() ),
+			'default' => null === $this->urls->defaultPrefix() ? $plain : $this->urls->addPrefix( $plain, (string) $this->urls->defaultPrefix() ),
+			'target'  => $this->urls->addPrefix( $plain, $this->target->slug() ),
 		);
 	}
 

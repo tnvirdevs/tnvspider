@@ -104,6 +104,22 @@ final class Purger {
 	}
 
 	/**
+	 * Ask the known page caches to drop every page, after a settings change
+	 * that alters all output (slugs, switcher, link and hreflang options).
+	 */
+	public static function purgeAll(): void {
+		do_action( 'litespeed_purge_all' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- LiteSpeed Cache's public purge action.
+		if ( function_exists( 'rocket_clean_domain' ) ) {
+			rocket_clean_domain(); // WP Rocket 3.23.5.1 inc/functions/files.php; LiteSpeed's litespeed_purge_all: src/api.cls.php.
+		}
+
+		/**
+		 * Fires when every cached page is outdated.
+		 */
+		do_action( 'wst_purge_all' );
+	}
+
+	/**
 	 * Ask the known page caches to drop these URLs.
 	 *
 	 * @param string[] $urls Absolute URLs.

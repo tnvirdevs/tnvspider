@@ -50,6 +50,14 @@ final class Frame {
 	public int $textNodes = 0;
 
 	/**
+	 * Tag, id, classes and selected attributes, kept only while user exclude
+	 * selectors are configured (ancestor matching).
+	 *
+	 * @var array{tag: string, id: string, classes: list<string>, attrs: array<string, string>}|null
+	 */
+	public ?array $info = null;
+
+	/**
 	 * Open an element.
 	 *
 	 * @param string $tag          Upper-case tag name.

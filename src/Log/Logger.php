@@ -20,16 +20,81 @@ final class Logger {
 	/** Entries kept. */
 	public const KEEP = 1000;
 
+	/** Levels the "log level" setting offers: record warnings and errors, or errors only. */
+	public const LEVELS = array( 'warning', 'error' );
+
 	/**
 	 * Create a logger.
 	 *
-	 * @param \wpdb  $db     Database connection.
-	 * @param Schema $schema Table names.
+	 * @param \wpdb  $db       Database connection.
+	 * @param Schema $schema   Table names.
+	 * @param string $minLevel "warning" (default) or "error": errors are always recorded.
 	 */
 	public function __construct(
 		private \wpdb $db,
-		private Schema $schema
+		private Schema $schema,
+		private string $minLevel = 'warning'
 	) {
+	}
+
+	/**
+	 * Latest entries, newest first.
+	 *
+	 * @param int         $limit  Entries (1–200).
+	 * @param string|null $level  Only this level.
+	 * @param string|null $source Only this source.
+	 * @return list<array{id: int, created_at: string, level: string, source: string, message: string, context: array<string, mixed>}>
+	 * @throws \RuntimeException On a database error.
+	 */
+	public function recent( int $limit, ?string $level = null, ?string $source = null ): array {
+		$where = array( '1=1' );
+		$args  = array( $this->schema->table( 'log' ) );
+		if ( null !== $level ) {
+			$where[] = 'level = %s';
+			$args[]  = $level;
+		}
+		if ( null !== $source ) {
+			$where[] = 'source = %s';
+			$args[]  = $source;
+		}
+		$args[] = max( 1, min( 200, $limit ) );
+		$sql    = $this->db->prepare( 'SELECT id, created_at, level, source, message, context FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY id DESC LIMIT %d', $args ); // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Conditions are fixed strings with placeholders.
+		$rows   = null === $sql ? null : $this->db->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared above.
+		if ( null === $rows || '' !== $this->db->last_error ) {
+			throw new \RuntimeException( 'Could not read the plugin log: ' . esc_html( $this->db->last_error ) );
+		}
+		$entries = array();
+		foreach ( $rows as $row ) {
+			$context   = null === $row->context ? array() : json_decode( (string) $row->context, true );
+			$entries[] = array(
+				'id'         => (int) $row->id,
+				'created_at' => (string) $row->created_at,
+				'level'      => (string) $row->level,
+				'source'     => (string) $row->source,
+				'message'    => (string) $row->message,
+				'context'    => is_array( $context ) ? $context : array(),
+			);
+		}
+
+		return $entries;
+	}
+
+	/**
+	 * Number of entries of a level and source in the last $seconds.
+	 *
+	 * @param string $level   Level.
+	 * @param string $source  Source.
+	 * @param int    $seconds Window.
+	 * @throws \RuntimeException On a database error.
+	 */
+	public function countSince( string $level, string $source, int $seconds ): int {
+		$sql   = $this->db->prepare( 'SELECT COUNT(*) FROM %i WHERE level = %s AND source = %s AND created_at > %s', $this->schema->table( 'log' ), $level, $source, gmdate( 'Y-m-d H:i:s', time() - $seconds ) );
+		$count = null === $sql ? null : $this->db->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared above.
+		if ( null === $count || '' !== $this->db->last_error ) {
+			throw new \RuntimeException( 'Could not read the plugin log: ' . esc_html( $this->db->last_error ) );
+		}
+
+		return (int) $count;
 	}
 
 	/**
@@ -51,7 +116,9 @@ final class Logger {
 	 * @param array<string, mixed> $context Extra data.
 	 */
 	public function warning( string $source, string $message, array $context = array() ): void {
-		$this->write( 'warning', $source, $message, $context );
+		if ( 'error' !== $this->minLevel ) {
+			$this->write( 'warning', $source, $message, $context );
+		}
 	}
 
 	/**

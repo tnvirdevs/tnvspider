@@ -44,7 +44,7 @@ final class HeadTagsTest extends WP_UnitTestCase {
 		$modes = new Resolver( $settings, $urls, $target );
 		$head  = new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes );
 		$head->boot();
-		$switcher = new Switcher( $settings->defaultLanguage(), $target, $byLang, $modes );
+		$switcher = new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, dirname( __DIR__, 3 ) . '/wp-site-translator.php' );
 		$switcher->boot();
 
 		return array( $head, $switcher );
@@ -108,8 +108,8 @@ final class HeadTagsTest extends WP_UnitTestCase {
 		$html = do_shortcode( '[wst_switcher]' );
 
 		$this->assertStringContainsString( 'data-wst-no-translate', $html );
-		$this->assertStringContainsString( '<a href="http://example.org/hello/?ref=menu" hreflang="en-US" lang="en-US">English</a>', $html );
-		$this->assertStringContainsString( '<a href="http://example.org/bn/hello/?ref=menu" hreflang="bn-BD" lang="bn-BD" aria-current="true">বাংলা</a>', $html );
+		$this->assertStringContainsString( '<a class="wst-switcher__link" href="http://example.org/hello/?ref=menu" hreflang="en-US" lang="en-US">English</a>', $html );
+		$this->assertStringContainsString( '<a class="wst-switcher__link" href="http://example.org/bn/hello/?ref=menu" hreflang="bn-BD" lang="bn-BD" aria-current="true">বাংলা</a>', $html );
 		$this->assertSame( $html, $switcher->render() );
 	}
 

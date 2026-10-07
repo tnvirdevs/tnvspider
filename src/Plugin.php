@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WST;
 
+use WST\Admin\AdminPage;
+use WST\Admin\Health;
 use WST\Admin\PostPanel;
 use WST\Cache\Purger;
 use WST\Cli\ProviderCommand;
@@ -35,8 +37,11 @@ use WST\Queue\Worker;
 use WST\Render\DiscoveryGate;
 use WST\Render\HeadTags;
 use WST\Render\Pipeline;
+use WST\Rest\HealthController;
 use WST\Rest\PagesController;
+use WST\Rest\ProvidersController;
 use WST\Rest\QueueController;
+use WST\Rest\SettingsController;
 use WST\Rest\StringsController;
 use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
@@ -83,25 +88,34 @@ final class Plugin {
 		$scheduler = new Scheduler( $queue, $worker );
 		$scheduler->boot();
 		add_action( 'init', array( Resolver::class, 'registerMeta' ) );
-		( new QueueController( $queue, $scheduler, $worker ) )->boot();
+		$logger   = new Logger( $wpdb, self::schema(), $settings->choice( 'log_level' ) );
+		$selector = new Selector( $settings, $providers, $state );
+		$tester   = new Tester( $settings, $providers, $state, $secrets );
+		$status   = new StatusReport( $settings, $secrets, $providers, $state, $tester, new Usage( $wpdb, self::schema() ), $queue );
+		( new QueueController( $queue, $scheduler, $worker, $settings, $selector, $providers ) )->boot();
+		( new SettingsController( $secrets, $queue, $scheduler ) )->boot();
+		( new ProvidersController( $status, $tester, $secrets ) )->boot();
+		( new HealthController( $settings, new Health( $settings, $wpdb, self::schema(), $queue, $status, $selector, $logger ), $logger, self::strings(), $status ) )->boot();
+		if ( is_admin() ) {
+			( new AdminPage( $file ) )->boot();
+		}
 
 		if ( null !== $target ) {
 			$home   = (string) get_option( 'home' );
-			$urls   = Urls::fromHome( $home, rest_get_url_prefix() );
+			$urls   = Urls::fromHome( $home, rest_get_url_prefix(), $settings->defaultPrefix() );
 			$byLang = new LanguageUrls( $urls, $target, LanguageUrls::origin( $home ) );
-			$logger = new Logger( $wpdb, self::schema() );
 			$modes  = new Resolver( $settings, $urls, $target );
 
 			// The language must be known before the locale and theme load.
 			( new Router( $settings, $target, $urls ) )->boot();
 			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
-			( new Switcher( $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
+			( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 			( new OffPages( $settings, $modes, $byLang ) )->boot();
-			$auto = new AutoQueue( $settings, new Selector( $settings, $providers, $state ), $queue, $scheduler );
+			$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
 			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes ) )->boot();
 			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
 			$purger->boot();
-			$requests = new Requests( $settings, self::strings(), $queue, new Selector( $settings, $providers, $state ), $scheduler, $modes );
+			$requests = new Requests( $settings, self::strings(), $queue, $selector, $scheduler, $modes );
 			( new StringsController( $requests, $target, $scheduler, $worker ) )->boot();
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
 			if ( is_admin() ) {
@@ -111,9 +125,7 @@ final class Plugin {
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'wst string', new StringCommand( self::strings(), $settings ) );
-			$tester = new Tester( $settings, $providers, $state, $secrets );
-			$status = new StatusReport( $settings, $secrets, $providers, $state, $tester, new Usage( $wpdb, self::schema() ), $queue );
-			\WP_CLI::add_command( 'wst queue', new QueueCommand( $settings, $queue, $scheduler, new Selector( $settings, $providers, $state ), $status, $worker ) );
+			\WP_CLI::add_command( 'wst queue', new QueueCommand( $settings, $queue, $scheduler, $selector, $status, $worker ) );
 			\WP_CLI::add_command( 'wst provider', new ProviderCommand( $tester ) );
 		}
 	}
@@ -141,7 +153,7 @@ final class Plugin {
 			new Selector( $settings, $providers, $state ),
 			new Registry(),
 			$secrets,
-			new Logger( $wpdb, self::schema() ),
+			new Logger( $wpdb, self::schema(), $settings->choice( 'log_level' ) ),
 			$wpdb
 		);
 	}

@@ -42,6 +42,13 @@ final class FakeProvider implements ProviderInterface {
 	public array $targets = array();
 
 	/**
+	 * What testConnection() answers.
+	 *
+	 * @var TestResult
+	 */
+	public TestResult $testResult;
+
+	/**
 	 * Translation callback.
 	 *
 	 * @var callable(string, string, bool): string
@@ -55,6 +62,7 @@ final class FakeProvider implements ProviderInterface {
 	 * @param Capabilities $caps Capabilities.
 	 */
 	public function __construct( private string $id = 'fake', private ?Capabilities $caps = null ) {
+		$this->testResult = new TestResult( true, 'ok' );
 		$this->translator = static function ( string $text, string $target ): string {
 			return '[' . $target . '] ' . $text;
 		};
@@ -91,6 +99,6 @@ final class FakeProvider implements ProviderInterface {
 	}
 
 	public function testConnection(): TestResult {
-		return new TestResult( true, 'ok' );
+		return $this->testResult;
 	}
 }

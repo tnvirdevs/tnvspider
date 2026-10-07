@@ -96,9 +96,9 @@ final class Resolver {
 	 */
 	public function resolvePost( int $postId ): array {
 		$link = get_permalink( $postId );
-		$path = false === $link ? '' : (string) wp_parse_url( $link, PHP_URL_PATH );
+		$path = false === $link ? null : $this->urls->unprefixedPath( (string) wp_parse_url( $link, PHP_URL_PATH ), $this->target->slug() );
 
-		return $this->resolve( $postId, '' === $path ? '/' : $path );
+		return $this->resolve( $postId, $path ?? '/' );
 	}
 
 	/**

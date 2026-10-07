@@ -110,4 +110,16 @@ final class UrlsTest extends TestCase {
 		$this->assertSame( 'https://example.com/blog/bn/a/', $this->subdir()->addPrefix( 'https://example.com/blog/a/', 'bn' ) );
 		$this->assertSame( 'https://example.com/other/', $this->subdir()->addPrefix( 'https://example.com/other/', 'bn' ) );
 	}
+
+	public function test_default_prefix_is_swapped_never_stacked_and_stripped_from_paths(): void {
+		$urls = new Urls( '/blog', 'example.org', 'wp-json', 'en' );
+
+		$this->assertSame( 'https://example.org/blog/bn/shop/', $urls->addPrefix( 'https://example.org/blog/en/shop/', 'bn' ) );
+		$this->assertSame( 'https://example.org/blog/en/shop/', $urls->addPrefix( 'https://example.org/blog/shop/', 'en' ) );
+		$this->assertSame( 'https://example.org/blog/en/shop/', $urls->addPrefix( 'https://example.org/blog/en/shop/', 'en' ) );
+		$this->assertSame( '/blog/shop/', $urls->unprefixedPath( '/blog/en/shop/?x=1', 'bn' ) );
+		$this->assertSame( '/blog/shop/', $urls->unprefixedPath( '/blog/bn/shop/', 'bn' ) );
+		$this->assertSame( 'en', $urls->defaultPrefix() );
+		$this->assertNull( ( new Urls( '', 'example.org', 'wp-json' ) )->defaultPrefix() );
+	}
 }

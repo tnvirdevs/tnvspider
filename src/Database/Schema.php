@@ -83,6 +83,21 @@ final class Schema {
 	}
 
 	/**
+	 * Drop every plugin table and the schema version (uninstall only).
+	 *
+	 * @throws \RuntimeException When a table cannot be dropped.
+	 */
+	public function drop(): void {
+		foreach ( self::TABLES as $table ) {
+			$sql = $this->db->prepare( 'DROP TABLE IF EXISTS %i', $this->table( $table ) );
+			if ( null === $sql || false === $this->db->query( $sql ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Prepared above; uninstall removes our own tables.
+				throw new \RuntimeException( 'Could not drop ' . esc_html( $this->table( $table ) ) . ': ' . esc_html( $this->db->last_error ) );
+			}
+		}
+		delete_option( self::VERSION_OPTION );
+	}
+
+	/**
 	 * Install when the stored version is older than self::VERSION.
 	 *
 	 * @return bool Whether install() ran.

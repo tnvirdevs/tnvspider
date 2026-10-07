@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WST\Routing;
 
+use WST\Config;
 use WST\Languages\Current;
 use WST\Languages\Language;
 use WST\Settings;
@@ -17,9 +18,15 @@ use WST\Settings;
  * Resolves the language before WordPress parses the request: a /{slug}/
  * prefix is stripped from REQUEST_URI for routing and restored afterwards,
  * so WordPress routes normally and canonical redirects keep the prefix.
- * Default-language requests only pay for the prefix check.
+ * Default-language requests only pay for the prefix check. With "prefix the
+ * default language" on, default-language URLs carry their own prefix too:
+ * unprefixed page URLs redirect (301) to it, and after the option is turned
+ * off the prefixed URLs redirect back, so no cached redirect strands a page.
  */
 final class Router {
+
+	/** The default-language prefix last used (for the redirect back when the option is turned off). */
+	public const USED_PREFIX_OPTION = Config::PREFIX . 'default_prefix_used';
 
 	/**
 	 * Request URI as received, while the stripped one is in $_SERVER.
@@ -53,7 +60,7 @@ final class Router {
 			return null;
 		}
 
-		return new self( $settings, $target, Urls::fromHome( (string) get_option( 'home' ), rest_get_url_prefix() ) );
+		return new self( $settings, $target, Urls::fromHome( (string) get_option( 'home' ), rest_get_url_prefix(), $settings->defaultPrefix() ) );
 	}
 
 	/**
@@ -61,6 +68,10 @@ final class Router {
 	 * the plugin file loads, before the locale and the theme are set up.
 	 */
 	public function boot(): void {
+		$prefix = $this->urls->defaultPrefix();
+		if ( null !== $prefix && get_option( self::USED_PREFIX_OPTION ) !== $prefix ) {
+			update_option( self::USED_PREFIX_OPTION, $prefix, true );
+		}
 		$this->detect();
 
 		add_filter( 'locale', array( $this, 'filterLocale' ) );
@@ -97,13 +108,57 @@ final class Router {
 	 */
 	public function beforeParseRequest( $parse ) {
 		$this->detect();
-		if ( Current::isTarget() ) {
-			$uri                    = $this->serverString( 'REQUEST_URI' );
-			$this->originalUri      = $uri;
-			$_SERVER['REQUEST_URI'] = $this->urls->stripPrefix( $uri, $this->target->slug() );
+		$this->redirectToCanonicalPrefix();
+		$slug = Current::isTarget() ? $this->target->slug() : $this->urls->defaultPrefix();
+		if ( null !== $slug ) {
+			$uri      = $this->serverString( 'REQUEST_URI' );
+			$stripped = $this->urls->stripPrefix( $uri, $slug );
+			if ( $stripped !== $uri ) {
+				$this->originalUri      = $uri;
+				$_SERVER['REQUEST_URI'] = $stripped;
+			}
 		}
 
 		return $parse;
+	}
+
+	/**
+	 * Default-language page requests: add the prefix while the option is on,
+	 * remove the formerly used one while it is off (both 301).
+	 */
+	private function redirectToCanonicalPrefix(): void {
+		if ( Current::isTarget() || ! $this->isFrontEndPageRequest() ) {
+			return;
+		}
+		$uri      = $this->serverString( 'REQUEST_URI' );
+		$relative = $this->urls->relativePath( '' === $uri ? '/' : $uri );
+		if ( null === $relative || $this->urls->isExempt( $relative ) || $this->isAjaxOrRest( $relative ) ) {
+			return;
+		}
+		$prefix = $this->urls->defaultPrefix();
+		$used   = (string) get_option( self::USED_PREFIX_OPTION, '' );
+		if ( null !== $prefix && ! $this->urls->hasPrefix( $relative, $prefix ) ) {
+			$to = $this->urls->addPrefix( '' === $uri ? '/' : $uri, $prefix );
+		} elseif ( null === $prefix && '' !== $used && $used !== $this->target->slug() && $this->urls->hasPrefix( $relative, $used ) ) {
+			$to = $this->urls->stripPrefix( $uri, $used );
+		} else {
+			return;
+		}
+		if ( str_starts_with( $to, '/' ) ) {
+			$to = LanguageUrls::origin( (string) get_option( 'home' ) ) . $to;
+		}
+		if ( wp_safe_redirect( $to, 301, 'WP Site Translator' ) ) {
+			exit;
+		}
+	}
+
+	/**
+	 * GET or HEAD front-end request (not admin, AJAX, cron or WP-CLI).
+	 */
+	private function isFrontEndPageRequest(): bool {
+		$method = strtoupper( $this->serverString( 'REQUEST_METHOD' ) );
+
+		return in_array( $method, array( 'GET', 'HEAD' ), true ) && ! is_admin() && ! wp_doing_ajax() && ! wp_doing_cron() && ! ( defined( 'WP_CLI' ) && WP_CLI );
 	}
 
 	/**
@@ -157,11 +212,12 @@ final class Router {
 	 */
 	public function filterHomeUrl( $url, $path = '', $origScheme = null, $blogId = null ) {
 		unset( $path, $blogId );
-		if ( ! Current::isTarget() || 'rest' === $origScheme ) {
+		$slug = Current::isTarget() ? $this->target->slug() : $this->urls->defaultPrefix();
+		if ( null === $slug || 'rest' === $origScheme ) {
 			return $url;
 		}
 
-		return $this->urls->addPrefix( $url, $this->target->slug() );
+		return $this->urls->addPrefix( $url, $slug );
 	}
 
 	/**
@@ -171,11 +227,12 @@ final class Router {
 	 * @return string
 	 */
 	public function filterRedirect( $location ) {
-		if ( ! Current::isTarget() || ! is_string( $location ) ) {
+		$slug = Current::isTarget() ? $this->target->slug() : $this->urls->defaultPrefix();
+		if ( null === $slug || ! is_string( $location ) ) {
 			return $location;
 		}
 
-		return $this->urls->addPrefix( $location, $this->target->slug() );
+		return $this->urls->addPrefix( $location, $slug );
 	}
 
 	/**
