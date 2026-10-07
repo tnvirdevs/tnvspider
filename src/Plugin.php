@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WST;
 
+use WST\Admin\PostPanel;
 use WST\Cache\Purger;
 use WST\Cli\ProviderCommand;
 use WST\Cli\QueueCommand;
@@ -16,6 +17,8 @@ use WST\Cli\StringCommand;
 use WST\Database\Schema;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Modes\OffPages;
+use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
 use WST\Providers\Secrets;
@@ -23,13 +26,16 @@ use WST\Providers\Selector;
 use WST\Queue\AutoQueue;
 use WST\Queue\Queue;
 use WST\Queue\RateLimiter;
+use WST\Queue\Requests;
 use WST\Queue\Scheduler;
 use WST\Queue\Usage;
 use WST\Queue\Worker;
 use WST\Render\DiscoveryGate;
 use WST\Render\HeadTags;
 use WST\Render\Pipeline;
+use WST\Rest\PagesController;
 use WST\Rest\QueueController;
+use WST\Rest\StringsController;
 use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
 use WST\Routing\Urls;
@@ -51,6 +57,7 @@ final class Plugin {
 			$file,
 			static function (): void {
 				self::schema()->install();
+				Access::install();
 			}
 		);
 
@@ -59,6 +66,7 @@ final class Plugin {
 			'plugins_loaded',
 			static function (): void {
 				self::schema()->maybeUpgrade();
+				Access::maybeInstall();
 			}
 		);
 
@@ -72,6 +80,7 @@ final class Plugin {
 		$worker    = static fn(): Worker => self::worker( $settings, $queue, $providers, $state, $secrets );
 		$scheduler = new Scheduler( $queue, $worker );
 		$scheduler->boot();
+		add_action( 'init', array( Resolver::class, 'registerMeta' ) );
 		( new QueueController( $queue, $scheduler, $worker ) )->boot();
 
 		if ( null !== $target ) {
@@ -79,14 +88,23 @@ final class Plugin {
 			$urls   = Urls::fromHome( $home, rest_get_url_prefix() );
 			$byLang = new LanguageUrls( $urls, $target, LanguageUrls::origin( $home ) );
 			$logger = new Logger( $wpdb, self::schema() );
+			$modes  = new Resolver( $settings, $urls, $target );
 
 			// The language must be known before the locale and theme load.
 			( new Router( $settings, $target, $urls ) )->boot();
-			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang ) )->boot();
-			( new Switcher( $settings->defaultLanguage(), $target, $byLang ) )->boot();
+			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
+			( new Switcher( $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
+			( new OffPages( $settings, $modes, $byLang ) )->boot();
 			$auto = new AutoQueue( $settings, new Selector( $settings, $providers, $state ), $queue, $scheduler );
-			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto ) )->boot();
-			( new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) ) )->boot();
+			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes ) )->boot();
+			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
+			$purger->boot();
+			$requests = new Requests( $settings, self::strings(), $queue, new Selector( $settings, $providers, $state ), $scheduler, $modes );
+			( new StringsController( $requests, $target, $scheduler, $worker ) )->boot();
+			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
+			if ( is_admin() ) {
+				( new PostPanel( self::strings(), $modes, $requests, $target, $file ) )->boot();
+			}
 		}
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {

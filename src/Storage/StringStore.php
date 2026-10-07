@@ -387,6 +387,116 @@ final class StringStore {
 	}
 
 	/**
+	 * Translation coverage of a post in one language: the strings recorded on
+	 * it plus the global strings (header, menu, footer; plan §4), or 0/0 when
+	 * the post was never seen.
+	 *
+	 * @param int    $postId Post id.
+	 * @param string $lang   Target locale.
+	 * @return array{total: int, translated: int, last_seen: string|null, last_scan: string|null}
+	 */
+	public function postCoverage( int $postId, string $lang ): array {
+		$page = $this->first( $this->prepare( 'SELECT MAX(last_seen) AS seen, MAX(last_scan) AS scan FROM %i WHERE post_id = %d', $this->schema->table( 'pages' ), $postId ) );
+		$seen = null === $page || null === $page->seen ? null : (string) $page->seen;
+		if ( null === $seen ) {
+			return array(
+				'total'      => 0,
+				'translated' => 0,
+				'last_seen'  => null,
+				'last_scan'  => null,
+			);
+		}
+		$row = $this->first(
+			$this->prepare(
+				'SELECT COUNT(*) AS total, COUNT(t.string_id) AS translated FROM (SELECT string_id FROM %i WHERE post_id = %d UNION SELECT id FROM %i WHERE is_global = 1) u'
+				. ' LEFT JOIN %i t ON t.string_id = u.string_id AND t.lang = %s',
+				$this->schema->table( 'occurrences' ),
+				$postId,
+				$this->schema->table( 'strings' ),
+				$this->schema->table( 'translations' ),
+				$lang
+			)
+		);
+
+		return array(
+			'total'      => null === $row ? 0 : (int) $row->total,
+			'translated' => null === $row ? 0 : (int) $row->translated,
+			'last_seen'  => $seen,
+			'last_scan'  => null === $page || null === $page->scan ? null : (string) $page->scan,
+		);
+	}
+
+	/**
+	 * Strings of a post (plus global strings, if the post was seen) that have
+	 * no translation in $lang.
+	 *
+	 * @param int    $postId Post id.
+	 * @param string $lang   Target locale.
+	 * @return list<int>
+	 */
+	public function untranslatedOnPost( int $postId, string $lang ): array {
+		if ( 0 === $this->postCoverage( $postId, $lang )['total'] ) {
+			return array();
+		}
+		$rows = $this->results(
+			$this->prepare(
+				'SELECT u.string_id FROM (SELECT string_id FROM %i WHERE post_id = %d UNION SELECT id FROM %i WHERE is_global = 1) u'
+				. ' LEFT JOIN %i t ON t.string_id = u.string_id AND t.lang = %s WHERE t.string_id IS NULL ORDER BY u.string_id',
+				$this->schema->table( 'occurrences' ),
+				$postId,
+				$this->schema->table( 'strings' ),
+				$this->schema->table( 'translations' ),
+				$lang
+			)
+		);
+
+		return array_values( array_map( static fn( \stdClass $row ): int => (int) $row->string_id, $rows ) );
+	}
+
+	/**
+	 * Of these strings, the ids that have a manual translation in $lang.
+	 *
+	 * @param int[]  $stringIds String ids.
+	 * @phpstan-param list<int> $stringIds
+	 * @param string $lang      Target locale.
+	 * @return list<int>
+	 */
+	public function manualIds( array $stringIds, string $lang ): array {
+		if ( array() === $stringIds ) {
+			return array();
+		}
+		$rows = $this->results(
+			$this->prepare(
+				'SELECT string_id FROM %i WHERE lang = %s AND status = %d AND string_id IN (' . implode( ',', array_fill( 0, count( $stringIds ), '%d' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				array_merge( array( $this->schema->table( 'translations' ), $lang, self::STATUS_MANUAL ), $stringIds )
+			)
+		);
+
+		return array_values( array_map( static fn( \stdClass $row ): int => (int) $row->string_id, $rows ) );
+	}
+
+	/**
+	 * Ids of these strings that exist.
+	 *
+	 * @param int[] $stringIds String ids.
+	 * @phpstan-param list<int> $stringIds
+	 * @return list<int>
+	 */
+	public function existingIds( array $stringIds ): array {
+		if ( array() === $stringIds ) {
+			return array();
+		}
+		$rows = $this->results(
+			$this->prepare(
+				'SELECT id FROM %i WHERE id IN (' . implode( ',', array_fill( 0, count( $stringIds ), '%d' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				array_merge( array( $this->schema->table( 'strings' ) ), $stringIds )
+			)
+		);
+
+		return array_values( array_map( static fn( \stdClass $row ): int => (int) $row->id, $rows ) );
+	}
+
+	/**
 	 * Number of queue rows still waiting for automatic translation for these
 	 * strings, ignoring rows older than $maxAgeSeconds.
 	 *

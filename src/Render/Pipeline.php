@@ -16,6 +16,7 @@ use WST\Html\Segment;
 use WST\Languages\Current;
 use WST\Languages\Language;
 use WST\Log\Logger;
+use WST\Modes\Resolver;
 use WST\Queue\AutoQueue;
 use WST\Routing\Urls;
 use WST\Settings;
@@ -56,6 +57,7 @@ final class Pipeline {
 	 * @param Logger        $logger   Plugin log.
 	 * @param Urls          $urls     URL helper.
 	 * @param AutoQueue     $auto     Queues untranslated strings.
+	 * @param Resolver      $modes    Page modes.
 	 */
 	public function __construct(
 		private Settings $settings,
@@ -64,7 +66,8 @@ final class Pipeline {
 		private DiscoveryGate $gate,
 		private Logger $logger,
 		private Urls $urls,
-		private AutoQueue $auto
+		private AutoQueue $auto,
+		private Resolver $modes
 	) {
 	}
 
@@ -85,10 +88,12 @@ final class Pipeline {
 		$uri  = isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only parsed.
 		$path = $this->urls->unprefixedPath( $uri, $this->target->slug() ) ?? '/';
 
+		$mode          = $this->modes->current()['mode'];
 		$this->context = new PageContext(
 			$path,
 			is_singular() ? (int) get_queried_object_id() : null,
-			$this->gate->allowsRequest( $path )
+			Settings::MODE_OFF !== $mode && $this->gate->allowsRequest( $path, $mode ),
+			$mode
 		);
 		ob_start( array( $this, 'finish' ) );
 	}
@@ -138,6 +143,13 @@ final class Pipeline {
 		$this->pending = 0;
 		$extractor     = new Extractor();
 		$segments      = $extractor->extract( $html );
+		if ( Settings::MODE_OFF === $context->mode ) {
+			// "Off" page shown with its original text: links stay in the
+			// language, nothing is translated, discovered or queued.
+			$html = ( new Replacer() )->apply( $html, $segments, array(), $this->linkEdits( $extractor->links() ) );
+
+			return $this->setDocumentLanguage( $html, $this->settings->defaultLanguage() );
+		}
 
 		// Inline originals are stored language-neutral: internal links in
 		// them lose the language prefix, so the slug never changes a hash.
@@ -181,7 +193,14 @@ final class Pipeline {
 
 		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
 
-		return $this->setDocumentLanguage( $html );
+		return $this->setDocumentLanguage( $html, $this->target );
+	}
+
+	/**
+	 * The request snapshot taken by start(), or null when not buffering.
+	 */
+	public function context(): ?PageContext {
+		return $this->context;
 	}
 
 	/**
@@ -278,22 +297,23 @@ final class Pipeline {
 	}
 
 	/**
-	 * Make the html element's lang and dir match the target language, for
-	 * themes that do not print language_attributes().
+	 * Make the html element's lang and dir match the page's language: the
+	 * target, or the default language for an "off" page shown untranslated.
 	 *
-	 * @param string $html Document.
+	 * @param string   $html     Document.
+	 * @param Language $language Language of the content.
 	 */
-	private function setDocumentLanguage( string $html ): string {
+	private function setDocumentLanguage( string $html, Language $language ): string {
 		$processor = new \WP_HTML_Tag_Processor( $html );
 		if ( ! $processor->next_tag( array( 'tag_name' => 'HTML' ) ) ) {
 			return $html;
 		}
-		$lang = $this->target->tag( $this->settings->flag( 'hreflang_drop_region' ) );
-		if ( $lang === $processor->get_attribute( 'lang' ) && $this->target->dir() === $processor->get_attribute( 'dir' ) ) {
+		$lang = $language->tag( $this->settings->flag( 'hreflang_drop_region' ) );
+		if ( $lang === $processor->get_attribute( 'lang' ) && $language->dir() === $processor->get_attribute( 'dir' ) ) {
 			return $html;
 		}
 		$processor->set_attribute( 'lang', $lang );
-		$processor->set_attribute( 'dir', $this->target->dir() );
+		$processor->set_attribute( 'dir', $language->dir() );
 
 		return $processor->get_updated_html();
 	}

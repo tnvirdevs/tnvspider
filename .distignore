@@ -11,6 +11,7 @@
 /bin
 /docs
 /assets-src
+/eslint.config.cjs
 /composer.json
 /composer.lock
 /package.json

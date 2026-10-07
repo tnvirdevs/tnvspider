@@ -16,6 +16,7 @@ use WST\Database\Schema;
 use WST\Languages\Current;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
 use WST\Providers\Selector;
@@ -68,7 +69,7 @@ final class Phase1AcceptanceTest extends WP_UnitTestCase {
 				}
 			)
 		);
-		$this->pipeline = new Pipeline( $settings, $target, $this->store, new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto );
+		$this->pipeline = new Pipeline( $settings, $target, $this->store, new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, new Resolver( $settings, $urls, $target ) );
 		( new Router( $settings, $target, $urls ) )->boot();
 		wp_cache_flush();
 	}

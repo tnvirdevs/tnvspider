@@ -42,10 +42,11 @@ final class DiscoveryGate {
 	 * when the response is complete.
 	 *
 	 * @param string $path Site path without language prefix.
+	 * @param string $mode Resolved mode of the page (plan §9): only auto pages discover.
 	 */
-	public function allowsRequest( string $path ): bool {
+	public function allowsRequest( string $path, string $mode ): bool {
 		$allowed = $this->settings->flag( 'discover_on_visit' )
-			&& Settings::MODE_AUTO === $this->settings->siteMode()
+			&& Settings::MODE_AUTO === $mode
 			&& 'GET' === ( isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_key( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : '' )
 			&& ! is_user_logged_in()
 			&& ! ( $this->settings->flag( 'block_crawlers' ) && self::isBot( isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '' ) )
@@ -64,8 +65,9 @@ final class DiscoveryGate {
 		 *
 		 * @param bool   $allowed Decision of the built-in rules.
 		 * @param string $path    Site path without language prefix.
+		 * @param string $mode    Resolved mode of the page.
 		 */
-		return (bool) apply_filters( 'wst_discovery_allowed', $allowed, $path );
+		return (bool) apply_filters( 'wst_discovery_allowed', $allowed, $path, $mode );
 	}
 
 	/**

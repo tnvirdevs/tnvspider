@@ -48,42 +48,42 @@ final class DiscoveryGateTest extends WP_UnitTestCase {
 	public function test_anonymous_visit_to_a_post_may_discover(): void {
 		$this->go_to( '/hello/' );
 
-		$this->assertTrue( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertTrue( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_logged_in_users_never_discover(): void {
 		$this->go_to( '/hello/' );
 		wp_set_current_user( self::factory()->user->create() );
 
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_crawlers_and_empty_user_agents_do_not_discover(): void {
 		$this->go_to( '/hello/' );
 		$_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 
 		$_SERVER['HTTP_USER_AGENT'] = '';
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 
-		$this->assertTrue( $this->gate( array( 'block_crawlers' => false ) )->allowsRequest( '/hello/' ) );
+		$this->assertTrue( $this->gate( array( 'block_crawlers' => false ) )->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_query_strings_block_discovery_except_allowed_args(): void {
 		$this->go_to( '/hello/' );
 		$_GET = array( 'utm_source' => 'x' );
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 
 		$_GET = array( 'paged' => '2' );
-		$this->assertTrue( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertTrue( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_search_and_404_do_not_discover(): void {
 		$this->go_to( '/?s=random' );
-		$this->assertFalse( $this->gate()->allowsRequest( '/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/', Settings::MODE_AUTO ) );
 
 		$this->go_to( '/no-such-page/' );
-		$this->assertFalse( $this->gate()->allowsRequest( '/no-such-page/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/no-such-page/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_password_protected_posts_do_not_discover(): void {
@@ -95,29 +95,30 @@ final class DiscoveryGateTest extends WP_UnitTestCase {
 		);
 		$this->go_to( get_permalink( $protected ) );
 
-		$this->assertFalse( $this->gate()->allowsRequest( '/secret/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/secret/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_settings_switch_discovery_off(): void {
 		$this->go_to( '/hello/' );
 
-		$this->assertFalse( $this->gate( array( 'discover_on_visit' => false ) )->allowsRequest( '/hello/' ) );
-		$this->assertFalse( $this->gate( array( 'site_mode' => 'manual' ) )->allowsRequest( '/hello/' ) );
-		$this->assertFalse( $this->gate( array( 'never_discover_paths' => array( '/hel*' ) ) )->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate( array( 'discover_on_visit' => false ) )->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_MANUAL ), 'Manual pages (site, path rule or page setting) never discover.' );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_OFF ) );
+		$this->assertFalse( $this->gate( array( 'never_discover_paths' => array( '/hel*' ) ) )->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_post_requests_do_not_discover(): void {
 		$this->go_to( '/hello/' );
 		$_SERVER['REQUEST_METHOD'] = 'POST';
 
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_filter_can_veto(): void {
 		$this->go_to( '/hello/' );
 		add_filter( 'wst_discovery_allowed', '__return_false' );
 
-		$this->assertFalse( $this->gate()->allowsRequest( '/hello/' ) );
+		$this->assertFalse( $this->gate()->allowsRequest( '/hello/', Settings::MODE_AUTO ) );
 	}
 
 	public function test_hourly_caps(): void {

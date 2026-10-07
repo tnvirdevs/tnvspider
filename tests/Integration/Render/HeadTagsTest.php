@@ -10,6 +10,7 @@ namespace WST\Tests\Integration\Render;
 use WP_UnitTestCase;
 use WST\Languages\Current;
 use WST\Languages\Registry;
+use WST\Modes\Resolver;
 use WST\Render\HeadTags;
 use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
@@ -40,9 +41,10 @@ final class HeadTagsTest extends WP_UnitTestCase {
 		$urls     = Urls::fromHome( 'http://example.org', 'wp-json' );
 		$byLang   = new LanguageUrls( $urls, $target, 'http://example.org' );
 		( new Router( $settings, $target, $urls ) )->boot();
-		$head = new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang );
+		$modes = new Resolver( $settings, $urls, $target );
+		$head  = new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes );
 		$head->boot();
-		$switcher = new Switcher( $settings->defaultLanguage(), $target, $byLang );
+		$switcher = new Switcher( $settings->defaultLanguage(), $target, $byLang, $modes );
 		$switcher->boot();
 
 		return array( $head, $switcher );

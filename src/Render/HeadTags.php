@@ -12,6 +12,7 @@ namespace WST\Render;
 use WST\Languages\Current;
 use WST\Languages\Language;
 use WST\Routing\LanguageUrls;
+use WST\Modes\Resolver;
 use WST\Settings;
 
 /**
@@ -29,12 +30,14 @@ final class HeadTags {
 	 * @param Language     $defaultLanguage Default language.
 	 * @param Language     $target   Target language.
 	 * @param LanguageUrls $urls     Per-language URLs.
+	 * @param Resolver     $modes    Page modes.
 	 */
 	public function __construct(
 		private Settings $settings,
 		private Language $defaultLanguage,
 		private Language $target,
-		private LanguageUrls $urls
+		private LanguageUrls $urls,
+		private Resolver $modes
 	) {
 	}
 
@@ -54,7 +57,8 @@ final class HeadTags {
 	 * @return array<string, string>|null hreflang => URL.
 	 */
 	public function alternates(): ?array {
-		if ( is_404() || is_search() || is_preview() ) {
+		// "Off" pages have no counterpart in the other language (plan §5).
+		if ( is_404() || is_search() || is_preview() || $this->modes->currentIsOff() ) {
 			return null;
 		}
 		$urls = $this->urls->forCurrentRequest( false );

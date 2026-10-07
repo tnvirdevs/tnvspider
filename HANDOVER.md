@@ -19,6 +19,13 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
   - Live end to end (real `Worker` → `TranslateX` → `wst_translations`, scratch test not committed): `testConnection` OK; 7/7 strings translated and stored as machine translations for `bn_BD` and `ar` (printf placeholder, URL and the never-translate term "WooCommerce" preserved; inline links translated as whole sentences, P20; a 2,699-byte text split and joined, P19). Our limiter held a request for its 1.2 s spacing as configured.
 - Blocked on keys: `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource) and `WST_GEMINI_KEY` are not set.
 
+**Phase 3 — Modes: done; awaiting owner approval.** Acceptance lines below ("Phase 3 acceptance").
+- `WST\Modes\Resolver`: page setting (`_wst_mode` post meta: inherit/auto/manual/off) > path rules (new setting `path_rules`, ordered, first match, `/x/*`, `{{home}}`) > site mode. Gates discovery (only `auto` discovers and auto-queues), the pipeline, hreflang and the switcher.
+- "Off" pages (new setting `off_behavior`): `redirect` (default, 302 to the original URL) or `original` (original text at the target URL, `lang`/`dir` of the default language, canonical to the original URL). No hreflang and no switcher on off pages in either language.
+- Explicit machine translation works on manual pages: `WST\Queue\Requests` (editor ids at priority 1, "translate this page now" at priority 2; manual translations never sent; refused on off pages with a reason).
+- REST: `GET /wst/v1/pages` (posts of every public type: own mode, applied mode and source, coverage, last seen/scan; filters `search`, `post_type`, `mode`, `include`, pagination headers), `POST /wst/v1/pages/mode` (bulk; per-post `edit_post` check; purges changed pages), `POST /wst/v1/strings/translate` (`ids[]` or `post_id`, `mode=queue|now`). All need the new `wst_translate` capability (administrators and editors; installed on activation and once after updates).
+- Post editors: block editor panel `build/post-panel.js` (source `assets-src/post-panel/index.js`) and a classic meta box (no-JS "Translate this page now" via `admin-post.php`). Verified live in the block editor (see Phase 3 acceptance).
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -154,6 +161,30 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P20 | Inline strings for plain-text providers go as **one sentence with tag tokens** (`Read {1}our story{2} today`, `Protector::protectInline()`): tags and protected text share one token numbering, text between tags is decoded, provider output is HTML-encoded before the tokens are restored, then `InlineMarkup` checks the tag structure. On any mismatch the row fails with a `Tags …` error and the queue retries it as segments (flag 1) after the normal backoff. | Owner request: word order around links. Live on TranslateX: `bn` "আজ <a…>আমাদের গল্প</a> পড়ুন", `ar` "اقرأ <a…>قصتنا</a> اليوم" (segments had given broken fragments). Attributes still never leave the site. |
 | P21 | **Run timing.** One worker run lasts at most its budget (20 s; `--budget` in WP-CLI) plus one request timeout (default 30 s, setting 5–120): no request starts after the budget, except the first of a run; unsent rows are released without counting an attempt. Before each request the worker makes sure `timeout + 5 s` fits PHP `max_execution_time`, raising it with `set_time_limit()` when needed; if that is impossible it stops, logs once and reports the provider as blocked. Claimed rows are locked for `2 × timeout + 60 s`, longer than any run. | Before, the budget was only checked between batches, so a batch retried one item per request could chain up to 100 × 30 s. TranslateX measured about 1 s per 1,000 characters, so a 10,000-character batch takes about 10 s, well inside the 30 s timeout. A run's worst case (20 + 30 s) also stays under the common 60 s web-server and PHP-FPM wall limits, which PHP cannot see. |
 
+## Decision log (Phase 3)
+
+| # | Decision | Reason |
+|---|---|---|
+| P22 | Path rules live in settings as an ordered list `{path, mode}` (mode auto/manual/off, at most 200), matched with the Phase 1 `PathRules` syntax against the site path without language prefix (home path included, like `never_discover_paths`). | One syntax for every path setting; the Phase 4 Translation screen edits the list. |
+| P23 | `off` redirects with **302**, not 301, and sets `X-Redirect-By: WP Site Translator`. Before redirecting, `Current` switches to the default language so the Router's `wp_redirect` filter does not add the prefix back (that loop was caught by `OffPagesTest`). | The mode can change; browsers cache 301s. |
+| P24 | With `off_behavior = original` the target URL shows the original text with the default language's `lang`/`dir`, a canonical to the original URL, internal links still in the target language, nothing discovered or queued. Theme strings may still be in the target locale (the locale is chosen before the query runs). | Plan §9 "show original text" without a duplicate-content page; changing the locale after the query would need a second request. |
+| P25 | On off pages the switcher prints nothing and no hreflang is printed, in both languages. | The other-language link would only redirect back (dead control) or show the same text. |
+| P26 | Coverage of a post = its recorded strings plus all global strings, counted only once the post was seen; "translate this page now" sends the untranslated ones of that set. | Plan §4: global strings count toward every page's coverage. |
+| P27 | Explicit requests (`Requests`) work in auto and manual mode, are refused on off pages, never send strings with a manual translation, and queue for the active provider (fallback included); without one they are refused with the provider's problem as the message. | Plan §9 table: editor MT works on manual pages; "off" is n/a. |
+| P28 | New capability `wst_translate` (plan §11) for the pages/strings endpoints, the coverage and "translate now" controls; changing a page's mode additionally needs `edit_post` for that post; `POST /queue/run` stays `manage_options`. The role change is stored in `wp_user_roles` on activation and once per grant version (`wst_caps_version`). | Editors translate; only administrators touch settings and the queue runner. |
+| P29 | The post panels show no "Open in translation editor" link until the editor exists (Phase 5). | No dead controls. |
+| P30 | JS build: `npm run build` builds `assets-src/post-panel/index.js` to `build/` (committed, shipped); `eslint.config.cjs` extends the `@wordpress/scripts` config and lists the `@wordpress/*` runtime externals as core modules instead of installing them. | Externals are provided by WordPress; installing them only for lint would add unused dependencies. |
+
+## Phase 3 acceptance (plan §16) — one line per criterion
+
+| Criterion | Result | Proof |
+|---|---|---|
+| Matrix tests cover every mode × discover × enqueue combination in §9 | **PASS** | `ModeMatrixTest::test_mode_source_and_discover_setting` (16 cases: auto/manual/off × site/path/page source × discover on/off, through the Router and `Pipeline::start()`), plus `test_page_setting_inherit_falls_back_to_path_rules_then_site`, `test_auto_page_without_a_usable_provider_discovers_but_queues_nothing`; `ResolverTest`; `DiscoveryGateTest::test_settings_switch_discovery_off` |
+| A manual page never reaches the queue (from visits) | **PASS** | `ModeMatrixTest::test_manual_page_never_reaches_the_queue_even_with_known_untranslated_strings`, manual rows of the matrix |
+| Editor-initiated MT still works on manual pages | **PASS** | `RequestsTest::test_translate_page_now_works_on_a_manual_page_and_skips_translated_strings`, `test_editor_strings_go_first_and_never_resend_manual_translations`; `PagesAndStringsControllerTest::test_translate_page_now_on_a_manual_page_queues_and_runs_one_batch`; `PostPanelTest::test_classic_meta_box_shows_mode_effective_mode_coverage_and_action` |
+| `off` behaviour | **PASS** | `OffPagesTest` (302 redirect, original + canonical, no hreflang/switcher), off rows of `ModeMatrixTest`; live on the dev site: `/bn/hello-world/?ref=1` → `302` to `/hello-world/?ref=1`; original mode → `lang="en-US"`, canonical to the original URL, no hreflang |
+| Post-meta panel (block + classic), pages endpoints | **PASS** | `PostPanelTest`, `PagesAndStringsControllerTest`, `ResolverTest::test_meta_is_editable_over_rest_only_by_users_who_can_edit_the_post`; live in the block editor (WordPress 7.1.2, headless Chromium): panel "Translation (বাংলা)" showed "Applies now: Automatic (site mode)" and 4/100 translated; "Translate this page now" queued 96 strings, WP-Cron translated them through live TranslateX (97/100 after the save); switching to Manual showed "Save the post to apply…", after saving "Applies now: Manual only (this page)"; no console error from our script |
+
 ## Phase 2 acceptance (plan §16) — one line per criterion
 
 | Criterion | Result | Proof |
@@ -177,9 +208,13 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Remaining
 
-- Phases 2–7 per plan §16.
+- Phases 4–7 per plan §16.
 - Phase 2 acceptance items that need keys: Microsoft and Gemini `testConnection` + live batch and their `all` fixture capture.
-- Deferred by design (built together with their phases, no dead settings now): page and path modes and `off` behaviour (Phase 3); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Deferred by design (built together with their phases, no dead settings now): settings UI for `path_rules`, `off_behavior` and the Pages screen (Phase 4, the REST routes exist); "Open in translation editor" and "Allow MT suggestions in the editor on manual pages" (Phase 5); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+
+## Files changed (Phase 3)
+
+`src/Modes/{Resolver,OffPages}.php`, `src/Access.php`, `src/Admin/PostPanel.php`, `src/Queue/{Requests,RequestRefused}.php`, `src/Rest/{PagesController,StringsController}.php`, `src/Settings.php` (`path_rules`, `off_behavior`), `src/Render/{Pipeline,PageContext,DiscoveryGate,HeadTags}.php`, `src/Switcher/Switcher.php`, `src/Storage/StringStore.php` (coverage, untranslated, manual/existing ids), `src/Cache/Purger.php` (`purgePosts`), `src/Plugin.php`, `assets-src/post-panel/index.js`, `build/post-panel.{js,asset.php}`, `package.json`, `eslint.config.cjs`, `.distignore`, tests under `tests/Integration/{Modes,Admin,Rest,Queue,Render}`.
 
 ## Files changed (Phase 2)
 
@@ -196,7 +231,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 94 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,122 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 2 included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,166 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 2 included.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). The Phase 1 suite has not been re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean.
 - PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`) (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
@@ -212,6 +247,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 6. The dev site's WooCommerce (built from GitHub without its JS build) shows an empty shop loop in both languages; product pages render. Not a plugin issue.
 7. Inline strings that fall back to segments (P20) translate each piece alone, so word order and short pieces suffer. Flag 1 marks them for the editor (Phase 5). The fallback waits one backoff (30 s) after the failed sentence attempt.
 8. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
+9. Dev site: WooCommerce from source fatals in wp-admin (`Could not find asset registry for wp-admin-scripts`, no JS build) and Elementor's unbuilt JS returns HTML (console "Unexpected token '<'"). Deactivate WooCommerce for admin checks. Not plugin issues. Start the server with `php -S 127.0.0.1:8899 -t site router.php` (the `-t` matters for static files).
+10. Yoast SEO / Rank Math print their own canonical; the `off_behavior = original` canonical override uses core's `get_canonical_url` only. Check with those plugins in the Phase 7 compatibility pass.
 
 ## Dev environment setup (scripted)
 
@@ -239,7 +276,6 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-Phase 2 live checks for the remaining providers, in a session where the keys are present (environment variables are read at session start):
-1. With `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource): `php bin/capture-provider-fixtures.php microsoft all`; then a live `testConnection` and worker batch for `bn_BD` and `ar` (same scratch test pattern as TranslateX: `ProviderRegistry::configured()` → `Worker::run()`; do not commit it).
-2. With `WST_GEMINI_KEY`: `php bin/capture-provider-fixtures.php gemini all` (confirms the `responseFormat` request shape), then the same live check.
-3. Add fixture-backed tests for anything that changes an error class, write one Phase 2 acceptance line per §16 criterion, update the PR description, and ask the owner to approve Phase 2.
+1. Owner: approve Phase 3 (acceptance lines above). Phase 2 still waits on the Microsoft and Gemini keys for its last two lines.
+2. Phase 2 live checks when `WST_AZURE_KEY` (+ `WST_AZURE_REGION`) / `WST_GEMINI_KEY` reach a session: `php bin/capture-provider-fixtures.php microsoft all` / `gemini all`, live `testConnection` and worker batch (same scratch-test pattern as TranslateX), fixture-backed tests for any changed error class.
+3. Phase 4 (Admin UI, plan §10, §16): one React app under `assets-src/admin/` built by `npm run build` next to `post-panel`; start with the Overview (setup checklist, queue panel via `POST /queue/run` polling, provider cards) and the `GET/POST /settings`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue` routes it needs; then Languages, Translation (incl. `path_rules`, `off_behavior`, provider limits), Switcher, Pages (uses `GET /pages`, `POST /pages/mode`), Advanced, Health. Secrets never reach the browser.

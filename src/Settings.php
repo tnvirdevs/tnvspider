@@ -26,6 +26,17 @@ final class Settings {
 
 	public const MODE_AUTO   = 'auto';
 	public const MODE_MANUAL = 'manual';
+	public const MODE_OFF    = 'off';
+
+	/** Modes a path rule or a page can set (plan §9). */
+	public const MODES = array( self::MODE_AUTO, self::MODE_MANUAL, self::MODE_OFF );
+
+	/** What a target-language URL of an "off" page does: redirect to the original URL, or show the original text. */
+	public const OFF_REDIRECT = 'redirect';
+	public const OFF_ORIGINAL = 'original';
+
+	/** Most path rules kept. */
+	public const MAX_PATH_RULES = 200;
 
 	/** Providers known to V1. */
 	public const PROVIDER_IDS = array( 'translatex', 'microsoft', 'gemini' );
@@ -61,6 +72,8 @@ final class Settings {
 	 *     hreflang_drop_region: bool,
 	 *     discovery_query_args: list<string>,
 	 *     never_discover_paths: list<string>,
+	 *     path_rules: list<array{path: string, mode: string}>,
+	 *     off_behavior: string,
 	 *     discovery_cap_page_hour: int,
 	 *     discovery_cap_site_hour: int,
 	 *     max_string_length: int,
@@ -215,6 +228,22 @@ final class Settings {
 	}
 
 	/**
+	 * Path rules in order; the first match wins (plan §9).
+	 *
+	 * @return list<array{path: string, mode: string}>
+	 */
+	public function pathRules(): array {
+		return $this->values['path_rules'];
+	}
+
+	/**
+	 * What a target-language URL of an "off" page does: OFF_REDIRECT or OFF_ORIGINAL.
+	 */
+	public function offBehavior(): string {
+		return $this->values['off_behavior'];
+	}
+
+	/**
 	 * Never-translate terms.
 	 *
 	 * @return list<string>
@@ -240,6 +269,8 @@ final class Settings {
 	 *     hreflang_drop_region: bool,
 	 *     discovery_query_args: list<string>,
 	 *     never_discover_paths: list<string>,
+	 *     path_rules: list<array{path: string, mode: string}>,
+	 *     off_behavior: string,
 	 *     discovery_cap_page_hour: int,
 	 *     discovery_cap_site_hour: int,
 	 *     max_string_length: int,
@@ -270,6 +301,8 @@ final class Settings {
 			'hreflang_drop_region'    => self::readBool( $raw, 'hreflang_drop_region', false ),
 			'discovery_query_args'    => self::readList( $raw, 'discovery_query_args', array( 'paged' ) ),
 			'never_discover_paths'    => self::readList( $raw, 'never_discover_paths', array() ),
+			'path_rules'              => self::readPathRules( $raw['path_rules'] ?? array() ),
+			'off_behavior'            => self::OFF_ORIGINAL === ( $raw['off_behavior'] ?? '' ) ? self::OFF_ORIGINAL : self::OFF_REDIRECT,
 			'discovery_cap_page_hour' => self::readInt( $raw, 'discovery_cap_page_hour', 100, 100000 ),
 			'discovery_cap_site_hour' => self::readInt( $raw, 'discovery_cap_site_hour', 1000, 1000000 ),
 			'max_string_length'       => self::readInt( $raw, 'max_string_length', 2000, 50000 ),
@@ -280,6 +313,32 @@ final class Settings {
 			'terms_case_insensitive'  => self::readBool( $raw, 'terms_case_insensitive', true ),
 			'terms_whole_word'        => self::readBool( $raw, 'terms_whole_word', true ),
 		);
+	}
+
+	/**
+	 * Path rules in order: path pattern ("/shop/*", "{{home}}", exact path)
+	 * and mode. Invalid entries are dropped.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return list<array{path: string, mode: string}>
+	 */
+	private static function readPathRules( $value ): array {
+		$rules = array();
+		if ( ! is_array( $value ) ) {
+			return $rules;
+		}
+		foreach ( $value as $rule ) {
+			$path = is_array( $rule ) && is_string( $rule['path'] ?? null ) ? trim( $rule['path'] ) : '';
+			$mode = is_array( $rule ) ? ( $rule['mode'] ?? '' ) : '';
+			if ( ( '{{home}}' === $path || 1 === preg_match( '#^/[^\s?\#]{0,250}$#', $path ) ) && in_array( $mode, self::MODES, true ) ) {
+				$rules[] = array(
+					'path' => $path,
+					'mode' => (string) $mode,
+				);
+			}
+		}
+
+		return array_slice( $rules, 0, self::MAX_PATH_RULES );
 	}
 
 	/**

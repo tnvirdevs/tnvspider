@@ -12,6 +12,7 @@ use WP_UnitTestCase;
 use WST\Database\Schema;
 use WST\Languages\Registry;
 use WST\Log\Logger;
+use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
 use WST\Providers\Selector;
@@ -66,14 +67,18 @@ final class PipelineTest extends WP_UnitTestCase {
 		);
 		$scheduler->boot();
 
+		$target = $settings->targetLanguage() ?? throw new \LogicException( 'No target.' );
+		$urls   = Urls::fromHome( $home, 'wp-json' );
+
 		return new Pipeline(
 			$settings,
-			$settings->targetLanguage() ?? throw new \LogicException( 'No target.' ),
+			$target,
 			$this->store,
 			new DiscoveryGate( $settings, $logger ),
 			$logger,
-			Urls::fromHome( $home, 'wp-json' ),
-			new AutoQueue( $settings, $selector, $queue, $scheduler )
+			$urls,
+			new AutoQueue( $settings, $selector, $queue, $scheduler ),
+			new Resolver( $settings, $urls, $target )
 		);
 	}
 

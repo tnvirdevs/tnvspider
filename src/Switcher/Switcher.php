@@ -12,6 +12,7 @@ namespace WST\Switcher;
 use WST\Config;
 use WST\Languages\Current;
 use WST\Languages\Language;
+use WST\Modes\Resolver;
 use WST\Routing\LanguageUrls;
 
 /**
@@ -29,11 +30,13 @@ final class Switcher {
 	 * @param Language     $defaultLanguage Default language.
 	 * @param Language     $target  Target language.
 	 * @param LanguageUrls $urls    Per-language URLs.
+	 * @param Resolver     $modes   Page modes.
 	 */
 	public function __construct(
 		private Language $defaultLanguage,
 		private Language $target,
-		private LanguageUrls $urls
+		private LanguageUrls $urls,
+		private Resolver $modes
 	) {
 	}
 
@@ -48,7 +51,8 @@ final class Switcher {
 	 * Switcher markup for the current request.
 	 */
 	public function render(): string {
-		$urls = $this->urls->forCurrentRequest( true );
+		// An "off" page has no other-language version to switch to.
+		$urls = $this->modes->currentIsOff() ? null : $this->urls->forCurrentRequest( true );
 		if ( null === $urls ) {
 			return '';
 		}

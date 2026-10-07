@@ -83,6 +83,27 @@ final class Purger {
 	}
 
 	/**
+	 * Purge the target-language URLs of posts whose output changed (e.g. a
+	 * new page mode).
+	 *
+	 * @param int[] $postIds Post ids.
+	 * @phpstan-param list<int> $postIds
+	 * @return list<string> Purged URLs.
+	 */
+	public function purgePosts( array $postIds ): array {
+		$urls = array();
+		foreach ( $postIds as $postId ) {
+			$link = get_permalink( $postId );
+			if ( false !== $link ) {
+				$urls[] = $this->urls->addPrefix( $link, $this->target->slug() );
+			}
+		}
+		$this->purge( $urls );
+
+		return $urls;
+	}
+
+	/**
 	 * Ask the known page caches to drop these URLs.
 	 *
 	 * @param string[] $urls Absolute URLs.
