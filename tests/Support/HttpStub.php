@@ -23,9 +23,9 @@ trait HttpStub {
 	private array $requests = array();
 
 	/**
-	 * Responses to return, in order.
+	 * Responses to return, in order; a callable gets (url, args) and returns one.
 	 *
-	 * @var list<array<string, mixed>|\WP_Error>
+	 * @var list<array<string, mixed>|\WP_Error|callable>
 	 */
 	private array $responses = array();
 
@@ -51,7 +51,9 @@ trait HttpStub {
 			$this->fail( 'Unexpected HTTP request to ' . $url );
 		}
 
-		return array_shift( $this->responses );
+		$next = array_shift( $this->responses );
+
+		return is_callable( $next ) ? $next( $url, $args ) : $next;
 	}
 
 	/**

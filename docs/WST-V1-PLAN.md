@@ -583,7 +583,7 @@ All routes check a capability and a REST nonce. Sanitise input, escape output, n
 **Phase 2 — Providers, queue, limiter, usage**
 - **First task: capture real TranslateX responses** with the owner's key as fixtures (§7.2) and resolve its `VERIFY` items.
 - Provider interface, shared placeholder protection (including never-translate terms) and tag placeholders (§7), TranslateX, Microsoft, Gemini, queue table/worker, rate limiter (per-minute and per-day, `0 = unlimited`), usage/monthly budget, **fallback provider**, WP-CLI, cron + admin runner endpoint, page-cache purge when a page's queued strings finish (§6A).
-- **Done when**: with a fake provider, the limiter never exceeds the configured RPM under concurrent workers; `requests_per_minute = 0` sends batches without throttling yet still honours a `429`; the fallback switches and returns exactly as §8; the TranslateX adapter never stores an empty or length-mismatched result as a translation and never logs the API key; 429/5xx/auth/quota paths behave as §8; manual translations are never overwritten; each real provider passes `testConnection` and a live batch with real keys supplied by the owner.
+- **Done when**: with a fake provider, the limiter never exceeds the configured RPM under concurrent workers; `requests_per_minute = 0` sends batches without throttling yet still honours a `429`; the fallback switches and returns exactly as §8; the TranslateX adapter never stores an empty or length-mismatched result as a translation and never logs the API key; 429/5xx/auth/quota paths behave as §8; manual translations are never overwritten; TranslateX passes `testConnection` and a live batch with the owner's key. Microsoft and Gemini are implemented and tested against recorded responses and fake HTTP; their live checks moved to Phase 7 (owner decision, 2026-10-07).
 
 **Phase 3 — Modes**
 - Resolver (page > path rules > site), post-meta panel (block + classic), pages table endpoints, enqueue gating, `off` behaviour.
@@ -603,7 +603,9 @@ All routes check a capability and a REST nonce. Sanitise input, escape output, n
 
 **Phase 7 — Hardening**
 - Compatibility matrix (§15) including a run with TranslatePress active (guard), performance measurements, security review of every endpoint, uninstall, upgrade routine, i18n strings, readme.
-- **Done when**: full suite + PHPStan + PHPCS pass; compatibility matrix filled in `HANDOVER.md`; known issues listed.
+- Live provider verification with the owner's keys (moved from Phase 2): `wp wst provider test microsoft|gemini` and a live batch each; the Gemini model name and request format (`generationConfig.responseFormat`); the real Gemini free-tier limits (RPM/RPD/TPM in AI Studio) against our defaults; Microsoft `403001` quota behaviour; the fallback switch and return with real keys; record fixtures with `bin/capture-provider-fixtures.php … all`.
+- Compatibility checks on a real staging site with released WooCommerce and Elementor (this development environment only has source builds without their JavaScript builds).
+- **Done when**: full suite + PHPStan + PHPCS pass; Microsoft and Gemini pass `testConnection` and a live batch with real keys, and the fallback switch works live; compatibility matrix (from the staging site) filled in `HANDOVER.md`; known issues listed.
 
 Run the full test suite **once** at the end of each phase, not after every edit; never edit files while it runs; never run two test/build processes at once.
 

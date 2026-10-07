@@ -39,6 +39,36 @@ final class ProviderState {
 	}
 
 	/**
+	 * Record a passed connection test for these credentials.
+	 *
+	 * @param string $id          Provider id.
+	 * @param string $fingerprint Secrets::fingerprint() of the tested credentials.
+	 * @param int    $at          Unix time.
+	 */
+	public function markVerified( string $id, string $fingerprint, int $at ): void {
+		$this->update(
+			$id,
+			array(
+				'verified_fp' => $fingerprint,
+				'verified_at' => (string) $at,
+			)
+		);
+	}
+
+	/**
+	 * When the connection test last passed for these credentials, or null
+	 * ("not tested yet": never, or the key or connection settings changed).
+	 *
+	 * @param string $id          Provider id.
+	 * @param string $fingerprint Current Secrets::fingerprint().
+	 */
+	public function verifiedAt( string $id, string $fingerprint ): ?int {
+		$state = $this->all()[ $id ] ?? array();
+
+		return isset( $state['verified_fp'], $state['verified_at'] ) && hash_equals( (string) $state['verified_fp'], $fingerprint ) ? (int) $state['verified_at'] : null;
+	}
+
+	/**
 	 * Record that the quota is used up for a period.
 	 *
 	 * @param string $id     Provider id.

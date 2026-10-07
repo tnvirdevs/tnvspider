@@ -9,10 +9,8 @@ declare(strict_types=1);
 
 namespace WST\Cli;
 
-use WST\Providers\Limits;
-use WST\Providers\ProviderRegistry;
-use WST\Providers\ProviderState;
 use WST\Providers\Selector;
+use WST\Providers\StatusReport;
 use WST\Queue\Queue;
 use WST\Queue\Scheduler;
 use WST\Queue\Usage;
@@ -34,22 +32,20 @@ final class QueueCommand {
 	/**
 	 * Create the command.
 	 *
-	 * @param Settings         $settings      Settings.
-	 * @param Queue            $queue         Queue.
-	 * @param Scheduler        $scheduler     Cron runner.
-	 * @param ProviderRegistry $providers     Configured adapters.
-	 * @param ProviderState    $state         Pauses and quotas.
-	 * @param Usage            $usage         Monthly usage.
-	 * @param callable         $workerFactory Returns the worker.
+	 * @param Settings     $settings      Settings.
+	 * @param Queue        $queue         Queue.
+	 * @param Scheduler    $scheduler     Cron runner.
+	 * @param Selector     $selector      Active provider.
+	 * @param StatusReport $status        Provider status.
+	 * @param callable     $workerFactory Returns the worker.
 	 * @phpstan-param callable(): Worker $workerFactory
 	 */
 	public function __construct(
 		private Settings $settings,
 		private Queue $queue,
 		private Scheduler $scheduler,
-		private ProviderRegistry $providers,
-		private ProviderState $state,
-		private Usage $usage,
+		private Selector $selector,
+		private StatusReport $status,
 		callable $workerFactory
 	) {
 		$this->workerFactory = $workerFactory;
@@ -108,7 +104,7 @@ final class QueueCommand {
 
 		$target = $this->settings->targetLanguage();
 		if ( null !== $target ) {
-			$active = ( new Selector( $this->settings, $this->providers, $this->state ) )->active( $this->settings->defaultLanguage(), $target, $period );
+			$active = $this->selector->active( $this->settings->defaultLanguage(), $target, $period );
 			\WP_CLI::line(
 				null === $active
 					? 'Active provider: none.'
@@ -117,19 +113,24 @@ final class QueueCommand {
 		}
 
 		$rows = array();
-		foreach ( Settings::PROVIDER_IDS as $id ) {
-			$adapter = $this->providers->get( $id );
-			$cap     = null === $adapter ? 0 : Limits::resolve( $this->settings, $id, $adapter->capabilities() )->monthlyCap;
-			$rows[]  = array(
-				'provider'   => $id,
-				'configured' => null === $adapter ? 'no key' : 'yes',
-				'state'      => $this->state->unavailableReason( $id, $period ),
-				'queued'     => $stats['by_provider'][ $id ] ?? 0,
-				'chars_used' => $this->usage->chars( $id, $period ) . ( $cap > 0 ? ' / ' . $cap : '' ),
-				'last_error' => $stats['last_errors'][ $id ] ?? '',
+		foreach ( $this->status->all() as $provider ) {
+			$rows[] = array(
+				'provider'   => $provider['id'] . ( '' === $provider['role'] ? '' : ' (' . $provider['role'] . ')' ),
+				'configured' => $provider['configured'] ? 'yes' : 'no key',
+				'tested'     => null === $provider['verified_at'] ? 'not tested yet' : wp_date( 'Y-m-d H:i', $provider['verified_at'] ),
+				'languages'  => $provider['any_language'] ? 'any' : ( null === $provider['languages'] ? 'not loaded yet' : (string) $provider['languages'] ),
+				'state'      => '' === $provider['unavailable'] ? 'ok' : $provider['unavailable'],
+				'queued'     => $provider['queued'],
+				'chars_used' => $provider['usage']['chars'] . ( $provider['usage']['cap'] > 0 ? ' / ' . $provider['usage']['cap'] : '' ),
+				'last_error' => $provider['last_error'],
 			);
 		}
-		\WP_CLI\Utils\format_items( 'table', $rows, array( 'provider', 'configured', 'state', 'queued', 'chars_used', 'last_error' ) );
+		\WP_CLI\Utils\format_items( 'table', $rows, array( 'provider', 'configured', 'tested', 'languages', 'state', 'queued', 'chars_used', 'last_error' ) );
+		foreach ( $this->status->all() as $provider ) {
+			if ( $provider['configured'] && null === $provider['verified_at'] ) {
+				\WP_CLI::line( sprintf( '%s has not passed a connection test with its current key: run "wp wst provider test %s".', $provider['label'], $provider['id'] ) );
+			}
+		}
 
 		$next = wp_next_scheduled( Scheduler::HOOK );
 		\WP_CLI::line( false === $next ? 'Cron: not scheduled (no queued work).' : 'Cron: next run ' . wp_date( 'Y-m-d H:i:s', $next ) . '.' );

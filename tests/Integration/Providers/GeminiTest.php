@@ -299,7 +299,9 @@ final class GeminiTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( QuotaExceeded::class, $this->failure( self::response( 402, array( 'error' => array( 'code' => 402 ) ) ) ) );
 		$this->assertInstanceOf( TransientError::class, $this->failure( self::response( 503, array( 'error' => array( 'code' => 503 ) ) ) ) );
 		$this->assertInstanceOf( TransientError::class, $this->failure( self::response( 408, null ) ) );
-		$this->assertInstanceOf( PermanentError::class, $this->failure( self::response( 404, array( 'error' => array( 'message' => 'models/x is not found' ) ) ) ) );
+		$unknownModel = $this->failure( self::response( 404, array( 'error' => array( 'message' => 'models/x is not found' ) ) ) );
+		$this->assertInstanceOf( AuthError::class, $unknownModel, 'An unknown model pauses the provider until the setting is fixed.' );
+		$this->assertStringContainsString( 'gemini-3.5-flash-lite', $unknownModel->getMessage() );
 		$this->assertInstanceOf( PermanentError::class, $this->failure( self::response( 400, array( 'error' => array( 'status' => 'INVALID_ARGUMENT' ) ) ) ) );
 	}
 

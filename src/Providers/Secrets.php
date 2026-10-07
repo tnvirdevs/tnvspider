@@ -24,6 +24,13 @@ final class Secrets {
 	/** Secret names V1 knows. */
 	public const NAMES = array( 'WST_TRANSLATEX_KEY', 'WST_AZURE_KEY', 'WST_AZURE_REGION', 'WST_GEMINI_KEY' );
 
+	/** Secrets each provider uses (the first one is required). */
+	public const BY_PROVIDER = array(
+		'translatex' => array( 'WST_TRANSLATEX_KEY' ),
+		'microsoft'  => array( 'WST_AZURE_KEY', 'WST_AZURE_REGION' ),
+		'gemini'     => array( 'WST_GEMINI_KEY' ),
+	);
+
 	/**
 	 * Value of a secret, or '' when not configured.
 	 *
@@ -87,6 +94,26 @@ final class Secrets {
 			$stored[ $name ] = trim( $value );
 		}
 		update_option( self::OPTION, $stored, false );
+	}
+
+	/**
+	 * Keyed hash of a provider's credentials and connection settings, so a
+	 * passed connection test stops counting once any of them changes. Never
+	 * reversible to the key (wp_hash uses the site's secret salt).
+	 *
+	 * @param string               $provider Provider id.
+	 * @param array<string, mixed> $settings The provider's settings (endpoint, model, plan…).
+	 */
+	public function fingerprint( string $provider, array $settings ): string {
+		$values = array( $provider );
+		foreach ( self::BY_PROVIDER[ $provider ] ?? array() as $name ) {
+			$values[] = $this->get( $name );
+		}
+		foreach ( array( 'endpoint', 'model' ) as $key ) {
+			$values[] = isset( $settings[ $key ] ) ? (string) $settings[ $key ] : '';
+		}
+
+		return wp_hash( (string) wp_json_encode( $values ), 'auth' );
 	}
 
 	/**

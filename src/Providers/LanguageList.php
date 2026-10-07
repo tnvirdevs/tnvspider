@@ -10,12 +10,15 @@ declare(strict_types=1);
 namespace WST\Providers;
 
 use WST\Config;
+use WST\Providers\Errors\PermanentError;
 use WST\Providers\Errors\TransientError;
 
 /**
  * Pair checks run while rendering, so they read this stored list and never
- * call the provider. Connection tests fill it; translation runs refresh it
- * once a day.
+ * call the provider. Before the first load a pair counts as supported, so
+ * strings get queued; the adapter loads the list on demand before its first
+ * request and refuses an unsupported pair then (see requireSupport()).
+ * Connection tests also fill it; translation runs refresh it once a day.
  */
 final class LanguageList {
 
@@ -39,19 +42,38 @@ final class LanguageList {
 	}
 
 	/**
-	 * Whether both codes are supported.
+	 * Whether both codes are supported; true while the list was never loaded.
 	 *
 	 * @param string $source Source code.
 	 * @param string $target Target code.
-	 * @throws TransientError When the list was never loaded.
 	 */
 	public function supports( string $source, string $target ): bool {
 		$codes = $this->codes();
-		if ( null === $codes ) {
-			throw new TransientError( esc_html( sprintf( '%s languages are not loaded yet. Run the connection test (wp wst provider test %s).', $this->label, $this->provider ) ) );
-		}
 
-		return in_array( $source, $codes, true ) && in_array( $target, $codes, true );
+		return null === $codes || ( in_array( $source, $codes, true ) && in_array( $target, $codes, true ) );
+	}
+
+	/**
+	 * Refuse a pair the loaded list does not contain (adapters call this
+	 * after loading the list, before sending).
+	 *
+	 * @param string $source Source code.
+	 * @param string $target Target code.
+	 * @throws PermanentError When the pair is not supported.
+	 */
+	public function requireSupport( string $source, string $target ): void {
+		if ( ! $this->supports( $source, $target ) ) {
+			throw new PermanentError( esc_html( sprintf( '%s does not support %s to %s.', $this->label, $source, $target ) ) );
+		}
+	}
+
+	/**
+	 * Number of stored codes, or null when the list was never loaded.
+	 */
+	public function count(): ?int {
+		$codes = $this->codes();
+
+		return null === $codes ? null : count( $codes );
 	}
 
 	/**

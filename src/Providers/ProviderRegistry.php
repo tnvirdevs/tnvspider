@@ -46,21 +46,38 @@ final class ProviderRegistry {
 		return new self(
 			array(),
 			static function () use ( $settings, $secrets ): array {
-				$http      = new Http( $secrets );
 				$providers = array();
-				if ( $secrets->has( TranslateX::SECRET ) ) {
-					$providers[ TranslateX::ID ] = new TranslateX( $settings, $secrets, $http );
-				}
-				if ( $secrets->has( Microsoft::SECRET ) ) {
-					$providers[ Microsoft::ID ] = new Microsoft( $settings, $secrets, $http );
-				}
-				if ( $secrets->has( Gemini::SECRET ) ) {
-					$providers[ Gemini::ID ] = new Gemini( $settings, $secrets, $http );
+				foreach ( Settings::PROVIDER_IDS as $id ) {
+					if ( $secrets->has( Secrets::BY_PROVIDER[ $id ][0] ) ) {
+						$providers[ $id ] = self::adapter( $id, $settings, $secrets );
+					}
 				}
 
 				return $providers;
 			}
 		);
+	}
+
+	/**
+	 * Build an adapter whether or not its key is set (for capabilities and
+	 * status displays; requests without a key fail with AuthError).
+	 *
+	 * @param string   $id       Provider id.
+	 * @param Settings $settings Settings.
+	 * @param Secrets  $secrets  Key store.
+	 * @throws \InvalidArgumentException For an unknown id.
+	 */
+	public static function adapter( string $id, Settings $settings, Secrets $secrets ): ProviderInterface {
+		$http = new Http( $secrets );
+		switch ( $id ) {
+			case TranslateX::ID:
+				return new TranslateX( $settings, $secrets, $http );
+			case Microsoft::ID:
+				return new Microsoft( $settings, $secrets, $http );
+			case Gemini::ID:
+				return new Gemini( $settings, $secrets, $http );
+		}
+		throw new \InvalidArgumentException( 'Unknown provider.' );
 	}
 
 	/**

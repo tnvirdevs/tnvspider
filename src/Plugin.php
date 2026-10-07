@@ -23,6 +23,8 @@ use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
 use WST\Providers\Secrets;
 use WST\Providers\Selector;
+use WST\Providers\StatusReport;
+use WST\Providers\Tester;
 use WST\Queue\AutoQueue;
 use WST\Queue\Queue;
 use WST\Queue\RateLimiter;
@@ -109,8 +111,10 @@ final class Plugin {
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'wst string', new StringCommand( self::strings(), $settings ) );
-			\WP_CLI::add_command( 'wst queue', new QueueCommand( $settings, $queue, $scheduler, $providers, $state, new Usage( $wpdb, self::schema() ), $worker ) );
-			\WP_CLI::add_command( 'wst provider', new ProviderCommand( $providers, $state ) );
+			$tester = new Tester( $settings, $providers, $state, $secrets );
+			$status = new StatusReport( $settings, $secrets, $providers, $state, $tester, new Usage( $wpdb, self::schema() ), $queue );
+			\WP_CLI::add_command( 'wst queue', new QueueCommand( $settings, $queue, $scheduler, new Selector( $settings, $providers, $state ), $status, $worker ) );
+			\WP_CLI::add_command( 'wst provider', new ProviderCommand( $tester ) );
 		}
 	}
 

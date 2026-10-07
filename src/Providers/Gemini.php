@@ -253,7 +253,7 @@ final class Gemini implements ProviderInterface {
 	 *
 	 * @param string $body JSON body.
 	 * @return array{status: int, headers: array<string, string>, body: string, json: mixed}
-	 * @throws AuthError Key missing or rejected.
+	 * @throws AuthError Key missing or rejected, or the model does not exist.
 	 * @throws QuotaExceeded Prepaid credit used up.
 	 * @throws RateLimited HTTP 429.
 	 * @throws TransientError HTTP 408 or 5xx.
@@ -297,6 +297,11 @@ final class Gemini implements ProviderInterface {
 		// invalid-key.json: HTTP 400 with reason API_KEY_INVALID; missing-key.json: 403.
 		if ( in_array( 'API_KEY_INVALID', $reasons, true ) || 401 === $status || 403 === $status ) {
 			throw new AuthError( esc_html( 'Gemini rejected the API key: ' . $message ) );
+		}
+		// An unknown model fails every request until the setting is fixed:
+		// pause like an auth failure (to verify with a real key in Phase 7).
+		if ( 404 === $status ) {
+			throw new AuthError( esc_html( 'Gemini does not know the model "' . $this->model() . '": ' . $message ) );
 		}
 		if ( 402 === $status ) {
 			throw new QuotaExceeded( esc_html( 'Gemini prepaid credit is used up: ' . $message ) );

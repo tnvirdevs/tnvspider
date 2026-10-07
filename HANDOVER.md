@@ -8,7 +8,7 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 1 — Core without providers: done and approved by the owner.**
 
-**Phase 2 — Providers, queue, limiter, usage: code complete; TranslateX verified live; Microsoft and Gemini live checks pending (keys).**
+**Phase 2 — Providers, queue, limiter, usage: closed by the owner (2026-10-07).** TranslateX is the live provider for development and testing. Microsoft and Gemini are implemented and fully tested against recorded responses and fake HTTP, **not yet verified live**; their live checks are Phase 7 acceptance items. Do not ask for their keys before Phase 7.
 - Done and tested (fake provider + recorded/stubbed HTTP): provider contract and typed errors, placeholder protection (never-translate terms) and tag placeholders, segmentation for plain-text providers, rate limiter (rpm / rpd / chars-per-minute, `0` = unlimited, `GET_LOCK`, 4-process concurrency test), monthly usage and budget (80 % warning, 100 % stop), queue and worker (priorities, backoff, `max_attempts`, fallback switch and return, 429 always honoured, manual translations never overwritten), visitor auto-queue (priority 5) with the §6A cache rules, WP-Cron one-minute event that exists only while work is queued, `POST /wst/v1/queue/run` (one batch, `manage_options` + REST nonce), WP-CLI `wp wst queue run|status|retry-failed|clear` and `wp wst provider test <id>` (lifts a pause on success), page-cache purge (LiteSpeed `litespeed_purge_url`, WP Rocket `rocket_clean_files()`, generic `wst_purge_url`), adapters for TranslateX, Microsoft and Gemini.
 - Recorded keyless fixtures (`bin/capture-provider-fixtures.php`, `bin/capture-translatex-fixtures.php`): TranslateX missing/invalid key → HTTP 400 `{"err":"invalid api key"}`; Microsoft missing/invalid key → HTTP 401 code **401001** (plan listed 401000; both are mapped by the 401xxx class), language list (138 languages incl. `bn` and `ar`); Gemini invalid key → HTTP 400 `INVALID_ARGUMENT` with `details[].reason = API_KEY_INVALID`, missing key → HTTP 403 `PERMISSION_DENIED`.
 - **TranslateX verified with the owner's free key** (2026-10-06; the key was given in chat, kept in a mode-600 file outside the repo, passed only via the environment; no fixture, log or commit contains it; the owner was advised to rotate it). Fixtures in `tests/fixtures/providers/translatex/` (`all`, `tokens`, `limits`, `rate-limit` modes). Facts now in plan §7.2:
@@ -17,9 +17,9 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
   - Free plan: 35 languages, **`bn` and `ar` included**. `x-api-client: WP-Site-Translator/0.1.0` accepted.
   - Placeholders: `[[1]]` came back as `[ [ 1]]` and once as `[ [ 3]]]]`; `{1}` survived in `bn` and `ar` (P16).
   - Live end to end (real `Worker` → `TranslateX` → `wst_translations`, scratch test not committed): `testConnection` OK; 7/7 strings translated and stored as machine translations for `bn_BD` and `ar` (printf placeholder, URL and the never-translate term "WooCommerce" preserved; inline links translated as whole sentences, P20; a 2,699-byte text split and joined, P19). Our limiter held a request for its 1.2 s spacing as configured.
-- Blocked on keys: `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource) and `WST_GEMINI_KEY` are not set.
+- Microsoft/Gemini keys (`WST_AZURE_KEY`, `WST_AZURE_REGION`, `WST_GEMINI_KEY`): needed only in Phase 7.
 
-**Phase 3 — Modes: done; awaiting owner approval.** Acceptance lines below ("Phase 3 acceptance").
+**Phase 3 — Modes: done and approved by the owner (2026-10-07).** Acceptance lines below ("Phase 3 acceptance").
 - `WST\Modes\Resolver`: page setting (`_wst_mode` post meta: inherit/auto/manual/off) > path rules (new setting `path_rules`, ordered, first match, `/x/*`, `{{home}}`) > site mode. Gates discovery (only `auto` discovers and auto-queues), the pipeline, hreflang and the switcher.
 - "Off" pages (new setting `off_behavior`): `redirect` (default, 302 to the original URL) or `original` (original text at the target URL, `lang`/`dir` of the default language, canonical to the original URL). No hreflang and no switcher on off pages in either language.
 - Explicit machine translation works on manual pages: `WST\Queue\Requests` (editor ids at priority 1, "translate this page now" at priority 2; manual translations never sent; refused on off pages with a reason).
@@ -185,6 +185,26 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | `off` behaviour | **PASS** | `OffPagesTest` (302 redirect, original + canonical, no hreflang/switcher), off rows of `ModeMatrixTest`; live on the dev site: `/bn/hello-world/?ref=1` → `302` to `/hello-world/?ref=1`; original mode → `lang="en-US"`, canonical to the original URL, no hreflang |
 | Post-meta panel (block + classic), pages endpoints | **PASS** | `PostPanelTest`, `PagesAndStringsControllerTest`, `ResolverTest::test_meta_is_editable_over_rest_only_by_users_who_can_edit_the_post`; live in the block editor (WordPress 7.1.2, headless Chromium): panel "Translation (বাংলা)" showed "Applies now: Automatic (site mode)" and 4/100 translated; "Translate this page now" queued 96 strings, WP-Cron translated them through live TranslateX (97/100 after the save); switching to Manual showed "Save the post to apply…", after saving "Applies now: Manual only (this page)"; no console error from our script |
 
+## Decision log (pre-Phase 4, owner items of 2026-10-07)
+
+| # | Decision | Reason |
+|---|---|---|
+| P31 | Language lists load **on demand**: before the first load a pair counts as supported (strings get queued); the adapter loads the list before its first request and refuses an unsupported pair with a `PermanentError` without sending text; afterwards the selector knows the pair is unsupported and hands rows to the fallback or reports it. | Before, TranslateX did nothing until someone ran the connection test (owner item 5a). Rendering still never calls a provider. |
+| P32 | "Tested" state: `Tester` (shared by `wp wst provider test` and the Phase 4 test button) records a passed connection test with a keyed fingerprint (`wp_hash`) of the provider's secrets plus endpoint/model; any change makes it "not tested yet" again. `wp wst queue status` shows `tested` and `languages` columns and a line per configured-but-untested provider; `StatusReport` feeds the REST status. | Owner items 4 and 5a: never silently idle; cards show "not verified yet" until the test passes once. The fingerprint is a salted HMAC, not the key. |
+| P33 | Gemini HTTP 404 (unknown model) → `AuthError` (provider paused with the model name in the reason) instead of failing strings one by one. | Every request fails until the model setting is fixed; the pause is lifted by a passing test. To confirm with a real key in Phase 7. |
+| P34 | Gemini `chars_per_minute` default stays 0 (unlimited): input-token limits are unpublished; requests are bounded by 5 RPM × 5,000 characters. Editable. Microsoft keeps 33,000 (F0 throttle). | No invented numbers; Phase 7 compares with AI Studio. |
+
+## Phase 7 acceptance (planned) — moved here and added by the owner
+
+| Item | Status |
+|---|---|
+| Microsoft: `wp wst provider test microsoft` and a live batch for `bn_BD` and `ar`; record `bin/capture-provider-fixtures.php microsoft all` | implemented, not yet verified live |
+| Microsoft `403001` quota behaviour with a real key (quota → `QuotaExceeded`, fallback, return next period) | implemented, not yet verified live |
+| Gemini: `wp wst provider test gemini` and a live batch; the model name (`gemini-3.5-flash-lite`) and the request format (`generationConfig.responseFormat`, structured JSON); record `bin/capture-provider-fixtures.php gemini all` | implemented, not yet verified live |
+| Gemini free-tier limits as shown in AI Studio (RPM, RPD, input TPM) against the defaults 5 / 100 / unlimited; 404 for an unknown model (P33) | implemented, not yet verified live |
+| Fallback switch and return with real keys (primary failure → fallback → primary again) | implemented, not yet verified live |
+| Compatibility matrix (§15) on a **real staging site with released WooCommerce and Elementor**: this environment only has source builds without their JavaScript builds (WooCommerce fatals in wp-admin, Elementor's JS 301s to HTML; see Known issues) | to do |
+
 ## Phase 2 acceptance (plan §16) — one line per criterion
 
 | Criterion | Result | Proof |
@@ -197,8 +217,7 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | 429 / 5xx / auth / quota paths behave as §8 | **PASS** | `WorkerTest::test_a_429_is_honoured_even_with_unlimited_rpm`, `test_transient_errors_back_off_and_count_an_attempt`, `test_auth_error_*`, `test_quota_exceeded_switches_and_returns_next_period`, `test_monthly_budget_stops_the_provider`; adapter mapping in `TranslateXTest`, `MicrosoftTest`, `GeminiTest` |
 | Manual translations are never overwritten | **PASS** | `WorkerTest::test_manual_translations_are_never_overwritten`, `QueueTest::test_manual_save_removes_queued_rows` |
 | TranslateX passes `testConnection` and a live batch with a real key | **PASS** | Live run 2026-10-07 (scratch test, not committed): `testConnection` OK; 7/7 strings for `bn_BD` and for `ar` stored as machine translations, including an inline link sentence and a 2,699-byte text |
-| Microsoft passes `testConnection` and a live batch | **PENDING (key)** | Needs `WST_AZURE_KEY` (+ `WST_AZURE_REGION` for a regional resource); keyless fixtures and mapping tests pass (`MicrosoftTest`) |
-| Gemini passes `testConnection` and a live batch | **PENDING (key)** | Needs `WST_GEMINI_KEY`; keyless fixtures and mapping tests pass (`GeminiTest`) |
+| Microsoft and Gemini pass `testConnection` and a live batch | **MOVED TO PHASE 7** (owner, 2026-10-07) | Implemented, not yet verified live. Tested against recorded responses and fake HTTP: `MicrosoftTest`, `GeminiTest`, `LimitsTest`, `TesterAndStatusTest`, `RealAdapterFallbackTest` (403001 → Gemini and back next month, auth failure → pause + fallback, plain 429 never switches, the fallback's own limits). See "Phase 7 acceptance (planned)". |
 
 Scope items of §16 Phase 2 beyond the criteria: WP-CLI (`QueueCommand`, `ProviderCommand`; not unit-tested, no WP-CLI in the test runtime), cron (`SchedulerTest`), admin runner (`QueueControllerTest`), page-cache purge (`PurgerTest`), usage and monthly budget (`WorkerTest::test_monthly_budget_stops_the_provider`, `test_translates_queued_strings_and_counts_usage`), placeholder protection (`ProtectorTest`, `InlineTokensTest`, `RequestPlanTest`), visitor queueing (`PipelineTest::test_discoverable_page_queues_untranslated_strings_for_the_active_provider`), run timing (`WorkerTest::test_no_request_starts_after_the_budget_even_inside_a_batch`, `test_request_timeout_must_fit_max_execution_time`).
 
@@ -209,7 +228,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Remaining
 
 - Phases 4–7 per plan §16.
-- Phase 2 acceptance items that need keys: Microsoft and Gemini `testConnection` + live batch and their `all` fixture capture.
+- Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
 - Deferred by design (built together with their phases, no dead settings now): settings UI for `path_rules`, `off_behavior` and the Pages screen (Phase 4, the REST routes exist); "Open in translation editor" and "Allow MT suggestions in the editor on manual pages" (Phase 5); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
 
 ## Files changed (Phase 3)
@@ -276,6 +295,4 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: approve Phase 3 (acceptance lines above). Phase 2 still waits on the Microsoft and Gemini keys for its last two lines.
-2. Phase 2 live checks when `WST_AZURE_KEY` (+ `WST_AZURE_REGION`) / `WST_GEMINI_KEY` reach a session: `php bin/capture-provider-fixtures.php microsoft all` / `gemini all`, live `testConnection` and worker batch (same scratch-test pattern as TranslateX), fixture-backed tests for any changed error class.
-3. Phase 4 (Admin UI, plan §10, §16): one React app under `assets-src/admin/` built by `npm run build` next to `post-panel`; start with the Overview (setup checklist, queue panel via `POST /queue/run` polling, provider cards) and the `GET/POST /settings`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue` routes it needs; then Languages, Translation (incl. `path_rules`, `off_behavior`, provider limits), Switcher, Pages (uses `GET /pages`, `POST /pages/mode`), Advanced, Health. Secrets never reach the browser.
+1. Phase 4 (Admin UI, plan §10, §16): one React app under `assets-src/admin/` built by `npm run build` next to `post-panel`; start with the Overview (setup checklist, queue panel via `POST /queue/run` polling, provider cards) and the `GET/POST /settings`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue` routes it needs; then Languages, Translation (incl. `path_rules`, `off_behavior`, provider limits), Switcher, Pages (uses `GET /pages`, `POST /pages/mode`), Advanced, Health. Secrets never reach the browser.

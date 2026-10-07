@@ -86,11 +86,11 @@ final class Microsoft implements ProviderInterface {
 	}
 
 	/**
-	 * Answers from the stored language list; never calls the API.
+	 * Answers from the stored language list; never calls the API. Before the
+	 * list is loaded every pair counts as supported; translate() loads it.
 	 *
 	 * @param string $source Source code.
 	 * @param string $target Target code.
-	 * @throws TransientError When the list was never loaded.
 	 */
 	public function supportsPair( string $source, string $target ): bool {
 		return $this->languages->supports( $source, $target );
@@ -114,6 +114,7 @@ final class Microsoft implements ProviderInterface {
 		if ( $this->languages->isStale() ) {
 			$this->loadLanguages();
 		}
+		$this->languages->requireSupport( $source, $target );
 
 		$query = array(
 			'api-version' => '3.0',

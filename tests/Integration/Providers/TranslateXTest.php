@@ -357,17 +357,13 @@ final class TranslateXTest extends WP_UnitTestCase {
 
 		$this->expectException( PermanentError::class );
 		$this->expectExceptionMessage( 'unsupported target language' );
-		$this->adapter()->translate( array( 1 => 'One' ), 'en', 'xx', false );
+		$this->adapter()->translate( array( 1 => 'One' ), 'en', 'it', false );
 	}
 
 	public function test_pair_support_comes_from_the_stored_list_without_requests(): void {
 		$adapter = $this->adapter();
-		try {
-			$adapter->supportsPair( 'en', 'bn' );
-			$this->fail( 'Expected TransientError before the list is loaded.' );
-		} catch ( TransientError $e ) {
-			$this->assertStringContainsString( 'connection test', $e->getMessage() );
-		}
+		$this->assertTrue( $adapter->supportsPair( 'en', 'xx' ), 'Not loaded yet: queue anyway; translate() loads the list.' );
+		$this->assertSame( array(), $this->requests );
 
 		$this->responses[] = self::response(
 			200,
@@ -395,6 +391,20 @@ final class TranslateXTest extends WP_UnitTestCase {
 		$this->assertTrue( $adapter->supportsPair( 'en', 'bn' ) );
 		$this->assertFalse( $adapter->supportsPair( 'en', 'ar' ) );
 		$this->assertCount( 1, $this->requests );
+	}
+
+	public function test_missing_language_list_is_loaded_on_demand_and_an_unsupported_pair_is_refused(): void {
+		$this->responses[] = self::fixture( 'translatex', 'supported-languages' );
+
+		try {
+			$this->adapter()->translate( array( 1 => 'Hello' ), 'en', 'xx', false );
+			$this->fail( 'Expected PermanentError.' );
+		} catch ( PermanentError $e ) {
+			$this->assertStringContainsString( 'does not support en to xx', $e->getMessage() );
+		}
+		$this->assertCount( 1, $this->requests, 'Only the language list was fetched; nothing was sent for translation.' );
+		$this->assertFalse( $this->adapter()->supportsPair( 'en', 'xx' ), 'Now known: the provider is unavailable for this pair.' );
+		$this->assertTrue( $this->adapter()->supportsPair( 'en', 'bn' ) );
 	}
 
 	public function test_stale_language_list_is_refreshed_before_translating(): void {
