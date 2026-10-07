@@ -36,6 +36,7 @@ composer test:unit                   # no WordPress, no DB
 composer test:integration            # WordPress test suite; DB from WST_TEST_DB_* env vars
 bin/fetch-html5lib-tests.sh          # html5lib inputs for RoundTripTest (gitignored)
 npm install && npm run build         # assets-src/ -> build/ (commit build/); npm run lint:js; Node >= 22.22.2
+npm run test:js                      # JS unit tests (Node's built-in runner)
 npx wp-env start                     # Docker dev site with WooCommerce + Elementor
 bin/build-zip.sh                     # release zip from HEAD (.distignore, checks contents and secrets) -> dist/
 ```

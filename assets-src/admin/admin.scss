@@ -171,6 +171,22 @@
 	}
 }
 
+.wst-file-label {
+	display: block;
+	margin-block-end: 8px;
+	font-weight: 600;
+}
+
+.wst-progress {
+	margin-block: 12px;
+
+	progress {
+		display: block;
+		inline-size: 100%;
+		margin-block-start: 4px;
+	}
+}
+
 .wst-toolbar {
 	display: flex;
 	flex-wrap: wrap;

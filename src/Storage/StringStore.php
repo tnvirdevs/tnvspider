@@ -28,6 +28,9 @@ final class StringStore {
 
 	private const CACHE_GROUP = 'wst_translations';
 
+	/** Provider recorded for machine translations that came from a CSV import. */
+	public const IMPORT_PROVIDER = 'csv';
+
 	/**
 	 * Create the store.
 	 *
@@ -239,6 +242,41 @@ final class StringStore {
 	}
 
 	/**
+	 * Check a human-made translation (editor, CSV import) and return it as
+	 * it is stored: trimmed; inline translations must keep the original's
+	 * tags and attributes and are sanitised with wp_kses. Other kinds are
+	 * plain text, encoded when they are printed.
+	 *
+	 * @param string $original    Normalised original.
+	 * @param string $kind        Segment kind.
+	 * @param string $translation Translation.
+	 * @throws \InvalidArgumentException When a value is empty or an inline translation changes the markup.
+	 */
+	public static function checkTranslation( string $original, string $kind, string $translation ): string {
+		$translation = trim( $translation );
+		if ( '' === $original || '' === $translation ) {
+			throw new \InvalidArgumentException( 'Original and translation must not be empty.' );
+		}
+		if ( Segment::INLINE !== $kind ) {
+			return $translation;
+		}
+		if ( ! InlineMarkup::survivesSanitize( $original ) ) {
+			throw new \InvalidArgumentException( InlineMarkup::UNSTORABLE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Fixed message.
+		}
+		// Reject extra or changed markup instead of silently stripping it;
+		// sanitising afterwards is a second line of defence.
+		if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {
+			throw new \InvalidArgumentException( 'The translation must keep exactly the tags and attributes of the original.' );
+		}
+		$translation = InlineMarkup::sanitize( $original, $translation );
+		if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {
+			throw new \InvalidArgumentException( 'The translation contains markup that is not allowed.' );
+		}
+
+		return $translation;
+	}
+
+	/**
 	 * Save a manual (protected) translation, creating the string if needed.
 	 * Inline translations must keep the original's tags and attributes.
 	 *
@@ -252,24 +290,7 @@ final class StringStore {
 	 */
 	public function saveManual( string $original, string $kind, string $lang, string $translation, int $userId ): int {
 		$original    = Text::normalize( $original );
-		$translation = trim( $translation );
-		if ( '' === $original || '' === $translation ) {
-			throw new \InvalidArgumentException( 'Original and translation must not be empty.' );
-		}
-		if ( Segment::INLINE === $kind ) {
-			if ( ! InlineMarkup::survivesSanitize( $original ) ) {
-				throw new \InvalidArgumentException( InlineMarkup::UNSTORABLE ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Fixed message.
-			}
-			// Reject extra or changed markup instead of silently stripping it;
-			// sanitising afterwards is a second line of defence.
-			if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {
-				throw new \InvalidArgumentException( 'The translation must keep exactly the tags and attributes of the original.' );
-			}
-			$translation = InlineMarkup::sanitize( $original, $translation );
-			if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {
-				throw new \InvalidArgumentException( 'The translation contains markup that is not allowed.' );
-			}
-		}
+		$translation = self::checkTranslation( $original, $kind, $translation );
 
 		$now = current_time( 'mysql', true );
 		$this->query(
@@ -526,6 +547,147 @@ final class StringStore {
 		);
 
 		return null === $row ? null : self::row( $row );
+	}
+
+	/**
+	 * Strings and their translations for a CSV export (plan §13A.3), in id
+	 * order from $afterId, with the paths of the pages they were seen on.
+	 *
+	 * @param string      $lang    Target locale.
+	 * @param string      $filter  all, untranslated, machine or manual.
+	 * @param string|null $pageKey Only strings seen on this page.
+	 * @param int         $afterId Last id of the previous chunk (0 to start).
+	 * @param int         $limit   Rows per chunk.
+	 * @return list<array{id: int, kind: string, original: string, translated: string|null, status: int|null, pages: list<string>}>
+	 * @throws \InvalidArgumentException For an unknown filter.
+	 */
+	public function exportRows( string $lang, string $filter, ?string $pageKey, int $afterId, int $limit ): array {
+		$where = array( 's.id > %d' );
+		$args  = array( $this->schema->table( 'strings' ), $this->schema->table( 'translations' ), $lang, $afterId );
+		if ( 'machine' === $filter ) {
+			$where[] = 't.status = ' . self::STATUS_MACHINE;
+		} elseif ( 'manual' === $filter ) {
+			$where[] = 't.status = ' . self::STATUS_MANUAL;
+		} elseif ( 'untranslated' === $filter ) {
+			$where[] = 't.id IS NULL';
+		} elseif ( 'all' !== $filter ) {
+			throw new \InvalidArgumentException( 'Unknown export filter.' );
+		}
+		if ( null !== $pageKey ) {
+			$where[] = 'EXISTS (SELECT 1 FROM %i o WHERE o.string_id = s.id AND o.page_key = %s)';
+			array_push( $args, $this->schema->table( 'occurrences' ), $pageKey );
+		}
+		$args[] = max( 1, $limit );
+		$rows   = array_map(
+			array( self::class, 'row' ),
+			$this->results(
+				$this->prepare(
+					'SELECT s.id, s.kind, s.original, t.translated, t.status FROM %i s LEFT JOIN %i t ON t.string_id = s.id AND t.lang = %s WHERE ' . implode( ' AND ', $where ) . ' ORDER BY s.id LIMIT %d', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Conditions are fixed strings.
+					$args
+				)
+			)
+		);
+		if ( array() === $rows ) {
+			return array();
+		}
+
+		$ids   = array_column( $rows, 'id' );
+		$pages = array();
+		foreach ( $this->results(
+			$this->prepare(
+				'SELECT o.string_id, p.path FROM %i o JOIN %i p ON p.page_key = o.page_key WHERE o.string_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ') ORDER BY p.path', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				array_merge( array( $this->schema->table( 'occurrences' ), $this->schema->table( 'pages' ) ), $ids )
+			)
+		) as $page ) {
+			$pages[ (int) $page->string_id ][] = (string) $page->path;
+		}
+
+		return array_values(
+			array_map(
+				static fn( array $row ): array => $row + array( 'pages' => $pages[ $row['id'] ] ?? array() ),
+				$rows
+			)
+		);
+	}
+
+	/**
+	 * Known strings among these originals, with their translation into $lang.
+	 *
+	 * @param string[] $originals Normalised originals.
+	 * @phpstan-param list<string> $originals
+	 * @param string   $lang      Target locale.
+	 * @return array<string, array{id: int, kind: string, original: string, translated: string|null, status: int|null}> Keyed by original.
+	 */
+	public function findMany( array $originals, string $lang ): array {
+		if ( array() === $originals ) {
+			return array();
+		}
+		$hashes = array_values( array_unique( array_map( array( self::class, 'hash' ), $originals ) ) );
+		$found  = array();
+		foreach ( $this->results(
+			$this->prepare(
+				'SELECT s.id, s.kind, s.original, t.translated, t.status FROM %i s LEFT JOIN %i t ON t.string_id = s.id AND t.lang = %s WHERE s.hash IN (' . implode( ',', array_fill( 0, count( $hashes ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				array_merge( array( $this->schema->table( 'strings' ), $this->schema->table( 'translations' ), $lang ), $hashes )
+			)
+		) as $row ) {
+			$found[ (string) $row->original ] = self::row( $row );
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Store an imported translation (plan §13A.3) with the given status,
+	 * creating the string if needed, and drop its queue row: the string is
+	 * translated now. The caller has checked the translation and decided to
+	 * overwrite (conflict policy).
+	 *
+	 * @param string $original    Normalised original.
+	 * @param string $kind        Kind for a new string.
+	 * @param string $lang        Target locale.
+	 * @param string $translation Checked translation (see checkTranslation()).
+	 * @param int    $status      STATUS_MACHINE or STATUS_MANUAL.
+	 * @param int    $userId      Importing user.
+	 * @return int String id.
+	 * @throws \InvalidArgumentException For an unknown status.
+	 */
+	public function importTranslation( string $original, string $kind, string $lang, string $translation, int $status, int $userId ): int {
+		if ( self::STATUS_MACHINE !== $status && self::STATUS_MANUAL !== $status ) {
+			throw new \InvalidArgumentException( 'Unknown translation status.' );
+		}
+		$now = current_time( 'mysql', true );
+		$this->query(
+			$this->prepare(
+				'INSERT IGNORE INTO %i (hash, kind, original, char_count, created_at) VALUES (%s, %s, %s, %d, %s)',
+				$this->schema->table( 'strings' ),
+				self::hash( $original ),
+				$kind,
+				$original,
+				mb_strlen( $original ),
+				$now
+			)
+		);
+		$id = (int) $this->value(
+			$this->prepare( 'SELECT id FROM %i WHERE hash = %s', $this->schema->table( 'strings' ), self::hash( $original ) )
+		);
+		$this->query(
+			$this->prepare(
+				'INSERT INTO %i (string_id, lang, translated, status, provider, flags, updated_by, updated_at) VALUES (%d, %s, %s, %d, NULLIF(%s, \'\'), 0, %d, %s)
+				ON DUPLICATE KEY UPDATE translated = VALUES(translated), status = VALUES(status), provider = VALUES(provider), flags = 0, updated_by = VALUES(updated_by), updated_at = VALUES(updated_at)',
+				$this->schema->table( 'translations' ),
+				$id,
+				$lang,
+				$translation,
+				$status,
+				self::STATUS_MACHINE === $status ? self::IMPORT_PROVIDER : '',
+				$userId,
+				$now
+			)
+		);
+		wp_cache_delete( $lang . ':' . self::hash( $original ), self::CACHE_GROUP );
+		$this->query( $this->prepare( 'DELETE FROM %i WHERE string_id = %d AND lang = %s', $this->schema->table( 'queue' ), $id, $lang ) );
+
+		return $id;
 	}
 
 	/**

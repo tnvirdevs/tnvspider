@@ -14,6 +14,7 @@ import Switcher from './screens/Switcher';
 import Pages from './screens/Pages';
 import Advanced from './screens/Advanced';
 import Health from './screens/Health';
+import ImportExport from './screens/ImportExport';
 
 const SCREENS = [
 	[ 'overview', __( 'Overview', 'wp-site-translator' ), Overview ],
@@ -22,6 +23,11 @@ const SCREENS = [
 	[ 'switcher', __( 'Language switcher', 'wp-site-translator' ), Switcher ],
 	[ 'pages', __( 'Pages', 'wp-site-translator' ), Pages ],
 	[ 'advanced', __( 'Advanced', 'wp-site-translator' ), Advanced ],
+	[
+		'import-export',
+		__( 'Import / Export', 'wp-site-translator' ),
+		ImportExport,
+	],
 	[ 'health', __( 'Health', 'wp-site-translator' ), Health ],
 ];
 

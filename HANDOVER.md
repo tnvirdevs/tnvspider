@@ -48,6 +48,11 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - **Floating switcher offset** setting (`switcher_offset`, px from the top or bottom edge, 0–400, default 16); top-left/top-right already existed; live preview follows it; positions are logical, so left/right swap on right-to-left pages.
 - **Other plugins' admin notices** are hidden on the Translator settings screens too (scripts stay; the editor keeps full isolation).
 
+**Phase 6a — CSV import / export: done (2026-10-07).** Plan §13A.3; acceptance lines in "Phase 6a acceptance".
+- Screen **Translator → Import / Export** (`manage_options`). **Export**: all / untranslated / machine / manual / one page (path) → `admin-post.php?action=wst_export` with a nonce; streamed in chunks of 500 (keyset by id), UTF-8 with BOM, columns `original,translated,status,kind,lang,pages` (pages joined by `|`), RFC 4180 quoting without an escape character, CSV-injection guard.
+- **Import**: the browser reads the file (`assets-src/admin/csv.js`, RFC 4180, BOM tolerated, header by name, `original` and `translated` required), checks it in a **dry run** (`POST /import/check`, writes nothing), then applies it (`POST /import/apply`) in chunks of 500 with a progress bar. Options: import as manual (default) / machine / as in the file; conflict policy add only / overwrite machine, keep manual (default) / overwrite all. Summary: rows, new, updates, unchanged, kept by the policy, skipped (no translation), invalid with line and reason. Limits: 20 MB and 100,000 rows per file (screen), 500 rows per request and 64 KB per cell (server).
+- Every row is checked like an editor save (`StringStore::checkTranslation()`: inline translations keep the original's tags and attributes, then `wp_kses`), plus language (must be the target locale or empty), kind, status, UTF-8 and duplicates within a chunk. Imported rows leave the queue (translated now) and finished pages are purged (`wst_strings_translated`).
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -262,6 +267,12 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P58 | Pages that cannot be scanned get specific messages: drafts/pending/scheduled ("not published yet… publish it first"); a page that redirects the visitor scan (HTTP 3xx, e.g. WooCommerce checkout without a cart) → 422 `wst_scan_redirected` explaining that its texts are translated where they also appear. | The generic "HTTP 302 and no scan result" did not tell the owner what to do. |
 | P59 | `switcher_offset` is an inline CSS variable (`--wst-switcher-offset`) on the floating switcher only; the admin-bar height is added for top positions (32 px, 46 px ≤ 782 px). | One setting moves the switcher clear of a theme's fixed bar at either edge without new positions. |
 | P60 | Settings screens hide third-party **notices** only (`Isolation::NOTICE_HOOKS`, stripped on `current_screen` and again just before printing); third-party scripts keep loading there. | Owner asked for clean screens; full isolation stays editor-only because settings screens do not need it and it would hide e.g. a cache plugin's toolbar tools. |
+| P61 | Import is parsed **in the browser** and sent as JSON chunks to stateless `check`/`apply` endpoints; the server keeps nothing between requests. | No upload storage (a file in `uploads/` would be publicly reachable; temp dirs are not shared across servers), no new table, and the plan's chunked apply with a progress bar falls out naturally. File limits are checked by the screen, row/cell limits by the server. |
+| P62 | Export is a streamed `admin-post.php` download (nonce + `manage_options`), not a REST route. | REST responses are buffered JSON; a download must stream in chunks (plan: "no memory blow-up"). |
+| P63 | CSV-injection guard: cells starting with `= + - @`, **tab or carriage return** get a leading `'`; cells that already start with apostrophes before such a character get one more; import strips exactly one `'` only before such a character. | Plan names `= + - @`; tab and CR are also formula triggers (OWASP). Stripping only in front of a guarded character keeps texts like `'Tis` intact and makes the round trip lossless (`'=x` ↔ `''=x`). |
+| P64 | Import status option "as in the file" (besides manual/machine). Machine imports are stored with provider `csv`, manual ones without provider. | Plan §16: export → import must round-trip losslessly, which needs the file's status. |
+| P65 | Apply writes row by row without a transaction; each write is idempotent (insert-ignore string, upsert translation, drop queue row), so a failed chunk can be sent again; the screen says how many rows were imported and that re-importing is safe. | A nested `START TRANSACTION` would silently commit any transaction already open (WordPress's test framework runs each test in one). |
+| P66 | Non-inline kinds are stored as plain text (no `wp_kses`): they are encoded when printed (`Text::encodeText`, attribute setters). Inline translations go through `wp_kses` via `InlineMarkup::sanitize`. The §6.5 placeholder checks apply to provider output only (CSV text has no placeholders). | Same rules as the editor, so a value saved in one is accepted by the other; `wp_kses` on plain text would corrupt texts such as `a < b`. |
 | P53 | "Translate entire site" (plan §8) is **not** in this phase: the owner's Phase 5 list is scan flow, list, autosave, bulk queue actions, preview, entry points. Bulk here is per page. | No dead controls; it needs a site URL list and a budget confirmation (to schedule; see "Exact next step"). |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -310,7 +321,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 - Phases 4–7 per plan §16.
 - Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
-- Deferred by design (built together with their phases, no dead settings now): "Translate entire site" (P53, to schedule); §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, CSV, TranslatePress (Phase 6); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Deferred by design (built together with their phases, no dead settings now): "Translate entire site" (P53, to schedule); §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, TranslatePress (Phase 6; CSV done in 6a); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
 
 ## Staging fixes acceptance
 
@@ -320,6 +331,19 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Phase 6a acceptance (plan §16) — one line per criterion
+
+- PASS — Export → import round-trips losslessly, including the CSV-injection guard: `CsvTransferTest::test_export_then_import_round_trips_losslessly` (formula-like originals and translations, quotes, commas, line breaks, inline HTML; tables emptied, re-imported as in the file: originals, translations and statuses identical; a second import: all unchanged); `CsvTest` (guard/unguard cases incl. `'Tis`, `'=x`, tab, CR; RFC 4180 writing); `tests/js/csv.test.mjs` (browser reader). Live: full export of the dev site (256 rows) re-imported as in the file with overwrite all → 150 unchanged, 106 skipped (untranslated), 0 new/updates/invalid.
+- PASS — Dry run changes nothing: `test_dry_run_writes_nothing`, REST check in `test_rest_routes_need_manage_options_and_limit_the_chunk`; live dry run then import.
+- PASS — Conflict policies, import status options, queue cleared, purge fired: `test_conflict_policies`, `test_import_status_options_set_status_and_provider_and_clear_the_queue`.
+- PASS — Validation with reasons (language, kind, status, empty original, inline markup incl. `onclick`, invalid UTF-8, cell size, malformed rows, duplicates, no translation): `test_invalid_rows_are_reported_with_reasons`; live: wrong language, wrong cell count, empty translation listed with line numbers.
+- PASS — Export filters, page filter, streaming (1,001 rows in 3 chunks), BOM/header/pages column, download needs `manage_options` and a nonce: `test_export_*`, `test_page_filter_needs_a_recorded_page`, `test_download_needs_manage_options_and_a_nonce`; live downloads (all, one page, unknown page → message).
+- PASS — Screen at 1280 and 390 px (no horizontal overflow; result table uses the card layout).
+
+## Files changed (Phase 6a)
+
+`src/Transfer/{Csv,Exporter,Importer}.php`, `src/Rest/ImportController.php`, `src/Storage/StringStore.php` (`checkTranslation`, `exportRows`, `findMany`, `importTranslation`, `IMPORT_PROVIDER`), `src/Admin/AdminPage.php` (export/import config), `src/Plugin.php`, `assets-src/admin/{csv.js,App.js,admin.scss,screens/ImportExport.js}`, `build/admin.*`, `package.json` (`test:js`), `eslint.config.cjs`, tests `tests/Unit/Transfer/CsvTest.php`, `tests/Integration/Transfer/CsvTransferTest.php`, `tests/js/csv.test.mjs`.
 
 ## Files changed (staging fixes)
 
@@ -351,8 +375,9 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Validation status
 
-- `vendor/bin/phpunit` (unit): 115 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,309 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), staging fixes included.
+- `vendor/bin/phpunit` (unit): 128 tests green.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,320 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6a included.
+- `npm run test:js` (Node's built-in test runner, no extra dependency): 4 tests green.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
 - `npm run lint:js` and `npm run lint:css`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
@@ -405,5 +430,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: re-test the staging fixes (P55–P60) on the phone; send the logo `<img src>` from the English page if it is still broken. Decision on "Translate entire site" (P53) still open.
-2. Phase 6a (CSV import/export, plan §13A.3): export with filters, streamed, CSV-injection guard; import with dry run, conflict policy, chunked apply, validation and `wp_kses`; Import/Export screen; tests.
+1. Owner: re-test the staging fixes (P55–P60) on the phone; send the logo `<img src>` from the English page if it is still broken; review Phase 6a (P61–P66). Decision on "Translate entire site" (P53) still open.
+2. Phase 6b (plan §13A.4): TranslatePress importer (read-only, idempotent, match-rate report, all three statuses, entity/whitespace normalisation) against a fixture dataset, coexistence guard (our front end stays off while TranslatePress is active), Migration screen shown only while TranslatePress data or the plugin is present.

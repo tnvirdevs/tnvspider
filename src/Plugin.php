@@ -45,6 +45,7 @@ use WST\Render\HeadTags;
 use WST\Render\Pipeline;
 use WST\Rest\EditorController;
 use WST\Rest\HealthController;
+use WST\Rest\ImportController;
 use WST\Rest\PagesController;
 use WST\Rest\ProvidersController;
 use WST\Rest\QueueController;
@@ -54,6 +55,8 @@ use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
 use WST\Routing\Urls;
 use WST\Storage\StringStore;
+use WST\Transfer\Exporter;
+use WST\Transfer\Importer;
 use WST\Switcher\Switcher;
 
 /**
@@ -129,6 +132,8 @@ final class Plugin {
 			( new StringsController( $requests, $target, $scheduler, $worker, self::strings(), $pageTarget ) )->boot();
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
 			( new EditorController( $pageTarget ) )->boot();
+			( new ImportController( new Importer( self::strings(), $target ) ) )->boot();
+			( new Exporter( self::strings(), $target ) )->boot();
 			if ( is_admin() ) {
 				( new PostPanel( self::strings(), $modes, $requests, $target, $file, $settings->flag( 'editor_mt_on_manual' ) ) )->boot();
 				( new EditorPage( $settings, $target, $selector, new Isolation( $file ), $file ) )->boot();

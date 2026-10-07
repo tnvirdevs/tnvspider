@@ -12,6 +12,9 @@ namespace WST\Admin;
 use WST\Assets;
 use WST\Config;
 use WST\Switcher\Switcher;
+use WST\Transfer\Csv;
+use WST\Transfer\Exporter;
+use WST\Transfer\Importer;
 
 /**
  * Top-level "Translator" menu that hosts the React app (build/admin.js).
@@ -118,6 +121,17 @@ final class AdminPage {
 			'shortcode'  => '[' . Switcher::SHORTCODE . ']',
 			'menusUrl'   => admin_url( 'nav-menus.php' ),
 			'serverCron' => $cronDisabled ? Health::serverCronCommand() : '',
+			'export'     => array(
+				'url'    => admin_url( 'admin-post.php' ),
+				'action' => Exporter::ACTION,
+				'nonce'  => wp_create_nonce( Exporter::ACTION ),
+			),
+			'import'     => array(
+				'chunk'        => Importer::MAX_ROWS,
+				'maxFileBytes' => Importer::MAX_FILE_BYTES,
+				'maxRows'      => Importer::MAX_FILE_ROWS,
+				'columns'      => Csv::COLUMNS,
+			),
 		);
 	}
 }

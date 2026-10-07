@@ -25,4 +25,11 @@ module.exports = [
 			],
 		},
 	},
+	{
+		// JS unit tests run on Node's built-in runner (npm run test:js); vitest is not installed.
+		files: [ 'tests/js/**' ],
+		rules: {
+			'vitest/no-import-node-test': 'off',
+		},
+	},
 ];

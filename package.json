@@ -9,6 +9,7 @@
 		"start": "wp-scripts start post-panel=./assets-src/post-panel/index.js switcher-block=./assets-src/switcher-block/index.js admin=./assets-src/admin/index.js editor=./assets-src/editor/index.js --output-path=build",
 		"lint:js": "wp-scripts lint-js",
 		"lint:css": "wp-scripts lint-style",
+		"test:js": "node --test tests/js/*.test.mjs",
 		"env": "wp-env"
 	},
 	"devDependencies": {
