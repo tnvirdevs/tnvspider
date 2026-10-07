@@ -23,12 +23,16 @@ final class PageContext {
 	 * @param int|null $postId       Queried post for singular views.
 	 * @param bool     $discoverable Whether new strings may be recorded (plan §6A).
 	 * @param string   $mode         Resolved mode (plan §9): auto, manual or off.
+	 * @param string   $editor       Verified editor request: '', Tokens::SCAN or Tokens::PREVIEW.
+	 * @param bool     $personal     Search, cart, checkout or account page (plan §6A).
 	 */
 	public function __construct(
 		public string $path,
 		public ?int $postId,
 		public bool $discoverable,
-		public string $mode = Settings::MODE_AUTO
+		public string $mode = Settings::MODE_AUTO,
+		public string $editor = '',
+		public bool $personal = false
 	) {
 	}
 }

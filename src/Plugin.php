@@ -17,6 +17,9 @@ use WST\Cli\ProviderCommand;
 use WST\Cli\QueueCommand;
 use WST\Cli\StringCommand;
 use WST\Database\Schema;
+use WST\Editor\EditorRequest;
+use WST\Editor\PageTarget;
+use WST\Editor\Preview;
 use WST\Languages\Registry;
 use WST\Log\Logger;
 use WST\Modes\OffPages;
@@ -37,6 +40,7 @@ use WST\Queue\Worker;
 use WST\Render\DiscoveryGate;
 use WST\Render\HeadTags;
 use WST\Render\Pipeline;
+use WST\Rest\EditorController;
 use WST\Rest\HealthController;
 use WST\Rest\PagesController;
 use WST\Rest\ProvidersController;
@@ -108,16 +112,19 @@ final class Plugin {
 
 			// The language must be known before the locale and theme load.
 			( new Router( $settings, $target, $urls ) )->boot();
+			( new EditorRequest( $urls, $target ) )->boot();
 			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
 			( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 			( new OffPages( $settings, $modes, $byLang ) )->boot();
 			$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
-			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes ) )->boot();
+			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) ) )->boot();
 			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
 			$purger->boot();
-			$requests = new Requests( $settings, self::strings(), $queue, $selector, $scheduler, $modes );
-			( new StringsController( $requests, $target, $scheduler, $worker ) )->boot();
+			$requests   = new Requests( $settings, self::strings(), $queue, $selector, $scheduler, $modes );
+			$pageTarget = new PageTarget( $urls, $byLang, $target, $modes, self::strings() );
+			( new StringsController( $requests, $target, $scheduler, $worker, self::strings(), $pageTarget ) )->boot();
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
+			( new EditorController( $pageTarget ) )->boot();
 			if ( is_admin() ) {
 				( new PostPanel( self::strings(), $modes, $requests, $target, $file ) )->boot();
 			}

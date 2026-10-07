@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WST\Modes;
 
+use WST\Editor\EditorRequest;
 use WST\Languages\Current;
 use WST\Routing\LanguageUrls;
 use WST\Settings;
@@ -45,7 +46,8 @@ final class OffPages {
 	 * Redirect, or set the canonical URL, for an "off" target page.
 	 */
 	public function handle(): void {
-		if ( ! Current::isTarget() || ! $this->modes->currentIsOff() ) {
+		// Editor scans and previews of an "off" page are answered by the pipeline.
+		if ( ! Current::isTarget() || ! $this->modes->currentIsOff() || null !== EditorRequest::current() ) {
 			return;
 		}
 		$urls = $this->urls->forCurrentRequest( true );

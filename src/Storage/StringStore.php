@@ -191,6 +191,54 @@ final class StringStore {
 	}
 
 	/**
+	 * When a page was last seen by a visitor and last scanned.
+	 *
+	 * @param string $path Page path without language prefix.
+	 * @return array{last_seen: string|null, last_scan: string|null}
+	 */
+	public function pageTimes( string $path ): array {
+		$row = $this->first( $this->prepare( 'SELECT last_seen, last_scan FROM %i WHERE page_key = %s', $this->schema->table( 'pages' ), self::pageKey( $path ) ) );
+
+		return array(
+			'last_seen' => null === $row || null === $row->last_seen ? null : (string) $row->last_seen,
+			'last_scan' => null === $row || null === $row->last_scan ? null : (string) $row->last_scan,
+		);
+	}
+
+	/**
+	 * Record an admin scan (plan §11): every string on the page, without
+	 * caps. Occurrences of strings no longer on the page are removed and the
+	 * page's last scan time is set.
+	 *
+	 * @param array<string, string> $strings Normalised original => kind (all strings found).
+	 * @param string                $path    Page path without language prefix.
+	 * @param int|null              $postId  Queried post, if singular.
+	 * @return array<string, int> Original => string id.
+	 * @throws \RuntimeException When a write fails.
+	 */
+	public function recordScan( array $strings, string $path, ?int $postId ): array {
+		$ids     = $this->recordOnPage( $strings, $path, $postId );
+		$pageKey = self::pageKey( $path );
+		$table   = $this->schema->table( 'occurrences' );
+		if ( array() === $ids ) {
+			$this->query( $this->prepare( 'DELETE FROM %i WHERE page_key = %s', $table, $pageKey ) );
+		} else {
+			$keep = array_values( $ids );
+			$this->query(
+				$this->prepare(
+					'DELETE FROM %i WHERE page_key = %s AND string_id NOT IN (' . implode( ',', array_fill( 0, count( $keep ), '%d' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+					array_merge( array( $table, $pageKey ), $keep )
+				)
+			);
+		}
+		$now = current_time( 'mysql', true );
+		$this->touchPage( $pageKey, $path, $postId, $now );
+		$this->query( $this->prepare( 'UPDATE %i SET last_scan = %s WHERE page_key = %s', $this->schema->table( 'pages' ), $now, $pageKey ) );
+
+		return $ids;
+	}
+
+	/**
 	 * Save a manual (protected) translation, creating the string if needed.
 	 * Inline translations must keep the original's tags and attributes.
 	 *
@@ -256,6 +304,159 @@ final class StringStore {
 		$this->query( $this->prepare( 'DELETE FROM %i WHERE string_id = %d AND lang = %s', $this->schema->table( 'queue' ), $id, $lang ) );
 
 		return $id;
+	}
+
+	/**
+	 * Strings for the translation editor (plan §11): those recorded on one
+	 * page (plus the site-wide ones), or all strings when $pageKey is null.
+	 * Each row carries its translation, provider, flags and queue state.
+	 *
+	 * @param string      $lang          Target locale.
+	 * @param string|null $pageKey       Page key, or null for every string.
+	 * @param bool        $includeGlobal Whether site-wide strings (menus, footer) are listed with the page.
+	 * @param string      $filter        all, untranslated, machine, manual or warning.
+	 * @param string      $search        Substring of the original or the translation.
+	 * @param int         $limit         Rows per page.
+	 * @param int         $offset        Rows to skip.
+	 * @param int|null    $stringId      Only this string.
+	 * @return array{items: list<array{id: int, kind: string, original: string, translated: string|null, status: int|null, provider: string|null, flags: int, global: bool, queue_state: string|null, queue_error: string|null}>, total: int, counts: array<string, int>}
+	 * @throws \InvalidArgumentException For an unknown filter.
+	 */
+	public function editorList( string $lang, ?string $pageKey, bool $includeGlobal, string $filter, string $search, int $limit, int $offset, ?int $stringId = null ): array {
+		$from = ' FROM %i s LEFT JOIN %i t ON t.string_id = s.id AND t.lang = %s LEFT JOIN %i q ON q.string_id = s.id AND q.lang = %s';
+		$args = array( $this->schema->table( 'strings' ), $this->schema->table( 'translations' ), $lang, $this->schema->table( 'queue' ), $lang );
+		$base = array();
+		if ( null !== $pageKey ) {
+			$base[] = '(s.id IN (SELECT string_id FROM %i WHERE page_key = %s)' . ( $includeGlobal ? ' OR s.is_global = 1)' : ')' );
+			array_push( $args, $this->schema->table( 'occurrences' ), $pageKey );
+		}
+		if ( null !== $stringId ) {
+			$base[] = 's.id = %d';
+			$args[] = $stringId;
+		}
+		if ( '' !== $search ) {
+			$like   = '%' . $this->db->esc_like( $search ) . '%';
+			$base[] = '(s.original LIKE %s OR t.translated LIKE %s)';
+			array_push( $args, $like, $like );
+		}
+		$where   = array() === $base ? '' : ' WHERE ' . implode( ' AND ', $base );
+		$warning = "(COALESCE(t.flags, 0) <> 0 OR q.state = 'failed')";
+		$counts  = $this->first(
+			$this->prepare(
+				'SELECT COUNT(*) AS total, COALESCE(SUM(t.id IS NULL), 0) AS untranslated, COALESCE(SUM(t.status = %d), 0) AS machine, COALESCE(SUM(t.status = %d), 0) AS manual, COALESCE(SUM(' . $warning . '), 0) AS warning' . $from . $where, // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed SQL fragments with placeholders.
+				array_merge( array( self::STATUS_MACHINE, self::STATUS_MANUAL ), $args )
+			)
+		);
+		$filters = array(
+			'all'          => '',
+			'untranslated' => 't.id IS NULL',
+			'machine'      => 't.status = ' . self::STATUS_MACHINE,
+			'manual'       => 't.status = ' . self::STATUS_MANUAL,
+			'warning'      => $warning,
+		);
+		if ( ! isset( $filters[ $filter ] ) ) {
+			throw new \InvalidArgumentException( 'Unknown filter.' );
+		}
+		if ( '' !== $filters[ $filter ] ) {
+			$where .= ( '' === $where ? ' WHERE ' : ' AND ' ) . $filters[ $filter ];
+		}
+		$rows  = $this->results(
+			$this->prepare(
+				'SELECT s.id, s.kind, s.original, s.is_global, t.translated, t.status, t.provider, t.flags, q.state AS queue_state, q.last_error' . $from . $where . ' ORDER BY s.id ASC LIMIT %d OFFSET %d', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed SQL fragments with placeholders.
+				array_merge( $args, array( max( 1, $limit ), max( 0, $offset ) ) )
+			)
+		);
+		$items = array();
+		foreach ( $rows as $row ) {
+			$items[] = self::row( $row ) + array(
+				'provider'    => null === $row->provider ? null : (string) $row->provider,
+				'flags'       => (int) $row->flags,
+				'global'      => '1' === (string) $row->is_global,
+				'queue_state' => null === $row->queue_state ? null : (string) $row->queue_state,
+				'queue_error' => null === $row->last_error || '' === $row->last_error ? null : (string) $row->last_error,
+			);
+		}
+		$all = array( 'all' => null === $counts ? 0 : (int) $counts->total );
+		foreach ( array( 'untranslated', 'machine', 'manual', 'warning' ) as $name ) {
+			$all[ $name ] = null === $counts ? 0 : (int) $counts->$name;
+		}
+
+		return array(
+			'items'  => $items,
+			'total'  => $all[ $filter ],
+			'counts' => $all,
+		);
+	}
+
+	/**
+	 * One string by id with its translation into $lang.
+	 *
+	 * @param int    $id   String id.
+	 * @param string $lang Target locale.
+	 * @return array{id: int, kind: string, original: string, translated: string|null, status: int|null}|null
+	 */
+	public function byId( int $id, string $lang ): ?array {
+		$row = $this->first(
+			$this->prepare(
+				'SELECT s.id, s.kind, s.original, t.translated, t.status FROM %i s LEFT JOIN %i t ON t.string_id = s.id AND t.lang = %s WHERE s.id = %d',
+				$this->schema->table( 'strings' ),
+				$this->schema->table( 'translations' ),
+				$lang,
+				$id
+			)
+		);
+
+		return null === $row ? null : self::row( $row );
+	}
+
+	/**
+	 * Turn a machine translation into a manual one, unchanged, so machine
+	 * runs never replace it.
+	 *
+	 * @param int    $id     String id.
+	 * @param string $lang   Target locale.
+	 * @param int    $userId User.
+	 * @return bool False when the string has no translation.
+	 */
+	public function markManual( int $id, string $lang, int $userId ): bool {
+		$string = $this->byId( $id, $lang );
+		if ( null === $string || null === $string['translated'] ) {
+			return false;
+		}
+		$this->query(
+			$this->prepare(
+				'UPDATE %i SET status = %d, updated_by = %d, updated_at = %s WHERE string_id = %d AND lang = %s',
+				$this->schema->table( 'translations' ),
+				self::STATUS_MANUAL,
+				$userId,
+				current_time( 'mysql', true ),
+				$id,
+				$lang
+			)
+		);
+		wp_cache_delete( $lang . ':' . self::hash( $string['original'] ), self::CACHE_GROUP );
+		$this->query( $this->prepare( 'DELETE FROM %i WHERE string_id = %d AND lang = %s', $this->schema->table( 'queue' ), $id, $lang ) );
+
+		return true;
+	}
+
+	/**
+	 * Remove a string's translation (manual or machine); the page shows the
+	 * original until it is translated again.
+	 *
+	 * @param int    $id   String id.
+	 * @param string $lang Target locale.
+	 * @return bool False when there was nothing to remove.
+	 */
+	public function deleteTranslation( int $id, string $lang ): bool {
+		$string = $this->byId( $id, $lang );
+		if ( null === $string || null === $string['translated'] ) {
+			return false;
+		}
+		$this->query( $this->prepare( 'DELETE FROM %i WHERE string_id = %d AND lang = %s', $this->schema->table( 'translations' ), $id, $lang ) );
+		wp_cache_delete( $lang . ':' . self::hash( $string['original'] ), self::CACHE_GROUP );
+
+		return true;
 	}
 
 	/**

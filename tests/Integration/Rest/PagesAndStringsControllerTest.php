@@ -27,6 +27,8 @@ use WST\Queue\Usage;
 use WST\Queue\Worker;
 use WST\Rest\PagesController;
 use WST\Rest\StringsController;
+use WST\Editor\PageTarget;
+use WST\Routing\LanguageUrls;
 use WST\Routing\Urls;
 use WST\Settings;
 use WST\Storage\StringStore;
@@ -87,8 +89,19 @@ final class PagesAndStringsControllerTest extends WP_UnitTestCase {
 		$this->store->saveManual( 'Soap price', 'text', 'bn_BD', 'সাবানের দাম', 0 );
 		unset( $ids );
 
+		$this->boot();
+	}
+
+	/**
+	 * Boot the controllers with these settings.
+	 *
+	 * @param array<string, mixed> $values Extra settings.
+	 */
+	private function boot( array $values = array() ): void {
+		global $wpdb, $wp_rest_server;
+		$schema    = new Schema( $wpdb );
 		$settings  = new Settings(
-			array(
+			$values + array(
 				'target_language' => 'bn_BD',
 				'provider'        => 'translatex',
 				'providers'       => array( 'translatex' => array( 'requests_per_minute' => 0 ) ),
@@ -115,8 +128,11 @@ final class PagesAndStringsControllerTest extends WP_UnitTestCase {
 		// Only these controllers: the plugin booted its own with the real (keyless) registry.
 		remove_all_actions( 'rest_api_init' );
 		$wp_rest_server = new \WP_REST_Server(); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's REST server global.
-		( new StringsController( $requests, $target, $scheduler, $worker ) )->boot();
-		( new PagesController( $this->store, $modes, $target, new Purger( $this->store, $urls, $target, 'http://example.org' ) ) )->boot();
+		$pages          = new PageTarget( $urls, new LanguageUrls( $urls, $target, 'http://example.org' ), $target, $modes, $this->store );
+		( new StringsController( $requests, $target, $scheduler, $worker, $this->store, $pages ) )->boot();
+		$purger = new Purger( $this->store, $urls, $target, 'http://example.org' );
+		$purger->boot();
+		( new PagesController( $this->store, $modes, $target, $purger ) )->boot();
 		do_action( 'rest_api_init', $wp_rest_server ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
 	}
 
@@ -301,5 +317,161 @@ final class PagesAndStringsControllerTest extends WP_UnitTestCase {
 		$refused = $this->call( 'POST', '/strings/translate', array( 'post_id' => $this->manualPost ) );
 		$this->assertSame( 409, $refused->get_status() );
 		$this->assertSame( 'wst_refused', $refused->get_data()['code'] );
+	}
+
+	private function editorUser(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+	}
+
+	/**
+	 * @param array<string, mixed> $params Query.
+	 * @return array{items: list<array<string, mixed>>, counts: array<string, int>}
+	 */
+	private function strings( array $params = array() ): array {
+		$response = $this->call( 'GET', '/strings', $params + array( 'page_key' => StringStore::pageKey( '/handmade-soap/' ) ) );
+		$this->assertSame( 200, $response->get_status(), (string) wp_json_encode( $response->get_data() ) );
+
+		return $response->get_data();
+	}
+
+	private function stringId( string $original ): int {
+		return (int) ( $this->store->find( $original, 'bn_BD' )['id'] ?? 0 );
+	}
+
+	public function test_string_list_for_a_page_with_site_wide_strings(): void {
+		global $wpdb;
+		$this->editorUser();
+		$ids = $this->store->recordOnPage( array( 'Site menu' => 'text' ), '/elsewhere/', null );
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET is_global = 1 WHERE id = %d', ( new Schema( $wpdb ) )->table( 'strings' ), $ids['Site menu'] ) );
+
+		$data = $this->strings();
+
+		$this->assertSame( array( 'Soap intro', 'Soap price', 'Site menu' ), array_column( $data['items'], 'original' ) );
+		$this->assertSame( array( 'none', 'manual', 'none' ), array_column( $data['items'], 'status' ) );
+		$this->assertSame( array( false, false, true ), array_column( $data['items'], 'global' ) );
+		$this->assertSame(
+			array(
+				'all'          => 3,
+				'untranslated' => 2,
+				'machine'      => 0,
+				'manual'       => 1,
+				'warning'      => 0,
+			),
+			$data['counts']
+		);
+		$this->assertSame( array( 'Soap intro', 'Soap price' ), array_column( $this->strings( array( 'include_global' => false ) )['items'], 'original' ) );
+		$this->assertSame( array( 'Soap price' ), array_column( $this->strings( array( 'filter' => 'manual' ) )['items'], 'original' ) );
+		$this->assertSame( array( 'Soap price' ), array_column( $this->strings( array( 'search' => 'সাবান' ) )['items'], 'original' ), 'Search covers translations.' );
+		$this->assertSame( 400, $this->call( 'GET', '/strings', array( 'page_key' => 'not-a-key' ) )->get_status() );
+	}
+
+	public function test_warnings_show_failed_rows_and_segmented_translations(): void {
+		$this->editorUser();
+		$intro = $this->stringId( 'Soap intro' );
+		$this->queue->enqueue( array( $intro ), 'bn_BD', 'translatex', Queue::PRIORITY_EDITOR, time() );
+		$row = $this->queue->claim( 'translatex', 'bn_BD', 1, 1000, 60, time() )[0];
+		$this->queue->fail( $row, 'Tags in the translation do not match the original.', 1, '', time() );
+
+		$item = $this->strings( array( 'filter' => 'warning' ) )['items'][0];
+
+		$this->assertSame( 'Soap intro', $item['original'] );
+		$this->assertSame( array( 'failed' ), $item['warnings'] );
+		$this->assertSame( 'Tags in the translation do not match the original.', $item['error'] );
+	}
+
+	public function test_manual_save_validates_purges_and_dequeues(): void {
+		$this->editorUser();
+		$intro = $this->stringId( 'Soap intro' );
+		$this->queue->enqueue( array( $intro ), 'bn_BD', 'translatex', Queue::PRIORITY_VISITOR, time() );
+
+		$saved = $this->call( 'POST', '/strings/' . $intro . '/translation', array( 'translation' => 'সাবানের পরিচয়' ) );
+
+		$this->assertSame( 200, $saved->get_status() );
+		$this->assertSame( array( 'সাবানের পরিচয়', 'manual', null ), array( $saved->get_data()['translation'], $saved->get_data()['status'], $saved->get_data()['queue'] ) );
+		$this->assertSame( 0, $this->queue->stats()['pending'], 'A manual translation is never machine-translated.' );
+		$this->assertContains( 'http://example.org/bn/handmade-soap/', $this->purged, 'The cached page is purged.' );
+		$this->assertSame( 400, $this->call( 'POST', '/strings/' . $intro . '/translation', array( 'translation' => '  ' ) )->get_status() );
+		$this->assertSame( 404, $this->call( 'POST', '/strings/999999/translation', array( 'translation' => 'x' ) )->get_status() );
+	}
+
+	public function test_inline_save_must_keep_the_markup(): void {
+		$this->editorUser();
+		$ids = $this->store->recordOnPage( array( 'Read <a href="/story/">our story</a>' => 'inline' ), '/handmade-soap/', $this->manualPost );
+		$id  = $ids['Read <a href="/story/">our story</a>'];
+
+		$bad  = $this->call( 'POST', '/strings/' . $id . '/translation', array( 'translation' => 'পড়ুন <a href="/evil/">গল্প</a>' ) );
+		$good = $this->call( 'POST', '/strings/' . $id . '/translation', array( 'translation' => '<a href="/story/">আমাদের গল্প</a> পড়ুন' ) );
+
+		$this->assertSame( 400, $bad->get_status() );
+		$this->assertSame( 'wst_invalid_translation', $bad->get_data()['code'] );
+		$this->assertSame( 200, $good->get_status() );
+	}
+
+	public function test_mark_manual_and_remove(): void {
+		$this->editorUser();
+		$intro = $this->stringId( 'Soap intro' );
+		$this->assertSame( 409, $this->call( 'POST', '/strings/' . $intro . '/manual' )->get_status(), 'Nothing to keep yet.' );
+		$this->store->saveMachine( $intro, 'Soap intro', 'bn_BD', 'যন্ত্রের অনুবাদ', 'translatex', 0 );
+
+		$marked = $this->call( 'POST', '/strings/' . $intro . '/manual' )->get_data();
+		$this->assertSame( array( 'যন্ত্রের অনুবাদ', 'manual' ), array( $marked['translation'], $marked['status'] ) );
+		$this->assertFalse( $this->store->saveMachine( $intro, 'Soap intro', 'bn_BD', 'নতুন', 'translatex', 0 ), 'Machine runs no longer replace it.' );
+
+		$removed = $this->call( 'DELETE', '/strings/' . $intro . '/translation' )->get_data();
+		$this->assertSame( array( null, 'none' ), array( $removed['translation'], $removed['status'] ) );
+		$this->assertSame( 409, $this->call( 'DELETE', '/strings/' . $intro . '/translation' )->get_status() );
+	}
+
+	public function test_editor_string_routes_need_the_capability(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
+		$intro = $this->stringId( 'Soap intro' );
+
+		$this->assertSame( 403, $this->call( 'GET', '/strings' )->get_status() );
+		$this->assertSame( 403, $this->call( 'POST', '/strings/' . $intro . '/translation', array( 'translation' => 'x' ) )->get_status() );
+		$this->assertSame( 403, $this->call( 'DELETE', '/strings/' . $intro . '/translation' )->get_status() );
+		$this->assertSame( 403, $this->call( 'POST', '/strings/' . $intro . '/manual' )->get_status() );
+	}
+
+	public function test_machine_translation_on_manual_pages_can_be_turned_off(): void {
+		$this->editorUser();
+		$intro = $this->stringId( 'Soap intro' );
+		$this->assertSame(
+			200,
+			$this->call(
+				'POST',
+				'/strings/translate',
+				array(
+					'ids'  => array( $intro ),
+					'path' => '/handmade-soap/',
+				)
+			)->get_status(),
+			'Allowed by default (plan §9).'
+		);
+
+		$this->boot( array( 'editor_mt_on_manual' => false ) );
+		$byIds  = $this->call(
+			'POST',
+			'/strings/translate',
+			array(
+				'ids'  => array( $intro ),
+				'path' => '/handmade-soap/',
+			)
+		);
+		$byPost = $this->call( 'POST', '/strings/translate', array( 'post_id' => $this->manualPost ) );
+
+		$this->assertSame( array( 409, 409 ), array( $byIds->get_status(), $byPost->get_status() ) );
+		$this->assertStringContainsString( 'turned off for manual pages', $byIds->get_data()['message'] );
+		$this->assertSame(
+			200,
+			$this->call(
+				'POST',
+				'/strings/translate',
+				array(
+					'ids'  => array( $intro ),
+					'path' => '/about-us/',
+				)
+			)->get_status(),
+			'Auto pages are not affected.'
+		);
 	}
 }

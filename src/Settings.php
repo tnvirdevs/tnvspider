@@ -117,7 +117,8 @@ final class Settings {
 	 *     providers: array<string, array<string, int|string>>,
 	 *     never_translate_terms: list<string>,
 	 *     terms_case_insensitive: bool,
-	 *     terms_whole_word: bool
+	 *     terms_whole_word: bool,
+	 *     editor_mt_on_manual: bool
 	 * }
 	 */
 	private array $values;
@@ -370,7 +371,8 @@ final class Settings {
 	 *     providers: array<string, array<string, int|string>>,
 	 *     never_translate_terms: list<string>,
 	 *     terms_case_insensitive: bool,
-	 *     terms_whole_word: bool
+	 *     terms_whole_word: bool,
+	 *     editor_mt_on_manual: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -415,6 +417,7 @@ final class Settings {
 			'never_translate_terms'   => array_slice( self::readList( $raw, 'never_translate_terms', array() ), 0, self::MAX_TERMS ),
 			'terms_case_insensitive'  => self::readBool( $raw, 'terms_case_insensitive', true ),
 			'terms_whole_word'        => self::readBool( $raw, 'terms_whole_word', true ),
+			'editor_mt_on_manual'     => self::readBool( $raw, 'editor_mt_on_manual', true ),
 		);
 	}
 

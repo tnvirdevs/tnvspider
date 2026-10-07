@@ -49,10 +49,12 @@ final class Requests {
 	 * @param int[]    $stringIds String ids.
 	 * @phpstan-param list<int> $stringIds
 	 * @param Language $target    Target language.
+	 * @param string   $pageMode  Mode of the editor's page, '' when unknown.
 	 * @return array{queued: int, skipped: int, provider: string}
-	 * @throws RequestRefused When no provider can translate now.
+	 * @throws RequestRefused When no provider can translate now, or machine translation is off for manual pages.
 	 */
-	public function strings( array $stringIds, Language $target ): array {
+	public function strings( array $stringIds, Language $target, string $pageMode = '' ): array {
+		$this->refuseOnManual( $pageMode );
 		$ids     = $this->store->existingIds( array_values( array_unique( $stringIds ) ) );
 		$send    = array_values( array_diff( $ids, $this->store->manualIds( $ids, $target->locale() ) ) );
 		$skipped = count( $stringIds ) - count( $send );
@@ -74,9 +76,11 @@ final class Requests {
 	 * @throws RequestRefused When the page is off, was never seen, or no provider can translate now.
 	 */
 	public function post( int $postId, Language $target ): array {
-		if ( Settings::MODE_OFF === $this->modes->resolvePost( $postId )['mode'] ) {
+		$mode = $this->modes->resolvePost( $postId )['mode'];
+		if ( Settings::MODE_OFF === $mode ) {
 			throw new RequestRefused( 'This page is set to "off": it is not translated.' );
 		}
+		$this->refuseOnManual( $mode );
 		if ( 0 === $this->store->postCoverage( $postId, $target->locale() )['total'] ) {
 			throw new RequestRefused( 'No strings are known for this page yet. Visit or scan its translated version first.' );
 		}
@@ -87,6 +91,19 @@ final class Requests {
 			'skipped'  => 0,
 			'provider' => $this->enqueue( $ids, $target, Queue::PRIORITY_PAGE_NOW ),
 		);
+	}
+
+	/**
+	 * Refuse explicit machine translation on manual pages when the owner
+	 * turned "Allow machine translation in the editor on manual pages" off.
+	 *
+	 * @param string $mode Page mode, '' when unknown.
+	 * @throws RequestRefused When refused.
+	 */
+	private function refuseOnManual( string $mode ): void {
+		if ( Settings::MODE_MANUAL === $mode && ! $this->settings->flag( 'editor_mt_on_manual' ) ) {
+			throw new RequestRefused( 'Machine translation is turned off for manual pages (Translator → Translation).' );
+		}
 	}
 
 	/**

@@ -51,13 +51,12 @@ final class DiscoveryGate {
 			&& ! is_user_logged_in()
 			&& ! ( $this->settings->flag( 'block_crawlers' ) && self::isBot( isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '' ) )
 			&& $this->queryArgsAllowed()
-			&& ! is_search()
 			&& ! is_404()
 			&& ! is_feed()
 			&& ! is_preview()
 			&& ! is_customize_preview()
 			&& ! ( is_singular() && post_password_required() )
-			&& ! $this->isPersonalShopPage()
+			&& ! self::isPersonalPage()
 			&& ! PathRules::matchesAny( $path, $this->settings->neverDiscoverPaths() );
 
 		/**
@@ -120,10 +119,13 @@ final class DiscoveryGate {
 	}
 
 	/**
-	 * WooCommerce cart, checkout (including order received) and account pages.
+	 * Pages that may show personal data: search results and WooCommerce
+	 * cart, checkout (including order received) and account pages. Visits
+	 * never discover there; scans ask first and never auto-queue.
 	 */
-	private function isPersonalShopPage(): bool {
-		return ( function_exists( 'is_cart' ) && is_cart() )
+	public static function isPersonalPage(): bool {
+		return is_search()
+			|| ( function_exists( 'is_cart' ) && is_cart() )
 			|| ( function_exists( 'is_checkout' ) && is_checkout() )
 			|| ( function_exists( 'is_account_page' ) && is_account_page() );
 	}

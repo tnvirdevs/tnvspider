@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 namespace WST\Render;
 
+use WST\Editor\EditorRequest;
+use WST\Editor\Preview;
+use WST\Editor\Tokens;
 use WST\Html\Extractor;
 use WST\Html\InlineMarkup;
 use WST\Html\Replacer;
@@ -59,6 +62,7 @@ final class Pipeline {
 	 * @param Urls          $urls     URL helper.
 	 * @param AutoQueue     $auto     Queues untranslated strings.
 	 * @param Resolver      $modes    Page modes.
+	 * @param Preview|null  $preview  Safe preview filter for the editor frame.
 	 */
 	public function __construct(
 		private Settings $settings,
@@ -68,7 +72,8 @@ final class Pipeline {
 		private Logger $logger,
 		private Urls $urls,
 		private AutoQueue $auto,
-		private Resolver $modes
+		private Resolver $modes,
+		private ?Preview $preview = null
 	) {
 	}
 
@@ -90,11 +95,14 @@ final class Pipeline {
 		$path = $this->urls->unprefixedPath( $uri, $this->target->slug() ) ?? '/';
 
 		$mode          = $this->modes->current()['mode'];
+		$editor        = EditorRequest::current();
 		$this->context = new PageContext(
 			$path,
 			is_singular() ? (int) get_queried_object_id() : null,
-			Settings::MODE_OFF !== $mode && $this->gate->allowsRequest( $path, $mode ),
-			$mode
+			null === $editor && Settings::MODE_OFF !== $mode && $this->gate->allowsRequest( $path, $mode ),
+			$mode,
+			null === $editor ? '' : $editor['type'],
+			DiscoveryGate::isPersonalPage()
 		);
 		ob_start( array( $this, 'finish' ) );
 	}
@@ -112,8 +120,17 @@ final class Pipeline {
 		if ( ! is_string( $html ) || '' === $html || null === $this->context || ! $this->isHtmlResponse() ) {
 			return $html;
 		}
-		if ( 200 !== http_response_code() ) {
+		$status = http_response_code();
+		if ( 200 !== $status ) {
 			$this->context->discoverable = false;
+		}
+		$scan = Tokens::SCAN === $this->context->editor;
+		if ( $scan ) {
+			EditorRequest::header( 'Content-Type: application/json; charset=utf-8' );
+			if ( 200 !== $status ) {
+				/* translators: %d: HTTP status */
+				return (string) wp_json_encode( array( 'error' => sprintf( __( 'The page answered with HTTP %d; only pages that load normally can be scanned.', 'wp-site-translator' ), (int) $status ) ) );
+			}
 		}
 
 		try {
@@ -124,10 +141,10 @@ final class Pipeline {
 				throw $e;
 			}
 
-			return $html;
+			return $scan ? (string) wp_json_encode( array( 'error' => __( 'The scan failed; see the Translator log.', 'wp-site-translator' ) ) ) : $html;
 		}
 
-		if ( $this->pending > 0 ) {
+		if ( $this->pending > 0 && '' === $this->context->editor ) {
 			$this->markUncacheable();
 		}
 
@@ -144,12 +161,15 @@ final class Pipeline {
 		$this->pending = 0;
 		$extractor     = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
 		$segments      = $extractor->extract( $html );
+		if ( Tokens::SCAN === $context->editor && Settings::MODE_OFF === $context->mode ) {
+			return (string) wp_json_encode( $this->summary( $context, array( 'strings' => 0 ) ) );
+		}
 		if ( Settings::MODE_OFF === $context->mode ) {
 			// "Off" page shown with its original text: links stay in the
 			// language, nothing is translated, discovered or queued.
 			$html = ( new Replacer() )->apply( $html, $segments, array(), $this->linkEdits( $extractor->links() ) );
 
-			return $this->setDocumentLanguage( $html, $this->settings->defaultLanguage() );
+			return $this->forPreview( $this->setDocumentLanguage( $html, $this->settings->defaultLanguage() ), $context );
 		}
 
 		// Inline originals are stored language-neutral: internal links in
@@ -164,6 +184,9 @@ final class Pipeline {
 		}
 		$lang  = $this->target->locale();
 		$found = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $lang );
+		if ( Tokens::SCAN === $context->editor ) {
+			return (string) wp_json_encode( $this->scan( $kinds, $found, $context ) );
+		}
 
 		$byNeutral    = array();
 		$untranslated = array();
@@ -194,7 +217,25 @@ final class Pipeline {
 
 		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
 
-		return $this->setDocumentLanguage( $html, $this->target );
+		return $this->forPreview( $this->setDocumentLanguage( $html, $this->target ), $context );
+	}
+
+	/**
+	 * The editor frame's version of the page (plan §11 safe preview).
+	 *
+	 * @param string      $html    Translated document.
+	 * @param PageContext $context Page context.
+	 * @throws \LogicException When a preview request arrives without the filter.
+	 */
+	private function forPreview( string $html, PageContext $context ): string {
+		if ( Tokens::PREVIEW !== $context->editor ) {
+			return $html;
+		}
+		if ( null === $this->preview ) {
+			throw new \LogicException( 'Preview request without a preview filter.' );
+		}
+
+		return $this->preview->prepare( $html, ( EditorRequest::current()['data']['scripts'] ?? false ) === true );
 	}
 
 	/**
@@ -209,6 +250,73 @@ final class Pipeline {
 	 */
 	public function pending(): int {
 		return $this->pending;
+	}
+
+	/**
+	 * Record every string of the page for the editor and queue what the
+	 * page's mode allows (plan §11, §6A: no caps; personal pages only after
+	 * confirmation and never auto-queued).
+	 *
+	 * @param array<string, string>                                                    $kinds   Normalised original => kind.
+	 * @param array<string, array{id: int, translated: string|null, status: int|null}> $found Known strings.
+	 * @param PageContext                                                              $context Page context.
+	 * @return array<string, mixed> Summary.
+	 */
+	private function scan( array $kinds, array $found, PageContext $context ): array {
+		$allowPersonal = true === ( EditorRequest::current()['data']['allow_personal'] ?? false );
+		if ( $context->personal && ! $allowPersonal ) {
+			return $this->summary(
+				$context,
+				array(
+					'needs_confirmation' => true,
+					'strings'            => count( $kinds ),
+				)
+			);
+		}
+		$maxLength = $this->settings->number( 'max_string_length' );
+		$keep      = array_filter( $kinds, static fn( $kind, $text ): bool => mb_strlen( (string) $text ) <= $maxLength, ARRAY_FILTER_USE_BOTH );
+		$ids       = $this->store->recordScan( $keep, $context->path, $context->postId );
+
+		$untranslated = array();
+		$translated   = 0;
+		foreach ( $ids as $text => $id ) {
+			if ( null === ( $found[ $text ]['translated'] ?? null ) ) {
+				$untranslated[] = $id;
+			} else {
+				++$translated;
+			}
+		}
+		$queued = Settings::MODE_AUTO === $context->mode && ! $context->personal && array() !== $untranslated && $this->auto->queue( $untranslated, $this->target );
+
+		return $this->summary(
+			$context,
+			array(
+				'strings'      => count( $ids ),
+				'new'          => count( array_diff_key( $ids, $found ) ),
+				'translated'   => $translated,
+				'untranslated' => count( $untranslated ),
+				'queued'       => $queued ? count( $untranslated ) : 0,
+				'too_long'     => count( $kinds ) - count( $keep ),
+			)
+		);
+	}
+
+	/**
+	 * Scan summary with the page facts.
+	 *
+	 * @param PageContext          $context Page context.
+	 * @param array<string, mixed> $counts  Counts.
+	 * @return array<string, mixed>
+	 */
+	private function summary( PageContext $context, array $counts ): array {
+		return array(
+			'scan_id'  => EditorRequest::current()['token'] ?? '',
+			'path'     => $context->path,
+			'page_key' => StringStore::pageKey( $context->path ),
+			'post_id'  => $context->postId,
+			'mode'     => $context->mode,
+			'personal' => $context->personal,
+		) + $counts;
 	}
 
 	/**
