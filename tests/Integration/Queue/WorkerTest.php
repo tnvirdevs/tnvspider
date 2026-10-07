@@ -20,6 +20,7 @@ use WST\Providers\Errors\RateLimited;
 use WST\Providers\Errors\TransientError;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
+use WST\Providers\RequestPlan;
 use WST\Providers\Secrets;
 use WST\Providers\Selector;
 use WST\Queue\Queue;
@@ -378,6 +379,96 @@ final class WorkerTest extends WP_UnitTestCase {
 
 		$this->assertSame( '[bn] Go <b>[bn] now</b>', $this->translation( 'Go <b>now</b>' )['translated'] ?? null );
 		$this->assertFalse( end( $this->fallback->calls )[3], 'The retry was sent as plain text segments.' );
+	}
+
+	public function test_no_request_starts_after_the_budget_even_inside_a_batch(): void {
+		$strings = array();
+		for ( $i = 1; $i <= 6; $i++ ) {
+			$strings[ 'Slow item ' . $i ] = 'text';
+		}
+		$this->enqueue( $strings );
+		// Every request takes 15 s; the provider caps a request at 2 items.
+		$this->primary->translator = function ( string $text, string $target ): string {
+			$this->now += 7.5;
+
+			return strtoupper( $target ) . ': ' . $text;
+		};
+
+		$report = $this->worker(
+			array(
+				'providers' => array(
+					'translatex' => array(
+						'requests_per_minute'   => 0,
+						'max_items_per_request' => 2,
+					),
+				),
+			)
+		)->run( 20.0 );
+
+		$this->assertSame( 2, $report->requests, 'Started at 0 s and 15 s; at 30 s the 20 s budget is used.' );
+		$this->assertSame( 4, $report->translated );
+		$stats = $this->queue->stats();
+		$this->assertSame( 2, $stats['pending'], 'The rest waits for the next run.' );
+		global $wpdb;
+		$this->assertSame( '0', $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(attempts) FROM %i WHERE lang = %s', $this->schema->table( 'queue' ), self::LANG ) ), 'No attempt counted.' );
+	}
+
+	public function test_request_timeout_must_fit_max_execution_time(): void {
+		$never = static function (): bool {
+			throw new \LogicException( 'Must not raise the limit.' );
+		};
+		$this->assertTrue( Worker::fitsTimeLimit( 30, 0, 500.0, $never ), 'No limit (CLI).' );
+		$this->assertTrue( Worker::fitsTimeLimit( 30, 60, 20.0, $never ), '35 s needed, 40 s left.' );
+
+		$asked = array();
+		$raise = static function ( int $seconds ) use ( &$asked ): bool {
+			$asked[] = $seconds;
+
+			return false;
+		};
+		$this->assertFalse( Worker::fitsTimeLimit( 30, 30, 1.0, $raise ), 'Default timeout on a 30 s host that forbids raising.' );
+		$this->assertSame( array( 35 ), $asked, 'Asks for the timeout plus the margin.' );
+		$this->assertTrue( Worker::fitsTimeLimit( 30, 30, 1.0, static fn( int $seconds ): bool => 35 === $seconds ), 'set_time_limit allowed: fits.' );
+	}
+
+	public function test_plain_text_provider_sends_inline_as_one_sentence(): void {
+		$this->enqueue( array( 'Go <b>now</b>' => 'inline' ) );
+		// No "[bn]" prefix here: a bracket outside a token is rejected as token debris.
+		$this->primary->translator = static fn( string $text, string $target ): string => strtoupper( $target ) . ': ' . $text;
+
+		$this->worker()->run();
+
+		$this->assertSame( 'BN: Go <b>now</b>', $this->translation( 'Go <b>now</b>' )['translated'] ?? null );
+		$this->assertSame( 0, $this->translationFlags( 'Go <b>now</b>' ) );
+		$this->assertSame( array( 1 => 'Go [[1]]now[[2]]' ), $this->primary->calls[0][0], 'One text with tag tokens.' );
+	}
+
+	public function test_plain_text_tag_mismatch_falls_back_to_segments(): void {
+		$this->enqueue( array( 'Go <b>now</b>' => 'inline' ) );
+		$this->primary->translator = static fn( string $text, string $target ): string => str_contains( $text, '[[' ) ? 'জাও এখন' : strtoupper( $target ) . ': ' . $text;
+
+		$worker = $this->worker();
+		$worker->run();
+		$this->assertNull( $this->translation( 'Go <b>now</b>' )['translated'] ?? null, 'Sentence lost its tags: nothing stored.' );
+		$this->now += Queue::BACKOFF_BASE;
+		$worker->run();
+
+		$this->assertSame( 'BN: Go <b>BN: now</b>', $this->translation( 'Go <b>now</b>' )['translated'] ?? null );
+		$this->assertSame( RequestPlan::FLAG_SEGMENTED, $this->translationFlags( 'Go <b>now</b>' ) );
+	}
+
+	private function translationFlags( string $text ): ?int {
+		global $wpdb;
+		$value = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT t.flags FROM %i t JOIN %i s ON s.id = t.string_id WHERE s.hash = %s',
+				$this->schema->table( 'translations' ),
+				$this->schema->table( 'strings' ),
+				StringStore::hash( $text )
+			)
+		);
+
+		return null === $value ? null : (int) $value;
 	}
 
 	private function translationProvider( string $text ): ?string {

@@ -268,7 +268,7 @@ interface ProviderInterface {
 - **Error mapping is provider-specific (D11).** Each adapter maps its own error codes first and falls back to HTTP status only when the provider gives no specific code. Example: Microsoft `403001` (free quota exceeded) → `QuotaExceeded`, while Microsoft `401000` → `AuthError`.
 - **Placeholder protection** (shared helper): shortcode remnants, `%s`/`%1$s`, `{{…}}`, URLs, emails, user "never translate" terms (§13) are swapped for opaque tokens before sending and restored after; reject a result if any token is missing or duplicated.
 - **Tag placeholders for `inline` strings** (HTML-capable providers): never send real attributes. Send `Buy <a id="1">now</a>` instead of `Buy <a href="…" class="…">now</a>`, keeping a map `id → original opening tag`; restore afterwards. Providers cannot alter links or classes, fewer characters are billed, and the check "same tag sequence and ids" is trivial. Reject and retry/segment on mismatch; set flag `4` when a repair was applied.
-- **Providers without HTML support**: do not send tags. Split an `inline` string at its tags, translate segments separately, rejoin. Set `flags` bit `1` on such translations so the editor can warn about possible word-order issues.
+- **Providers without HTML support**: do not send tags. Send an `inline` string as one sentence with each tag replaced by a placeholder token (`Read {1}our story{2} today`) so word order can change; restore the original tags and validate the structure. Only if that fails, split the string at its tags, translate segments separately and rejoin, setting `flags` bit `1` so the editor can warn about possible word-order issues (HANDOVER P20).
 - Language code mapping lives in the registry, not in providers.
 - Provider selection is a setting. An optional **fallback provider** is part of V1 (rules in §8).
 
@@ -299,7 +299,7 @@ Source of truth: the owner's uploaded **"TranslateX for TranslatePress" 1.0.0** 
 | Languages | `GET https://api.translatex.com/supported-languages?key={API_KEY}` → `{"languages":[{"language":"en", …}, …]}`. Cache 24 h (transient). Use it for `supportsPair()` and for the *Test connection* result. |
 | Test call | `en → it`, one string `"Hello World!"`. |
 | Timeout | Reference uses 45 s for translate, 10 s for languages. Ours: configurable, default 30 s; the worker time budget must exceed it. |
-| Batch size | Measured: **each text ≤ 2,000 UTF-8 bytes** (2,000 accepted, 2,001 rejected, also for Bengali, so about 700 Bengali characters); 500 texts and 60,000 characters per request accepted, but a 60,000-character request took 58 s. Defaults: 100 texts, 10,000 characters per request; texts over 2,000 bytes are failed by the adapter without sending them. |
+| Batch size | Measured: **each text ≤ 2,000 UTF-8 bytes** (2,000 accepted, 2,001 rejected, also for Bengali, so about 700 Bengali characters); 500 texts and 60,000 characters per request accepted, but a 60,000-character request took 58 s. Defaults: 100 texts, 10,000 characters per request; texts over 2,000 bytes are split at sentence boundaries and joined back (HANDOVER P19). |
 | Language codes | Plain ISO codes. The free key's `/supported-languages` returns 35 codes, **including `bn` and `ar`** (also `iw` for Hebrew, `no`, `zh-CN` / `zh-TW`). Resolve the final map from `/supported-languages` at runtime; keep a small override table in the language registry. |
 | Placeholders | Measured: TranslateX rewrites `[[1]]` as `[ [ 1]]` and sometimes adds brackets (`[ [ 3]]]]`), changes `%1$d` to `%1$D` and `{{shop}}` to `{{Shop}}`; `{1}` survives unchanged in `bn` and `ar`. The adapter uses the token format `{%d}`; restore rejects stray token punctuation. |
 
@@ -360,7 +360,7 @@ Validation: reject negative or non-integer values, clamp absurd values (e.g. > 1
 - Return to the primary automatically at the next budget period or when the key is fixed. The Overview shows "Using fallback: X (reason)".
 - The UI warns that site text may be sent to both vendors.
 
-**Rate limiter**: token bucket per provider, correct across concurrent PHP processes (MySQL `GET_LOCK` or atomic compare-and-swap on one row), supporting request-per-minute, request-per-day and character-per-minute windows, each with the `0 = unlimited` bypass. Interface + one implementation + a concurrency unit test.
+**Rate limiter**: token bucket per provider (implemented as strict even spacing, HANDOVER P18), correct across concurrent PHP processes (MySQL `GET_LOCK` or atomic compare-and-swap on one row), supporting request-per-minute, request-per-day and character-per-minute windows, each with the `0 = unlimited` bypass. Interface + one implementation + a concurrency unit test.
 
 **Triggers**
 - WP-Cron event (custom 1-minute interval) active only while the queue is non-empty.

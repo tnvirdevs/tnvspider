@@ -171,30 +171,51 @@ final class TranslateXTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_texts_over_the_byte_limit_are_failed_without_sending_them(): void {
+	public function test_texts_over_the_byte_limit_are_split_at_sentences_and_joined(): void {
 		$this->languagesLoaded();
-		$long              = str_repeat( 'স্বাগতম ', 100 );
-		$this->responses[] = self::response( 200, array( 'translation' => array( 'এক' ) ) );
+		// About 2,850 bytes of Bengali (about 1,000 characters): over the 2,000-byte limit.
+		$sentence = 'আমাদের দোকানে স্বাগতম, আজই কেনাকাটা করুন। ';
+		$long     = trim( str_repeat( $sentence, 25 ) ) . "\n\nশেষ অনুচ্ছেদ।";
+		$this->assertGreaterThan( TranslateX::MAX_TEXT_BYTES, strlen( $long ) );
+		$this->assertLessThan( TranslateX::MAX_TEXT_BYTES, mb_strlen( $long ), 'The limit is bytes, not characters.' );
+		$this->responses[] = self::response( 200, array( 'translation' => array( 'One', 'PART A', 'PART B' ) ) );
 
 		$result = $this->adapter()->translate(
 			array(
-				1 => 'One',
+				1 => 'এক',
 				2 => $long,
 			),
-			'en',
 			'bn',
+			'en',
 			false
 		);
 
-		$this->assertGreaterThan( TranslateX::MAX_TEXT_BYTES, strlen( $long ) );
-		$this->assertLessThan( TranslateX::MAX_TEXT_BYTES, mb_strlen( $long ), 'The limit is bytes, not characters.' );
-		$this->assertSame( array( 1 => 'এক' ), $result->translations );
-		$this->assertSame( array( 2 ), array_keys( $result->errors ) );
-		$this->assertSame( 'text=One', $this->requests[0][1]['body'] );
+		parse_str( str_replace( 'text=', 'text[]=', $this->requests[0][1]['body'] ), $sent );
+		$this->assertCount( 3, $sent['text'], 'One request: the short text plus two pieces.' );
+		$this->assertSame( 'এক', $sent['text'][0] );
+		foreach ( array_slice( $sent['text'], 1 ) as $piece ) {
+			$this->assertLessThanOrEqual( TranslateX::MAX_TEXT_BYTES, strlen( $piece ) );
+			$this->assertMatchesRegularExpression( '/।$/u', $piece, 'Pieces end at a sentence boundary.' );
+		}
+		$this->assertSame( $long, $sent['text'][1] . ' ' . $sent['text'][2] );
+		$this->assertSame(
+			array(
+				1 => 'One',
+				2 => 'PART A PART B',
+			),
+			$result->translations
+		);
+	}
 
-		$only = $this->adapter()->translate( array( 5 => $long ), 'en', 'bn', false );
-		$this->assertSame( array( 5 ), array_keys( $only->errors ) );
-		$this->assertCount( 1, $this->requests, 'Nothing to send: no request.' );
+	public function test_an_empty_piece_fails_the_whole_long_text(): void {
+		$this->languagesLoaded();
+		$long              = trim( str_repeat( 'Welcome to our shop. ', 120 ) );
+		$this->responses[] = self::response( 200, array( 'translation' => array( 'স্বাগতম', '' ) ) );
+
+		$result = $this->adapter()->translate( array( 7 => $long ), 'en', 'bn', false );
+
+		$this->assertSame( array(), $result->translations );
+		$this->assertSame( array( 7 ), array_keys( $result->errors ) );
 	}
 
 	public function test_no_key_configured_fails_without_a_request(): void {

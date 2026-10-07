@@ -45,7 +45,10 @@ final class TranslateX implements ProviderInterface {
 	private const MAX_ITEMS = 100;
 	private const MAX_CHARS = 10000;
 
-	/** Longest accepted text, in UTF-8 bytes (fixtures chars-2000/2001, bytes-bn-2000/2001). */
+	/**
+	 * Longest accepted text, in UTF-8 bytes (fixtures chars-2000/2001,
+	 * bytes-bn-2000/2001). Longer texts are split at sentence boundaries.
+	 */
 	public const MAX_TEXT_BYTES = 2000;
 
 	/**
@@ -131,12 +134,6 @@ final class TranslateX implements ProviderInterface {
 			throw new \LogicException( 'TranslateX is used in plain-text mode only.' );
 		}
 		$result = new BatchResult();
-		foreach ( $items as $unit => $text ) {
-			if ( strlen( $text ) > self::MAX_TEXT_BYTES ) {
-				$result->errors[ $unit ] = sprintf( 'Text is longer than the %d bytes TranslateX accepts.', self::MAX_TEXT_BYTES );
-				unset( $items[ $unit ] );
-			}
-		}
 		if ( array() === $items ) {
 			return $result;
 		}
@@ -144,9 +141,15 @@ final class TranslateX implements ProviderInterface {
 			$this->loadLanguages();
 		}
 
-		$body = array();
-		foreach ( $items as $text ) {
-			$body[] = 'text=' . rawurlencode( $text );
+		// Texts over the per-text limit go out as sentence-sized pieces and
+		// are joined back with their original separators.
+		$pieces = array();
+		$body   = array();
+		foreach ( $items as $unit => $text ) {
+			$pieces[ $unit ] = TextSplitter::split( $text, self::MAX_TEXT_BYTES );
+			foreach ( $pieces[ $unit ] as $piece ) {
+				$body[] = 'text=' . rawurlencode( $piece['text'] );
+			}
 		}
 		$response = $this->call(
 			'POST',
@@ -163,18 +166,21 @@ final class TranslateX implements ProviderInterface {
 		if ( ! is_array( $translations ) || array_values( $translations ) !== $translations ) {
 			throw new TransientError( esc_html( 'TranslateX returned an unexpected response (HTTP ' . $response['status'] . ').' ) );
 		}
-		if ( count( $translations ) !== count( $items ) ) {
-			throw new PermanentError( esc_html( sprintf( '%s: sent %d, TranslateX returned %d.', BatchResult::COUNT_MISMATCH, count( $items ), count( $translations ) ) ) );
+		if ( count( $translations ) !== count( $body ) ) {
+			throw new PermanentError( esc_html( sprintf( '%s: sent %d, TranslateX returned %d.', BatchResult::COUNT_MISMATCH, count( $body ), count( $translations ) ) ) );
 		}
 
 		$position = 0;
-		foreach ( array_keys( $items ) as $unit ) {
-			$text = $translations[ $position++ ];
-			if ( ! is_string( $text ) || '' === trim( $text ) ) {
-				$result->errors[ $unit ] = 'TranslateX returned an empty translation.';
-				continue;
+		foreach ( $pieces as $unit => $unitPieces ) {
+			$texts     = array_slice( $translations, $position, count( $unitPieces ) );
+			$position += count( $unitPieces );
+			foreach ( $texts as $text ) {
+				if ( ! is_string( $text ) || '' === trim( $text ) ) {
+					$result->errors[ $unit ] = 'TranslateX returned an empty translation.';
+					continue 2;
+				}
 			}
-			$result->translations[ $unit ] = $text;
+			$result->translations[ $unit ] = TextSplitter::join( $unitPieces, array_map( 'strval', $texts ) );
 		}
 		$remaining = $response['headers']['x-tx-ratelimit-remaining'] ?? '';
 		if ( ctype_digit( $remaining ) ) {

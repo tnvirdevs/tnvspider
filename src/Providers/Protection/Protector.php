@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace WST\Providers\Protection;
 
+use WST\Html\Text;
+
 /**
  * Swaps parts that must survive translation unchanged for opaque tokens:
  * URLs, e-mail addresses, printf placeholders, {{…}} variables, shortcode
@@ -87,32 +89,76 @@ final class Protector {
 	 * @param bool   $html Whether $text is HTML.
 	 */
 	public function protect( string $text, bool $html = false ): ProtectedText {
-		$tokens  = array();
-		$pattern = '/' . implode( '|', array_merge( array( ProtectedText::tokenRegex( $this->format ) ), self::PATTERNS, '' === $this->termPattern ? array() : array( $this->termPattern ) ) ) . '/u';
-		$swap    = function ( string $chunk ) use ( $pattern, &$tokens ): string {
-			return (string) preg_replace_callback(
-				$pattern,
-				function ( array $m ) use ( &$tokens ): string {
-					$n            = count( $tokens ) + 1;
-					$tokens[ $n ] = $m[0];
-
-					return sprintf( $this->format, $n );
-				},
-				$chunk
-			);
-		};
-
+		$tokens = array();
 		if ( ! $html ) {
-			return new ProtectedText( $swap( $text ), $tokens, $this->format );
+			return new ProtectedText( $this->swap( $text, $tokens, false ), $tokens, $this->format );
 		}
-		$parts = preg_split( '/(<[^>]*>)/', $text, -1, PREG_SPLIT_DELIM_CAPTURE );
-		$parts = false === $parts ? array( $text ) : $parts;
-		$out   = '';
-		foreach ( $parts as $i => $part ) {
-			$out .= 1 === $i % 2 ? $part : $swap( $part );
+		$out = '';
+		foreach ( self::splitTags( $text ) as $i => $part ) {
+			$out .= 1 === $i % 2 ? $part : $this->swap( $part, $tokens, false );
 		}
 
 		return new ProtectedText( $out, $tokens, $this->format );
+	}
+
+	/**
+	 * Whole-sentence form of an inline fragment for plain-text providers:
+	 * every tag becomes a token too, so the provider sees "Read {1}our
+	 * story{2} today" and may move the tags with the words. Text between tags
+	 * is sent decoded. Token originals are HTML (tags raw, protected text
+	 * encoded), so restore() must be given the provider output already
+	 * passed through Text::encodeText().
+	 *
+	 * @param string $html Inline HTML fragment.
+	 */
+	public function protectInline( string $html ): ProtectedText {
+		$tokens = array();
+		$out    = '';
+		foreach ( self::splitTags( $html ) as $i => $part ) {
+			if ( 1 === $i % 2 ) {
+				$n            = count( $tokens ) + 1;
+				$tokens[ $n ] = $part;
+				$out         .= sprintf( $this->format, $n );
+				continue;
+			}
+			$out .= $this->swap( html_entity_decode( $part, ENT_QUOTES | ENT_HTML5, 'UTF-8' ), $tokens, true );
+		}
+
+		return new ProtectedText( $out, $tokens, $this->format );
+	}
+
+	/**
+	 * Replace protected parts of a text chunk with numbered tokens.
+	 *
+	 * @param string             $chunk  Plain text.
+	 * @param array<int, string> $tokens Token number => original, extended in place.
+	 * @param bool               $encode Store originals HTML-encoded (& < >).
+	 */
+	private function swap( string $chunk, array &$tokens, bool $encode ): string {
+		$pattern = '/' . implode( '|', array_merge( array( ProtectedText::tokenRegex( $this->format ) ), self::PATTERNS, '' === $this->termPattern ? array() : array( $this->termPattern ) ) ) . '/u';
+
+		return (string) preg_replace_callback(
+			$pattern,
+			function ( array $m ) use ( &$tokens, $encode ): string {
+				$n            = count( $tokens ) + 1;
+				$tokens[ $n ] = $encode ? Text::encodeText( $m[0] ) : $m[0];
+
+				return sprintf( $this->format, $n );
+			},
+			$chunk
+		);
+	}
+
+	/**
+	 * Split HTML into text (even indexes) and tags (odd indexes).
+	 *
+	 * @param string $html HTML fragment.
+	 * @return list<string>
+	 */
+	private static function splitTags( string $html ): array {
+		$parts = preg_split( '/(<[^>]*>)/', $html, -1, PREG_SPLIT_DELIM_CAPTURE );
+
+		return false === $parts ? array( $html ) : $parts;
 	}
 
 	/**

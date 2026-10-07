@@ -12,6 +12,7 @@ namespace WST\Providers;
 
 use WST\Html\InlineMarkup;
 use WST\Html\Segment;
+use WST\Html\Text;
 use WST\Providers\Protection\InlineTokens;
 use WST\Providers\Protection\ProtectedText;
 use WST\Providers\Protection\Protector;
@@ -103,6 +104,18 @@ final class RequestPlan {
 				);
 				continue;
 			}
+			if ( Segment::INLINE === $string['kind'] && ! $caps->supportsHtml && ! $segmentInline && ! ( $string['segment'] ?? false ) ) {
+				// Plain-text provider: the whole sentence with tags as tokens, so
+				// word order can change; a mismatch retries as segments.
+				$this->units[ $next ] = $protector->protectInline( $string['text'] );
+				$plain[ $next ]       = $this->units[ $next ]->text;
+				$this->strings[ $id ] = array(
+					'mode'     => 'sentence',
+					'units'    => array( $next++ ),
+					'original' => $string['text'],
+				);
+				continue;
+			}
 			if ( Segment::INLINE === $string['kind'] ) {
 				$chunks = Segmenter::split( $string['text'] );
 				$units  = array();
@@ -177,9 +190,14 @@ final class RequestPlan {
 			$restored = array();
 			foreach ( $plan['units'] as $unit ) {
 				$output = $unitTranslations[ $unit ] ?? null;
-				$value  = null === $output || '' === trim( $output ) ? null : $this->units[ $unit ]->restore( $output );
+				if ( null === $output || '' === trim( $output ) ) {
+					$failed[ $id ] = 'Empty or missing translation.';
+					continue 2;
+				}
+				$value = $this->units[ $unit ]->restore( 'sentence' === $plan['mode'] ? Text::encodeText( $output ) : $output );
 				if ( null === $value ) {
-					$failed[ $id ] = null === $output || '' === trim( $output ) ? 'Empty or missing translation.' : 'A protected placeholder was lost or changed.';
+					// The "Tags " prefix makes the queue retry an inline string as segments.
+					$failed[ $id ] = 'sentence' === $plan['mode'] ? 'Tags or placeholders in the translation do not match the original.' : 'A protected placeholder was lost or changed.';
 					continue 2;
 				}
 				$restored[] = trim( $value );
@@ -194,7 +212,9 @@ final class RequestPlan {
 			}
 
 			$flags = 0;
-			if ( 'segments' === $plan['mode'] ) {
+			if ( 'sentence' === $plan['mode'] ) {
+				$html = $restored[0];
+			} elseif ( 'segments' === $plan['mode'] ) {
 				$html   = Segmenter::join( $plan['chunks'] ?? array(), $restored );
 				$flags |= self::FLAG_SEGMENTED;
 			} else {

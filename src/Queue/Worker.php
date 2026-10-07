@@ -40,6 +40,24 @@ final class Worker {
 	/** Default time budget of one run, in seconds. */
 	public const TIME_BUDGET = 20.0;
 
+	/** Seconds kept free after a provider request for storing its results. */
+	public const TIME_MARGIN = 5;
+
+	/**
+	 * End of the current run's time budget (no request starts after it,
+	 * except the first one of a run).
+	 *
+	 * @var float
+	 */
+	private float $deadline = 0.0;
+
+	/**
+	 * Whether the "timeout does not fit max_execution_time" error was logged in this run.
+	 *
+	 * @var bool
+	 */
+	private bool $timeLimitLogged = false;
+
 	/**
 	 * Clock returning Unix time with microseconds.
 	 *
@@ -90,9 +108,10 @@ final class Worker {
 	 * @param int   $maxBatches Batches at most (the admin runner uses 1).
 	 */
 	public function run( float $budget = self::TIME_BUDGET, int $maxBatches = PHP_INT_MAX ): WorkerReport {
-		$report   = new WorkerReport();
-		$deadline = ( $this->clock )() + $budget;
-		while ( ( $this->clock )() < $deadline && $report->batches < $maxBatches ) {
+		$report                = new WorkerReport();
+		$this->deadline        = ( $this->clock )() + $budget;
+		$this->timeLimitLogged = false;
+		while ( ( $this->clock )() < $this->deadline && $report->batches < $maxBatches ) {
 			$progress = false;
 			foreach ( $this->queue->duePairs( (int) ( $this->clock )() ) as $pair ) {
 				if ( $this->processPair( $pair['provider'], $pair['lang'], $report ) ) {
@@ -207,6 +226,15 @@ final class Worker {
 		$unitErrors   = array();
 		$requestError = '';
 		foreach ( $plan->requests() as $request ) {
+			// A run lasts at most its budget plus one request timeout: after the
+			// budget no further request starts. Unsent rows are released without
+			// counting an attempt.
+			if ( $report->requests > 0 && ( $this->clock )() >= $this->deadline ) {
+				break;
+			}
+			if ( ! $this->timeForRequest( $id, $limits->timeout, $report ) ) {
+				break;
+			}
 			$chars = (int) array_sum( array_map( 'mb_strlen', $request['items'] ) );
 			$wait  = $this->limiter->acquire( $id, $limits, $chars, ( $this->clock )() );
 			if ( $wait > 0 ) {
@@ -301,6 +329,57 @@ final class Worker {
 		// unavailable (the next pass hands its rows to the fallback). Rows
 		// released for a wait are not.
 		return array() !== $done || $failedHere > 0 || $unavailable;
+	}
+
+	/**
+	 * Make sure one more request of $timeout seconds fits PHP's
+	 * max_execution_time, raising it when the host allows.
+	 *
+	 * @param string       $id      Provider id.
+	 * @param int          $timeout Request timeout in seconds.
+	 * @param WorkerReport $report  Report.
+	 */
+	private function timeForRequest( string $id, int $timeout, WorkerReport $report ): bool {
+		$limit   = (int) ini_get( 'max_execution_time' );
+		$started = isset( $_SERVER['REQUEST_TIME_FLOAT'] ) ? (float) $_SERVER['REQUEST_TIME_FLOAT'] : microtime( true );
+		$fits    = self::fitsTimeLimit(
+			$timeout,
+			$limit,
+			microtime( true ) - $started,
+			static fn( int $seconds ): bool => function_exists( 'set_time_limit' ) && set_time_limit( $seconds )
+		);
+		if ( ! $fits && $timeout + self::TIME_MARGIN > $limit ) {
+			$reason                 = sprintf( 'The %s request timeout (%d s) does not fit PHP max_execution_time (%d s) and the limit cannot be raised. Lower the provider timeout or raise max_execution_time.', $id, $timeout, $limit );
+			$report->blocked[ $id ] = $reason;
+			if ( ! $this->timeLimitLogged ) {
+				$this->logger->error( 'queue', $reason );
+				$this->timeLimitLogged = true;
+			}
+		}
+
+		return $fits;
+	}
+
+	/**
+	 * Whether a request of $timeout seconds (plus TIME_MARGIN) still fits:
+	 * always without a limit, when enough time remains, or when $raise
+	 * (set_time_limit, which restarts the clock) succeeds.
+	 *
+	 * @param int                 $timeout Request timeout in seconds.
+	 * @param int                 $limit   max_execution_time (0 = none).
+	 * @param float               $elapsed Seconds since the request started (wall time, conservative).
+	 * @param callable(int): bool $raise   Tries to allow this many more seconds.
+	 */
+	public static function fitsTimeLimit( int $timeout, int $limit, float $elapsed, callable $raise ): bool {
+		if ( $limit <= 0 ) {
+			return true;
+		}
+		$needed = $timeout + self::TIME_MARGIN;
+		if ( $limit - $elapsed >= $needed ) {
+			return true;
+		}
+
+		return $raise( $needed );
 	}
 
 	/**

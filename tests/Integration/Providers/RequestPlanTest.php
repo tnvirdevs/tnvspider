@@ -97,12 +97,13 @@ final class RequestPlanTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $result['translated'][3]['flags'] );
 	}
 
-	public function test_inline_for_plain_text_providers_is_segmented_and_flagged(): void {
+	public function test_inline_for_plain_text_providers_on_retry_is_segmented_and_flagged(): void {
 		$plan   = new RequestPlan(
 			array(
 				3 => array(
-					'text' => 'Read <a href="/story/">our story</a> today',
-					'kind' => 'inline',
+					'text'    => 'Read <a href="/story/">our story</a> today',
+					'kind'    => 'inline',
+					'segment' => true,
 				),
 			),
 			new Capabilities( false, 100, 10000 ),
@@ -114,6 +115,91 @@ final class RequestPlanTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'READ <a href="/story/">OUR STORY</a> TODAY', $result['translated'][3]['translation'] );
 		$this->assertSame( RequestPlan::FLAG_SEGMENTED, $result['translated'][3]['flags'] );
+	}
+
+	public function test_inline_for_plain_text_providers_goes_as_one_sentence_with_tag_tokens(): void {
+		$plan = new RequestPlan(
+			array(
+				3 => array(
+					'text' => 'Read <a href="/story/" class="x">our story</a> today',
+					'kind' => 'inline',
+				),
+			),
+			new Capabilities( false, 100, 10000, 0, 0, 0, 'UTC', '{%d}' ),
+			new Protector( array(), true, true, '{%d}' ),
+			100,
+			10000
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'html'  => false,
+					'items' => array( 1 => 'Read {1}our story{2} today' ),
+				),
+			),
+			$plan->requests(),
+			'Attributes never leave the site; one text per inline string.'
+		);
+		$result = $plan->complete( array( 1 => '{1}আমাদের গল্প{2} আজ পড়ুন' ) );
+
+		$this->assertSame( '<a href="/story/" class="x">আমাদের গল্প</a> আজ পড়ুন', $result['translated'][3]['translation'], 'The link moved with its words.' );
+		$this->assertSame( 0, $result['translated'][3]['flags'], 'Not segmented.' );
+	}
+
+	public function test_sentence_mode_decodes_text_and_keeps_placeholders_and_entities_safe(): void {
+		$plan = new RequestPlan(
+			array(
+				5 => array(
+					'text' => 'Save &amp; pay <b>%s</b> now',
+					'kind' => 'inline',
+				),
+			),
+			new Capabilities( false, 100, 10000, 0, 0, 0, 'UTC', '{%d}' ),
+			new Protector( array(), true, true, '{%d}' ),
+			100,
+			10000
+		);
+
+		$this->assertSame( array( 1 => 'Save & pay {1}{2}{3} now' ), $plan->requests()[0]['items'] );
+		$result = $plan->complete( array( 1 => 'এখন {1}{2}{3} সেভ & পে <script>' ) );
+
+		$this->assertSame( 'এখন <b>%s</b> সেভ &amp; পে &lt;script&gt;', $result['translated'][5]['translation'], 'Provider text is encoded; only our tags are raw.' );
+	}
+
+	/**
+	 * @dataProvider brokenSentenceProvider
+	 */
+	public function test_sentence_mode_mismatch_fails_with_the_segment_retry_prefix( string $output ): void {
+		$plan = new RequestPlan(
+			array(
+				3 => array(
+					'text' => 'Read <a href="/story/">our story</a> today',
+					'kind' => 'inline',
+				),
+			),
+			new Capabilities( false, 100, 10000, 0, 0, 0, 'UTC', '{%d}' ),
+			new Protector( array(), true, true, '{%d}' ),
+			100,
+			10000
+		);
+
+		$result = $plan->complete( array( 1 => $output ) );
+
+		$this->assertArrayNotHasKey( 3, $result['translated'] );
+		$this->assertStringStartsWith( 'Tags ', $result['failed'][3], 'The worker retries such rows as segments.' );
+	}
+
+	/**
+	 * @return array<string, array{0: string}>
+	 */
+	public function brokenSentenceProvider(): array {
+		return array(
+			'lost closer'  => array( '{1}আমাদের গল্প আজ পড়ুন' ),
+			'duplicated'   => array( '{1}আমাদের{2} {1}গল্প{2}' ),
+			'closer first' => array( '{2}আমাদের গল্প{1} আজ পড়ুন' ),
+			'stray brace'  => array( '{1}আমাদের গল্প{2}} আজ' ),
+		);
 	}
 
 	public function test_retry_after_tag_mismatch_segments_even_for_html_providers(): void {
