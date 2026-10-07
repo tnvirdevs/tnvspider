@@ -1,5 +1,5 @@
 /**
- * ESLint: the @wordpress/scripts defaults, plus the WordPress packages that
+ * ESLint: the `@wordpress/scripts` defaults, plus the WordPress packages that
  * are runtime externals (provided by WordPress, not installed with npm).
  */
 const defaults = require( '@wordpress/scripts/config/eslint.config.cjs' );
@@ -15,6 +15,7 @@ module.exports = [
 				'@wordpress/components',
 				'@wordpress/core-data',
 				'@wordpress/data',
+				'@wordpress/date',
 				'@wordpress/editor',
 				'@wordpress/element',
 				'@wordpress/i18n',

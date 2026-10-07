@@ -26,6 +26,13 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - REST: `GET /wst/v1/pages` (posts of every public type: own mode, applied mode and source, coverage, last seen/scan; filters `search`, `post_type`, `mode`, `include`, pagination headers), `POST /wst/v1/pages/mode` (bulk; per-post `edit_post` check; purges changed pages), `POST /wst/v1/strings/translate` (`ids[]` or `post_id`, `mode=queue|now`). All need the new `wst_translate` capability (administrators and editors; installed on activation and once after updates).
 - Post editors: block editor panel `build/post-panel.js` (source `assets-src/post-panel/index.js`) and a classic meta box (no-JS "Translate this page now" via `admin-post.php`). Verified live in the block editor (see Phase 3 acceptance).
 
+**Phase 4 — Admin UI: done, waiting for owner approval (2026-10-07).** Acceptance lines below ("Phase 4 acceptance").
+- Top-level menu **Translator** (`manage_options`) with one React app (`assets-src/admin/`, built to `build/admin.{js,css,asset.php}`), hash-routed screens Overview, Languages, Translation, Language switcher, Pages, Advanced, Health; persistent header (queue counts, main provider state); one settings draft shared by all screens with an unsaved-changes bar (Save / Discard, `beforeunload` warning); loading, empty and error states with "Try again" on every request.
+- **Provider cards** (Translation screen): write-only credentials (shows only "Saved (hidden)", "Set in wp-config.php", "Set in the server environment" or "Not set"; constant/env keys cannot be overwritten), plan/endpoint/model, **"Not verified yet" until Test connection passes with the current key and settings** ("Verified <date>" after; "Paused" with the reason; "Not configured"), Test connection disabled while the card has unsaved changes, test result with details, language-list state, monthly usage meter, queued rows, last error, every §8 limit with its default and "0 = no limit" / "0 = provider maximum" help.
+- New settings with real effect: default-language URL prefix (`prefix_default`, `default_slug`; 301s to and from the canonical form), language name style, switcher style/colours/floating/position, exclude selectors (§13 subset), log level, delete on uninstall. Switcher outputs: shortcode, `wst/switcher` block, menu item (classic menus), floating.
+- REST (all `manage_options`, REST nonce via `apiFetch`): `GET/POST /settings` (secrets write-only; invalid or unknown values → 400 naming each field, nothing saved), `GET /languages`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue`, `POST /queue/retry-failed`, `POST /queue/clear`, `GET /overview`, `GET /health` (`loopback=true` for the loopback test), `GET /log`, `POST /data/machine/clear` (confirm), `GET /data/orphans` (dry run), `POST /data/orphans/clear` (confirm). Settings changes purge every cached page (`litespeed_purge_all`, `rocket_clean_domain()`, `wst_purge_all`).
+- `uninstall.php` deletes data only when "Delete all translator data" is on.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -194,6 +201,32 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P33 | Gemini HTTP 404 (unknown model) → `AuthError` (provider paused with the model name in the reason) instead of failing strings one by one. | Every request fails until the model setting is fixed; the pause is lifted by a passing test. To confirm with a real key in Phase 7. |
 | P34 | Gemini `chars_per_minute` default stays 0 (unlimited): input-token limits are unpublished; requests are bounded by 5 RPM × 5,000 characters. Editable. Microsoft keeps 33,000 (F0 throttle). | No invented numbers; Phase 7 compares with AI Studio. |
 
+## Decision log (Phase 4)
+
+| # | Decision | Reason |
+|---|---|---|
+| P35 | `[GATE]` flags: **text-only switcher styles** (names, codes, codes + names). No flag images, no new dependency. | Flags stand for countries, not languages; a licence-clean SVG set would be a new dependency for a cosmetic option. Can be added later on request. |
+| P36 | Plan §12 supersedes P25 for the switcher: on an off page the other language's link goes to **that language's home page** (hreflang still omitted). | Plan §12 "if unavailable (mode `off`) go to the language home"; no dead link. |
+| P37 | Default-language prefix: with `prefix_default` on, default URLs move under `/<default slug>/` (custom slug optional); unprefixed URLs 301 to the prefixed form; after the option is turned off, prefixed URLs 301 back (the last used prefix is kept in `wst_default_prefix_used`). A prefix equal to the target prefix is refused (400). | Plan §5/§13; permanent redirects keep links and SEO when the option changes. |
+| P38 | Exclude selectors: documented subset only (tag, `.class`, `#id`, `[attr]`, `[attr=value]`, compounds, descendant, comma lists); anything else is rejected as a whole (400 lists the bad selectors), never half-applied. Matching is done in `WST\Html\Selectors` while the extractor walks the tags. | Plan §13; no CSS engine dependency. |
+| P39 | Settings validation in `POST /settings`: a submitted value that sanitising would drop or change is an error for that field; nested key order does not matter. | "Errors fail loudly": no silently ignored input. |
+| P40 | Secrets: the API never returns any part of a secret (not even a mask), only `set` and `source` (constant / env / option). | Plan §3/§14. Verified live: the TranslateX key appears in no REST response and not in the page. |
+| P41 | Uninstall removes tables, `wst_` options and transients, `_wst_mode` meta, the `wst_translate` capability and the cron event, **only** when "Delete all translator data" is on (default off). | Plan §10 Data; deleting the plugin must not lose translations by default. |
+| P42 | Log level `warning` (errors + warnings, default) or `error`; the log keeps the latest 1,000 entries. The Overview and Health show how many translated pages fell back to the original HTML in the last 24 h (`render` errors). | Plan §13 and the §6 failure policy. |
+| P43 | Admin styles use logical properties and the scheme's `--wp-admin-theme-color`, so one stylesheet serves LTR, RTL and every admin colour scheme; the generated `build/*-rtl.css` is not used (gitignored). | Verified in RTL and Midnight (screenshots in the acceptance table). |
+| P44 | Queue runner in the Overview calls `POST /queue/run` repeatedly while rows wait, sleeping client-side for the provider's `wait` (rate limit) and stopping on a blocked provider, an empty queue or no progress; ETA = waiting requests or characters ÷ the active provider's rpm / cpm (unknown when unlimited). | Plan §8 triggers: an open admin page keeps translations moving without WP-Cron, never faster than the limiter allows. |
+
+## Phase 4 acceptance (plan §16) — one line per criterion
+
+| Criterion | Result | Proof |
+|---|---|---|
+| Every control persists and has a real effect | **PASS** | `AdminRoutesTest` (save, partial save keeps other keys, purge on change, invalid values rejected with nothing saved, key-order-insensitive), `SettingsTest::test_phase4_keys_default_and_validate`, `DefaultPrefixTest`, `SwitcherTest`, `ExcludeSelectorsTest`, `SelectorsTest`, `LoggerTest`, `UninstallerTest`; behaviour of the Phase 1–3 settings already covered by their tests. Live: switcher style saved, reloaded and reset through the UI; no control without a backend (Phase 5/6 actions such as "Open editor" and "Translate entire site" are not shown). |
+| Secrets never reach the browser | **PASS** | `AdminRoutesTest::test_secrets_are_write_only` (no value or prefix in `/settings` or `/providers`), `test_a_secret_from_the_environment_cannot_be_overwritten`; live: the TranslateX key (from the server environment) is in no `wst/v1` response and not in the page HTML. |
+| Provider cards: "Not verified yet" until Test connection passes | **PASS** | `AdminRoutesTest::test_provider_is_not_verified_until_a_test_passes` (fake provider: failed test keeps `verified_at` null, passed test sets it), `test_overview_checklist_and_coverage`; live with TranslateX: card "Not verified yet" → Test connection ("TranslateX connection works. languages 35, pair supported, sample Ciao mondo!") → "Verified October 7, 2026"; header chip changed from "TranslateX: not verified yet" to "TranslateX ready". |
+| RTL and dark scheme verified | **PASS** | Headless Chromium on the dev site (WordPress 7.1.2): right-to-left admin (dev-only text-direction override) on Overview, Translation and Switcher — layout mirrored, no overlap; Midnight scheme on Overview, Translation and Advanced — accents follow the scheme; 390 px wide: no horizontal overflow on Translation, Pages, Switcher. |
+| Empty / loading / error states exist | **PASS** | Every screen: spinner while loading, `Notice` with "Try again" on request errors, empty texts (no path rules, no pages, empty log, no target language, no strings yet, no provider set up); save errors list each invalid field. |
+| Health | **PASS** | `AdminRoutesTest::test_health_reports_each_check_and_the_loopback` (PHP, WordPress + HTML API, tables, `GET_LOCK`, languages, provider incl. not verified, cron incl. `DISABLE_WP_CRON` command, render failures, loopback only on request); live Health screen all OK except "provider not verified" before the test. |
+
 ## Phase 7 acceptance (planned) — moved here and added by the owner
 
 | Item | Status |
@@ -229,7 +262,11 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 - Phases 4–7 per plan §16.
 - Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
-- Deferred by design (built together with their phases, no dead settings now): settings UI for `path_rules`, `off_behavior` and the Pages screen (Phase 4, the REST routes exist); "Open in translation editor" and "Allow MT suggestions in the editor on manual pages" (Phase 5); "prefix default language" option, user exclude selectors, floating switcher and switcher styles (Phase 4); admin notice for pipeline failures (Phase 4 Overview); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Deferred by design (built together with their phases, no dead settings now): "Open in translation editor", "Edit translations" on the Pages screen and "Allow MT suggestions in the editor on manual pages" (Phase 5); "Translate entire site" and safe preview (Phase 5 scans); §13A settings without a backend yet — digit conversion, dynamic content, language suggestion, sitemap alternates, CSV, TranslatePress (Phase 6); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+
+## Files changed (Phase 4)
+
+`src/Admin/{AdminPage,Health}.php`, `src/Rest/{SettingsController,ProvidersController,HealthController,QueueController}.php`, `src/Settings.php`, `src/Switcher/Switcher.php`, `src/Assets.php`, `src/Html/{Selectors,Extractor,Frame}.php`, `src/Render/Pipeline.php`, `src/Routing/{Urls,LanguageUrls,Router}.php`, `src/Modes/Resolver.php`, `src/Log/Logger.php`, `src/Storage/StringStore.php` (site coverage, machine-translation clear, orphans), `src/Cache/Purger.php` (`purgeAll`), `src/Providers/Secrets.php` (`source`), `src/Database/Schema.php` (`drop`), `src/Uninstaller.php`, `uninstall.php`, `src/Plugin.php`, `src/Admin/PostPanel.php`, `assets/switcher.css`, `blocks/switcher/block.json`, `assets-src/{admin,switcher-block}/`, `build/{admin,switcher-block}.*`, `package.json`, `eslint.config.cjs`, `.gitignore`, `phpstan.neon.dist`, `tests/phpstan/cache-plugin-stubs.php`, `tests/Support/FakeProvider.php`, tests `tests/Integration/{Rest/AdminRoutesTest,Routing/DefaultPrefixTest,Switcher/SwitcherTest,Html/ExcludeSelectorsTest,Uninstall/UninstallerTest,Log/LoggerTest,SettingsTest}.php`, `tests/Unit/{Html/SelectorsTest,Routing/UrlsTest}.php`.
 
 ## Files changed (Phase 3)
 
@@ -249,12 +286,12 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Validation status
 
-- `vendor/bin/phpunit` (unit): 94 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,166 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 2 included.
-- Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). The Phase 1 suite has not been re-run on those versions (CI matrix in Phase 7).
-- `vendor/bin/phpcs`: clean.
-- PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`) (PHPStan 2.3.0 official release phar + `szepeviktor/phpstan-wordpress` 2.0.4 / `php-stubs/wordpress-stubs` 7.1.2).
-- `npx wp-scripts`: installed; no entry points yet (the Phase 1 switcher needs no JavaScript; the first build comes with Phase 4).
+- `vendor/bin/phpunit` (unit): 115 tests green.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,237 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 4 included.
+- Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
+- `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
+- `npm run lint:js`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`.
+- Live admin checks: a Playwright script in the session scratchpad (headless Chromium; not committed) — see Phase 4 acceptance.
 
 ## Known issues
 
@@ -262,12 +299,14 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 2. **Network policy**: the WebFetch tool is still blocked for the docs hosts; `curl` works and was used.
 3. WP 6.7–6.9 core lexer warning on input ending in `<!---` (G2). Harmless for real pages. A CI matrix on those versions must expect it.
 4. Node in the container is 22.22.0; `@wordpress/scripts` 36 asks for ≥ 22.22.2 (npm warns only).
-5. Open extractor items: user exclude selectors (§13, Phase 4); entity canonicalisation of inline originals (`&#8217;` vs `’` hash differently); a runtime self-check for the bookmark-span dependency (G1a) that fails loudly (Phase 7 hardening).
+5. Open extractor items (user exclude selectors done in Phase 4): entity canonicalisation of inline originals (`&#8217;` vs `’` hash differently); a runtime self-check for the bookmark-span dependency (G1a) that fails loudly (Phase 7 hardening).
 6. The dev site's WooCommerce (built from GitHub without its JS build) shows an empty shop loop in both languages; product pages render. Not a plugin issue.
 7. Inline strings that fall back to segments (P20) translate each piece alone, so word order and short pieces suffer. Flag 1 marks them for the editor (Phase 5). The fallback waits one backoff (30 s) after the failed sentence attempt.
 8. On the first target visit discovery stops at the per-page cap (100/hour by default); the rest of the page is discovered on later visits or by editor scans (Phase 5).
 9. Dev site: WooCommerce from source fatals in wp-admin (`Could not find asset registry for wp-admin-scripts`, no JS build) and Elementor's unbuilt JS returns HTML (console "Unexpected token '<'"). Deactivate WooCommerce for admin checks. Not plugin issues. Start the server with `php -S 127.0.0.1:8899 -t site router.php` (the `-t` matters for static files).
 10. Yoast SEO / Rank Math print their own canonical; the `off_behavior = original` canonical override uses core's `get_canonical_url` only. Check with those plugins in the Phase 7 compatibility pass.
+11. Live TranslateX keeps failing the core comment-form string `Leave a comment <small><a … style="display:none;">Cancel reply</a></small>` with "Tags in the translation do not match the original." through all 5 attempts (sentence and segment form). Two rows are failed on the dev site. Investigate in Phase 5 with the editor (likely the hidden link's text being dropped); the string stays untranslated meanwhile.
+12. Dev-only RTL check: an mu-plugin on the dev site sets `$wp_locale->text_direction = 'rtl'` on `after_setup_theme` and disables script concatenation (load-styles.php does not run plugins). Not part of the plugin.
 
 ## Dev environment setup (scripted)
 
@@ -295,4 +334,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Phase 4 (Admin UI, plan §10, §16): one React app under `assets-src/admin/` built by `npm run build` next to `post-panel`; start with the Overview (setup checklist, queue panel via `POST /queue/run` polling, provider cards) and the `GET/POST /settings`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue` routes it needs; then Languages, Translation (incl. `path_rules`, `off_behavior`, provider limits), Switcher, Pages (uses `GET /pages`, `POST /pages/mode`), Advanced, Health. Secrets never reach the browser.
+1. Owner review of Phase 4 (screens, provider cards, decisions P35–P44).
+2. After approval, Phase 5 (Editor, plan §11, §16): conflict-proof translation editor with `GET /strings`, `POST /strings/{id}/translation`, scans (`POST /scan/register`), then add "Open editor", "Edit translations" and "Translate entire site" to the existing screens.

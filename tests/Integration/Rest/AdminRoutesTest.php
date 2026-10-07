@@ -273,6 +273,33 @@ final class AdminRoutesTest extends WP_UnitTestCase {
 		$this->assertSame( $before, get_option( Settings::OPTION ) );
 	}
 
+	public function test_key_order_of_nested_values_does_not_matter(): void {
+		$this->admin();
+
+		$response = $this->call(
+			'POST',
+			'/settings',
+			array(
+				'settings' => array(
+					'providers'       => array(
+						'translatex' => array(
+							'plan'                => 'startup',
+							'requests_per_minute' => 40,
+						),
+					),
+					'switcher_colors' => array(
+						'accent'     => '#000000',
+						'text'       => '#111111',
+						'background' => '#ffffff',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 40, Settings::load()->providerSettings( 'translatex' )['requests_per_minute'] );
+	}
+
 	public function test_unsupported_selectors_are_named(): void {
 		$this->admin();
 

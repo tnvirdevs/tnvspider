@@ -199,7 +199,7 @@ final class SettingsController {
 	 * A language for the admin app.
 	 *
 	 * @param Language $language Language.
-	 * @return array{locale: string, slug: string, english: string, native: string, rtl: bool, tag: string}
+	 * @return array{locale: string, slug: string, english: string, native: string, rtl: bool, tag: string, code: string}
 	 */
 	private static function language( Language $language ): array {
 		return array(
@@ -209,6 +209,7 @@ final class SettingsController {
 			'native'  => $language->nativeName(),
 			'rtl'     => $language->isRtl(),
 			'tag'     => $language->tag(),
+			'code'    => $language->tag( true ),
 		);
 	}
 
@@ -228,7 +229,7 @@ final class SettingsController {
 				$invalid[ $key ] = __( 'Unknown setting.', 'wp-site-translator' );
 				continue;
 			}
-			if ( wp_json_encode( $value ) === wp_json_encode( $clean[ $key ] ) ) {
+			if ( wp_json_encode( self::canonical( $value ) ) === wp_json_encode( self::canonical( $clean[ $key ] ) ) ) {
 				continue;
 			}
 			$invalid[ $key ] = self::reason( $key, $value );
@@ -239,6 +240,24 @@ final class SettingsController {
 		}
 
 		return $invalid;
+	}
+
+	/**
+	 * A value with object keys sorted, so key order never decides validity.
+	 *
+	 * @param mixed $value Value.
+	 * @return mixed
+	 */
+	private static function canonical( $value ) {
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+		$value = array_map( array( self::class, 'canonical' ), $value );
+		if ( array_values( $value ) !== $value ) {
+			ksort( $value );
+		}
+
+		return $value;
 	}
 
 	/**

@@ -8,3 +8,5 @@
 /composer.local.lock
 /tests/fixtures/html5lib-tests/
 /.tools/
+# rtlcss output: the admin stylesheet uses logical properties and serves both directions.
+/build/*-rtl.css

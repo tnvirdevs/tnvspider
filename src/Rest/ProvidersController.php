@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace WST\Rest;
 
 use WST\Config;
+use WST\Providers\Gemini;
+use WST\Providers\Microsoft;
 use WST\Providers\Secrets;
 use WST\Providers\StatusReport;
 use WST\Providers\Tester;
@@ -69,7 +71,8 @@ final class ProvidersController {
 	}
 
 	/**
-	 * Status of every provider, with where each credential comes from.
+	 * Status of every provider, with where each credential comes from and
+	 * the default endpoint or model shown when the field is left empty.
 	 *
 	 * @return list<array<string, mixed>>
 	 */
@@ -84,8 +87,12 @@ final class ProvidersController {
 					'source' => $source,
 				);
 			}
-			$row['secrets'] = $secrets;
-			$rows[]         = $row;
+			$row['secrets']    = $secrets;
+			$row['connection'] = array(
+				'endpoint' => Microsoft::ID === $row['id'] ? Microsoft::ENDPOINT : null,
+				'model'    => Gemini::ID === $row['id'] ? Gemini::DEFAULT_MODEL : null,
+			);
+			$rows[]            = $row;
 		}
 
 		return $rows;
