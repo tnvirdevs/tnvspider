@@ -49,6 +49,12 @@ final class Settings {
 	/** Corner of the floating switcher. */
 	public const SWITCHER_POSITIONS = array( 'bottom-right', 'bottom-left', 'top-right', 'top-left' );
 
+	/** Default distance of the floating switcher from the top or bottom edge, in pixels. */
+	public const SWITCHER_OFFSET = 16;
+
+	/** Largest vertical offset accepted, in pixels. */
+	public const SWITCHER_OFFSET_MAX = 400;
+
 	/** Switcher colours: follow the theme, light, dark, or custom colours. */
 	public const SWITCHER_THEMES = array( 'inherit', 'light', 'dark', 'custom' );
 
@@ -94,6 +100,7 @@ final class Settings {
 	 *     switcher_style: string,
 	 *     switcher_floating: bool,
 	 *     switcher_position: string,
+	 *     switcher_offset: int,
 	 *     switcher_theme: string,
 	 *     switcher_colors: array{text: string, background: string, accent: string},
 	 *     site_mode: string,
@@ -228,7 +235,7 @@ final class Settings {
 	/**
 	 * Integer setting.
 	 *
-	 * @param string $key One of discovery_cap_page_hour, discovery_cap_site_hour, max_string_length.
+	 * @param string $key One of discovery_cap_page_hour, discovery_cap_site_hour, max_string_length, switcher_offset.
 	 */
 	public function number( string $key ): int {
 		return (int) ( $this->values[ $key ] ?? 0 );
@@ -348,6 +355,7 @@ final class Settings {
 	 *     switcher_style: string,
 	 *     switcher_floating: bool,
 	 *     switcher_position: string,
+	 *     switcher_offset: int,
 	 *     switcher_theme: string,
 	 *     switcher_colors: array{text: string, background: string, accent: string},
 	 *     site_mode: string,
@@ -393,6 +401,7 @@ final class Settings {
 			'switcher_style'          => self::readChoice( $raw, 'switcher_style', self::SWITCHER_STYLES ),
 			'switcher_floating'       => self::readBool( $raw, 'switcher_floating', false ),
 			'switcher_position'       => self::readChoice( $raw, 'switcher_position', self::SWITCHER_POSITIONS ),
+			'switcher_offset'         => self::readInt( $raw, 'switcher_offset', self::SWITCHER_OFFSET, self::SWITCHER_OFFSET_MAX ),
 			'switcher_theme'          => self::readChoice( $raw, 'switcher_theme', self::SWITCHER_THEMES ),
 			'switcher_colors'         => self::readColors( $raw['switcher_colors'] ?? array() ),
 			'site_mode'               => self::MODE_MANUAL === $mode ? self::MODE_MANUAL : self::MODE_AUTO,

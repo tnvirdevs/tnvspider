@@ -49,6 +49,9 @@ final class PageTarget {
 	 */
 	public function forPost( int $postId ): array {
 		$post = get_post( $postId );
+		if ( null !== $post && in_array( $post->post_status, array( 'draft', 'pending', 'future', 'auto-draft' ), true ) && is_post_type_viewable( $post->post_type ) ) {
+			throw new \InvalidArgumentException( esc_html__( 'This post is not published yet. The editor scans pages as visitors see them, so publish it first, then translate it here.', 'wp-site-translator' ) );
+		}
 		if ( null === $post || ! is_post_publicly_viewable( $post ) ) {
 			throw new \InvalidArgumentException( esc_html__( 'Only published, public posts can be translated in the editor.', 'wp-site-translator' ) );
 		}

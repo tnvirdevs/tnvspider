@@ -38,6 +38,9 @@ final class Isolation {
 		'wp_print_footer_scripts',
 	);
 
+	/** Notice hooks; on our settings screen only these are cleaned. */
+	public const NOTICE_HOOKS = array( 'admin_notices', 'all_admin_notices', 'network_admin_notices', 'user_admin_notices' );
+
 	/**
 	 * Real paths of directories whose code counts as third-party.
 	 *
@@ -84,6 +87,21 @@ final class Isolation {
 			add_action( $hook, array( $this, 'dequeueForeign' ), PHP_INT_MIN );
 		}
 		add_action( 'admin_head', array( $this, 'stripLateCallbacks' ), PHP_INT_MIN );
+	}
+
+	/**
+	 * Hide third-party admin notices (our other screens keep other plugins'
+	 * scripts, which some admin features need). Call on current_screen.
+	 */
+	public function hideNotices(): void {
+		$strip = function (): void {
+			foreach ( self::NOTICE_HOOKS as $hook ) {
+				$this->stripHook( $hook );
+			}
+		};
+		$strip();
+		// Notices hooked after current_screen are removed just before they print.
+		add_action( 'in_admin_header', $strip, PHP_INT_MIN );
 	}
 
 	/**

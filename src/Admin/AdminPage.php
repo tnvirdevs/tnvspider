@@ -34,9 +34,10 @@ final class AdminPage {
 	/**
 	 * Create the page.
 	 *
-	 * @param string $pluginFile Main plugin file.
+	 * @param string    $pluginFile Main plugin file.
+	 * @param Isolation $isolation  Third-party notice guard.
 	 */
-	public function __construct( private string $pluginFile ) {
+	public function __construct( private string $pluginFile, private Isolation $isolation ) {
 	}
 
 	/**
@@ -45,6 +46,18 @@ final class AdminPage {
 	public function boot(): void {
 		add_action( 'admin_menu', array( $this, 'addMenu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
+		add_action( 'current_screen', array( $this, 'hideForeignNotices' ) );
+	}
+
+	/**
+	 * Other plugins' notices are not shown on this screen.
+	 *
+	 * @param \WP_Screen $screen Current screen.
+	 */
+	public function hideForeignNotices( $screen ): void {
+		if ( '' !== $this->hook && $screen instanceof \WP_Screen && $this->hook === $screen->id ) {
+			$this->isolation->hideNotices();
+		}
 	}
 
 	/**

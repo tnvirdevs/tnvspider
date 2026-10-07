@@ -42,6 +42,12 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - **Entry points**: Pages screen "Edit translations", block-editor panel and classic meta box "Open in translation editor" (published posts), toolbar "Translate this page" on the front end, Overview button.
 - New setting "Allow machine translation in the editor on manual pages" (default on, plan §9): off refuses editor/post-panel MT on manual pages (409) and hides the buttons.
 
+**Staging fixes after Phase 5: done (2026-10-07).** The owner tested on a real phone; decisions P55–P60, lines in "Staging fixes acceptance".
+- **Tables at phone width**: Pages and Advanced (log) use our own `.wst-table` (not `.wp-list-table`/`.widefat`, whose core mobile rules hide columns and fight our layout); ≤ 782 px rows become cards (title row with the checkbox at the inline end, one "label: value" line per cell); row checkbox labels and the header "Select" are `screen-reader-text`; the visible "Select all on this page" is a toolbar checkbox.
+- **Toolbar "Translate"** (A文 icon, label hidden but icon kept below 782 px) on every front-end page in both languages and in wp-admin for `wst_translate` users. Children: "Translate this page" (front end; post edit screens), "Back to page" (editor screen), "Translation editor", "Translator settings" (`manage_options`). 404 and search open the editor with a message; drafts and pages that redirect visitors (checkout without a cart) get a clear message.
+- **Floating switcher offset** setting (`switcher_offset`, px from the top or bottom edge, 0–400, default 16); top-left/top-right already existed; live preview follows it; positions are logical, so left/right swap on right-to-left pages.
+- **Other plugins' admin notices** are hidden on the Translator settings screens too (scripts stay; the editor keeps full isolation).
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -250,6 +256,12 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P51 | Editor isolation removes third-party callbacks by **file location** (plugins, must-use plugins, themes; the longest matching directory decides) from 15 admin hooks, and dequeues their assets by URL just before printing. Core callbacks/assets stay. | Plan §11 "only our bundle loads". Limitation: inline code a plugin attaches to a *core* script handle (`wp_add_inline_script('wp-element', …)`) is not removed; recorded as known issue 13. |
 | P52 | Safe preview keeps non-executable scripts (JSON, JSON-LD, templates) and removes executable ones plus every `on*` attribute; the frame is sandboxed without `allow-same-origin` even with "Run page scripts". | Page scripts, if run, cannot reach the editor, cookies or storage of the admin. |
 | P54 | After the token is verified, `wst_scan`, `wst_preview` and `wst_nocache` are removed from `REQUEST_URI`, `$_GET` and `$_REQUEST`. | Found live: core builds the comment "Cancel reply" link from the current URL, so every scan recorded a new string containing its own token and queued it. Regression test `ScanTest::test_urls_built_from_the_request_do_not_carry_the_token`; live rescan: 0 new strings. |
+| P55 | Admin tables are our own `.wst-table` with a card layout ≤ 782 px instead of `.wp-list-table`. | Core's list-table CSS hides every non-primary column on phones and expects its own toggle markup; mixing it with React tables produced the overlapping columns and letter-by-letter titles from the staging report. A horizontal scroller would hide the status columns off-screen. |
+| P56 | Toolbar item cause and fix: the old item was a text-only top-level node, which core's toolbar CSS hides below 782 px (only nodes with an icon are shown); it was also skipped on 404s. Now `wst-translate` has an icon (`assets/admin-bar.css`, dashicon `\f326`) and is added on every page; pages that cannot be scanned still link to the editor, which explains why. | Owner's report: missing on one English page (phone width). Note: the A文 item in the owner's screenshot was not ours before this change (we had no icon); it may have been another plugin's. |
+| P57 | "Translate this page" opens the editor for the post (singular) or the path; the editor always edits the target language, also when the page is viewed in the default language. 404 → `context=404` + path; search → `context=search`; both show an info notice and the page picker. | One editor for both views; nothing to scan on 404/search. |
+| P58 | Pages that cannot be scanned get specific messages: drafts/pending/scheduled ("not published yet… publish it first"); a page that redirects the visitor scan (HTTP 3xx, e.g. WooCommerce checkout without a cart) → 422 `wst_scan_redirected` explaining that its texts are translated where they also appear. | The generic "HTTP 302 and no scan result" did not tell the owner what to do. |
+| P59 | `switcher_offset` is an inline CSS variable (`--wst-switcher-offset`) on the floating switcher only; the admin-bar height is added for top positions (32 px, 46 px ≤ 782 px). | One setting moves the switcher clear of a theme's fixed bar at either edge without new positions. |
+| P60 | Settings screens hide third-party **notices** only (`Isolation::NOTICE_HOOKS`, stripped on `current_screen` and again just before printing); third-party scripts keep loading there. | Owner asked for clean screens; full isolation stays editor-only because settings screens do not need it and it would hide e.g. a cache plugin's toolbar tools. |
 | P53 | "Translate entire site" (plan §8) is **not** in this phase: the owner's Phase 5 list is scan flow, list, autosave, bulk queue actions, preview, entry points. Bulk here is per page. | No dead controls; it needs a site URL list and a budget confirmation (to schedule; see "Exact next step"). |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -300,6 +312,19 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
 - Deferred by design (built together with their phases, no dead settings now): "Translate entire site" (P53, to schedule); §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, CSV, TranslatePress (Phase 6); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
 
+## Staging fixes acceptance
+
+- PASS — Tables at 360/390/768 px (headless Chromium, admin): no horizontal page overflow, "Select all on this page" label only in the toolbar, row checkbox labels hidden, titles on one line; desktop unchanged. Core `.wp-list-table` mobile CSS no longer applies (own classes). Screenshots `after-{pages,advanced}-{360,390,768}.png` (scratchpad `live/p6fix`).
+- PASS — Toolbar item on `/`, a post, a category archive, `/shop/`, a product, search, a 404 and `/cart/`, in English and Bengali, at 1280 and 390 px: present and visible for the editor-role translator (16/16 each width); phone tap opens the submenu (touch emulation). `AdminBarTest` (14 page/language cases, admin and editor roles, author gets nothing, scan/preview renders get nothing, post edit screen, dashboard, editor "Back to page" for a post, a path and a draft).
+- PASS — Editor messages live: 404, search (info notices), draft (error with what to do); redirect message `EditorControllerTest::test_loopback_explains_pages_that_redirect_visitors`.
+- PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
+- PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
+- Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Files changed (staging fixes)
+
+`assets-src/admin/{admin.scss,screens/{Pages,Advanced,Switcher}.js}`, `assets-src/editor/{Editor.js,editor.scss}`, `assets/{admin-bar.css,switcher.css}`, `build/{admin,editor}.*`, `src/Editor/{AdminBar,PageTarget}.php`, `src/Admin/{AdminPage,EditorPage,Isolation}.php`, `src/Rest/EditorController.php`, `src/Settings.php`, `src/Switcher/Switcher.php`, `src/Plugin.php`, tests `tests/Integration/Editor/{AdminBarTest,EditorScreenTest,EditorControllerTest}.php`, `tests/Integration/{SettingsTest,Switcher/SwitcherTest}.php`.
+
 ## Files changed (Phase 5)
 
 `src/Editor/{Tokens,EditorRequest,PageTarget,Preview,AdminBar}.php`, `src/Admin/{EditorPage,Isolation}.php`, `src/Rest/{EditorController,StringsController}.php`, `src/Render/{Pipeline,PageContext,DiscoveryGate}.php`, `src/Modes/OffPages.php`, `src/Storage/StringStore.php` (scan recording, page times, editor list, by id, mark manual, delete translation), `src/Queue/Requests.php`, `src/Settings.php` (`editor_mt_on_manual`), `src/Admin/{AdminPage,PostPanel}.php`, `src/Plugin.php`, `assets/preview.js`, `assets-src/editor/*`, `assets-src/admin/{api.js,screens/{Pages,Overview,Translation}.js}`, `assets-src/post-panel/index.js`, `build/{editor,admin,post-panel}.*`, `package.json`; issue 11: `src/Html/InlineMarkup.php`, `src/Providers/RequestPlan.php`, `src/Queue/Worker.php`; release: `bin/build-zip.sh`, `.distignore`; tests `tests/Integration/Editor/*`, `tests/Integration/Rest/PagesAndStringsControllerTest.php`, `tests/Integration/{Html/InlineMarkupTest,Queue/WorkerTest,Storage/StringStoreTest}.php`, `tests/fixtures/hostile-plugin/*`, `tests/Support/FakeProvider.php`.
@@ -327,10 +352,10 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 115 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,284 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 5 included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,309 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), staging fixes included.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
-- `npm run lint:js`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
+- `npm run lint:js` and `npm run lint:css`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
 - Live checks with Playwright scripts in the session scratchpad (headless Chromium; not committed) — see Phase 4 and Phase 5 acceptance.
 
 ## Release zip
@@ -350,9 +375,9 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 9. Dev site: WooCommerce from source fatals in wp-admin (`Could not find asset registry for wp-admin-scripts`, no JS build) and Elementor's unbuilt JS returns HTML (console "Unexpected token '<'"). Deactivate WooCommerce for admin checks. Not plugin issues. Start the server with `php -S 127.0.0.1:8899 -t site router.php` (the `-t` matters for static files).
 10. Yoast SEO / Rank Math print their own canonical; the `off_behavior = original` canonical override uses core's `get_canonical_url` only. Check with those plugins in the Phase 7 compatibility pass.
 11. ~~Comment-form string failed with a tag mismatch on TranslateX~~ **fixed (P45)**: our bug, not the provider. `InlineMarkup::sanitize()` (`wp_kses` → `safecss_filter_attr`) rewrites `style="display:none;"` as `style="display:none"`, and `sameStructure()` compared attribute values byte for byte, so the original failed against its own sanitised copy whatever the provider returned (sentence and segment form alike; manual saves too). Live after the fix: both rows translated by TranslateX in one run, whole sentence (flags 0).
-12. Dev-only RTL check: an mu-plugin on the dev site sets `$wp_locale->text_direction = 'rtl'` on `after_setup_theme` and disables script concatenation (load-styles.php does not run plugins). Not part of the plugin.
+12. Dev-only RTL check: an mu-plugin on the dev site sets `$wp_locale->text_direction = 'rtl'` on `after_setup_theme` and disables script concatenation (load-styles.php does not run plugins). Not part of the plugin. It only affects wp-admin and default-language pages: on target pages the pipeline sets `dir` from the target language (Bengali → ltr), so front-end RTL checks set `dir="rtl"` on the rendered page.
 13. Editor isolation does not remove inline code that a plugin attaches to a **core** script handle (`wp_add_inline_script( 'wp-element', … )`) or core-handle data; such a plugin could still break the editor. Not seen in practice; the hostile fixture covers enqueued files, printed scripts, notices and head/footer output.
-14. Scans render as a visitor, so only published, public posts can be scanned; content shown only to logged-in users is not recorded.
+14. Scans render as a visitor, so only published, public posts can be scanned (drafts get a message, P58); content shown only to logged-in users is not recorded; pages that redirect visitors (checkout without a cart) cannot be scanned.
 
 ## Dev environment setup (scripted)
 
@@ -380,5 +405,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner review of Phase 5 (editor, isolation, scan/preview decisions P46–P54) and a decision on "Translate entire site" (P53): build it now as a small follow-up (site URL list, client-side scans with progress, budget confirmation) or move it to Phase 6.
-2. After approval, Phase 6a (CSV import/export, plan §13A.3).
+1. Owner: re-test the staging fixes (P55–P60) on the phone; send the logo `<img src>` from the English page if it is still broken. Decision on "Translate entire site" (P53) still open.
+2. Phase 6a (CSV import/export, plan §13A.3): export with filters, streamed, CSV-injection guard; import with dry run, conflict policy, chunked apply, validation and `wp_kses`; Import/Export screen; tests.

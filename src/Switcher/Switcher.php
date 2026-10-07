@@ -167,7 +167,7 @@ final class Switcher {
 			'<nav class="%s" data-wst-no-translate aria-label="%s"%s><ul class="wst-switcher__list">%s</ul></nav>',
 			esc_attr( $classes ),
 			esc_attr__( 'Language', 'wp-site-translator' ),
-			$this->styleAttribute(),
+			$this->styleAttribute( 'floating' === $context ),
 			$items
 		);
 	}
@@ -324,17 +324,23 @@ final class Switcher {
 	}
 
 	/**
-	 * Inline CSS variables for the custom colour theme.
+	 * Inline CSS variables: custom colours, and the vertical offset of the
+	 * floating switcher (moves it clear of a theme's fixed bar).
+	 *
+	 * @param bool $floating Whether this is the floating switcher.
 	 */
-	private function styleAttribute(): string {
-		if ( 'custom' !== $this->settings->choice( 'switcher_theme' ) ) {
-			return '';
+	private function styleAttribute( bool $floating ): string {
+		$vars = array();
+		if ( 'custom' === $this->settings->choice( 'switcher_theme' ) ) {
+			$colors = $this->settings->switcherColors();
+			$vars[] = '--wst-switcher-text:' . $colors['text'];
+			$vars[] = '--wst-switcher-bg:' . $colors['background'];
+			$vars[] = '--wst-switcher-accent:' . $colors['accent'];
 		}
-		$colors = $this->settings->switcherColors();
+		if ( $floating ) {
+			$vars[] = '--wst-switcher-offset:' . $this->settings->number( 'switcher_offset' ) . 'px';
+		}
 
-		return sprintf(
-			' style="%s"',
-			esc_attr( sprintf( '--wst-switcher-text:%s;--wst-switcher-bg:%s;--wst-switcher-accent:%s', $colors['text'], $colors['background'], $colors['accent'] ) )
-		);
+		return array() === $vars ? '' : sprintf( ' style="%s"', esc_attr( implode( ';', $vars ) ) );
 	}
 }

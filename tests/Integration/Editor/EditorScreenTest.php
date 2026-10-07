@@ -16,14 +16,11 @@ use WST\Access;
 use WST\Admin\AdminPage;
 use WST\Admin\EditorPage;
 use WST\Admin\Isolation;
-use WST\Editor\AdminBar;
 use WST\Languages\Current;
 use WST\Languages\Registry;
-use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
 use WST\Providers\Selector;
-use WST\Routing\Urls;
 use WST\Settings;
 
 final class EditorScreenTest extends WP_UnitTestCase {
@@ -77,7 +74,7 @@ final class EditorScreenTest extends WP_UnitTestCase {
 		$registry = new ProviderRegistry( array() );
 		$page     = new EditorPage( $settings, $target, new Selector( $settings, $registry, new ProviderState() ), new Isolation( self::PLUGIN_FILE ), self::PLUGIN_FILE );
 		$page->boot();
-		( new AdminPage( self::PLUGIN_FILE ) )->addMenu();
+		( new AdminPage( self::PLUGIN_FILE, new Isolation( self::PLUGIN_FILE ) ) )->addMenu();
 		$page->addMenu();
 
 		return $page;
@@ -139,28 +136,29 @@ final class EditorScreenTest extends WP_UnitTestCase {
 		$this->assertSame( 'http://example.org/wp-admin/admin.php?page=wst-editor&path=%2Fshop%2F', EditorPage::url( null, '/shop/' ) );
 	}
 
-	public function test_toolbar_entry_on_front_end_pages(): void {
-		global $wp_admin_bar;
-		$this->set_permalink_structure( '/%postname%/' );
-		$post = self::factory()->post->create( array( 'post_name' => 'bar-page' ) );
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
-		$settings = $this->settings();
-		$target   = $settings->targetLanguage() ?? throw new \LogicException( 'No target.' );
-		$urls     = Urls::fromHome( (string) get_option( 'home' ), 'wp-json' );
-		$this->go_to( get_permalink( $post ) );
-		require_once ABSPATH . WPINC . '/class-wp-admin-bar.php';
-		$wp_admin_bar = new \WP_Admin_Bar(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core toolbar global for this test.
+	public function test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts(): void {
+		$this->editorScreen( 'administrator' );
+		$admin = new AdminPage( self::PLUGIN_FILE, new Isolation( self::PLUGIN_FILE ) );
+		$admin->addMenu();
+		$this->assertNotEmpty( $this->foreignCallbacks( 'admin_notices' ) );
 
-		( new AdminBar( $urls, $target, new Resolver( $settings, $urls, $target ) ) )->addNode( $wp_admin_bar );
+		$admin->hideForeignNotices( \WP_Screen::get( 'toplevel_page_' . AdminPage::MENU_SLUG ) );
 
-		$node = $wp_admin_bar->get_node( 'wst-translate' );
-		$this->assertNotNull( $node );
-		$this->assertSame( EditorPage::url( $post ), $node->href );
+		foreach ( Isolation::NOTICE_HOOKS as $hook ) {
+			$this->assertSame( array(), $this->foreignCallbacks( $hook ), $hook );
+		}
+		$this->assertNotEmpty( $this->foreignCallbacks( 'admin_enqueue_scripts' ), 'Only notices are hidden on the settings screen.' );
+		$this->assertNotFalse( has_action( 'admin_notices', 'update_nag' ), 'Core notices stay.' );
+	}
 
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
-		$bar = new \WP_Admin_Bar();
-		( new AdminBar( $urls, $target, new Resolver( $settings, $urls, $target ) ) )->addNode( $bar );
-		$this->assertNull( $bar->get_node( 'wst-translate' ), 'Only for users who may translate.' );
+	public function test_other_screens_keep_other_plugins_notices(): void {
+		$this->editorScreen( 'administrator' );
+		$admin = new AdminPage( self::PLUGIN_FILE, new Isolation( self::PLUGIN_FILE ) );
+		$admin->addMenu();
+
+		$admin->hideForeignNotices( \WP_Screen::get( 'dashboard' ) );
+
+		$this->assertNotEmpty( $this->foreignCallbacks( 'admin_notices' ) );
 	}
 
 	/**

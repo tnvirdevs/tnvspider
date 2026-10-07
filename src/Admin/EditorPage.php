@@ -27,6 +27,12 @@ final class EditorPage {
 	public const SLUG          = 'wst-editor';
 	public const SCRIPT_HANDLE = 'wst-editor';
 
+	/** Editor opened from a "not found" page: nothing to scan. */
+	public const CONTEXT_NOT_FOUND = '404';
+
+	/** Editor opened from search results: not one page. */
+	public const CONTEXT_SEARCH = 'search';
+
 	/**
 	 * Hook suffix of the screen, once added.
 	 *
@@ -55,15 +61,19 @@ final class EditorPage {
 	/**
 	 * URL of the editor for a post or a path.
 	 *
-	 * @param int|null    $postId Post id.
-	 * @param string|null $path   Site path without language prefix.
+	 * @param int|null    $postId  Post id.
+	 * @param string|null $path    Site path without language prefix.
+	 * @param string|null $context self::CONTEXT_NOT_FOUND or self::CONTEXT_SEARCH.
 	 */
-	public static function url( ?int $postId = null, ?string $path = null ): string {
+	public static function url( ?int $postId = null, ?string $path = null, ?string $context = null ): string {
 		$args = array( 'page' => self::SLUG );
 		if ( null !== $postId ) {
 			$args['post'] = $postId;
 		} elseif ( null !== $path ) {
 			$args['path'] = rawurlencode( $path );
+		}
+		if ( null !== $context ) {
+			$args['context'] = $context;
 		}
 
 		return add_query_arg( $args, admin_url( 'admin.php' ) );
@@ -134,14 +144,16 @@ final class EditorPage {
 	 */
 	private function data(): array {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Read-only page selection.
-		$post = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
-		$path = isset( $_GET['path'] ) && is_string( $_GET['path'] ) ? sanitize_text_field( rawurldecode( wp_unslash( $_GET['path'] ) ) ) : '';
+		$post    = isset( $_GET['post'] ) ? absint( $_GET['post'] ) : 0;
+		$path    = isset( $_GET['path'] ) && is_string( $_GET['path'] ) ? sanitize_text_field( rawurldecode( wp_unslash( $_GET['path'] ) ) ) : '';
+		$context = isset( $_GET['context'] ) ? sanitize_key( wp_unslash( $_GET['context'] ) ) : '';
 		// phpcs:enable
 		$mt = null !== $this->selector->active( $this->settings->defaultLanguage(), $this->target, Usage::period() );
 
 		return array(
 			'postId'        => $post > 0 ? $post : null,
 			'path'          => '' === $path ? null : $path,
+			'context'       => in_array( $context, array( self::CONTEXT_NOT_FOUND, self::CONTEXT_SEARCH ), true ) ? $context : null,
 			'language'      => array(
 				'tag'    => $this->target->tag(),
 				'dir'    => $this->target->dir(),

@@ -32,6 +32,18 @@ const config = window.wstEditor || {
 	providerReady: false,
 	mtOnManual: true,
 	settingsUrl: '',
+	context: null,
+};
+
+const CONTEXT_MESSAGES = {
+	404: __(
+		'This address shows the site’s “not found” page (HTTP 404), so there is nothing to scan here. Texts of the not-found template are translated wherever they also appear; choose a page below.',
+		'wp-site-translator'
+	),
+	search: __(
+		'Search results are built from your other pages, so they cannot be scanned as one page. Translate the pages they show; choose one below.',
+		'wp-site-translator'
+	),
 };
 
 const PER_PAGE = 50;
@@ -63,6 +75,9 @@ const unix = ( value ) =>
 
 export default function Editor() {
 	const pageRef = useMemo( () => {
+		if ( config.context ) {
+			return null;
+		}
 		if ( config.postId ) {
 			return { post_id: config.postId };
 		}
@@ -385,6 +400,11 @@ export default function Editor() {
 		return (
 			<div className="wst-editor">
 				<h1>{ __( 'Translation editor', 'wp-site-translator' ) }</h1>
+				{ CONTEXT_MESSAGES[ config.context ] && (
+					<Notice status="info" isDismissible={ false }>
+						{ CONTEXT_MESSAGES[ config.context ] }
+					</Notice>
+				) }
 				<PagePicker />
 			</div>
 		);
@@ -500,6 +520,14 @@ export default function Editor() {
 					/>
 				</div>
 			</header>
+			{ page.mode === 'off' && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'This page is set to “off”: visitors see it untranslated, so it is not scanned. Strings listed here come from earlier scans; translations you make apply wherever the text appears.',
+						'wp-site-translator'
+					) }
+				</Notice>
+			) }
 			{ ! config.providerReady && (
 				<p className="wst-note">
 					{ __(

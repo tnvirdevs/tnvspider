@@ -183,7 +183,7 @@
 	display: inline-block;
 	padding-block: 2px;
 	padding-inline: 8px;
-	border: 1px solid currentColor;
+	border: 1px solid currentcolor;
 	border-radius: 2px;
 	font-size: 12px;
 	font-weight: 600;
@@ -263,6 +263,7 @@
 }
 
 .wst-usage {
+
 	label {
 		display: block;
 		margin-block-end: 4px;
@@ -361,7 +362,8 @@
 	border: 1px solid #f0f0f1;
 }
 
-// A stand-in page: the floating switcher is placed inside it, not on the screen.
+// A stand-in page: the floating switcher is placed inside it,
+// not on the screen.
 .wst-preview__page {
 	position: relative;
 	block-size: 160px;
@@ -416,15 +418,133 @@
 	overflow-x: auto;
 }
 
+// Our own table styles: WordPress's .wp-list-table / .widefat phone rules
+// expect its list-table markup (column-primary, toggle-row) and collapse
+// anything else, so they are not used here.
 .wst-table {
-	td,
-	th {
+	inline-size: 100%;
+	border-collapse: collapse;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+
+	th,
+	td {
+		padding: 8px 10px;
+		border-block-end: 1px solid #f0f0f1;
+		text-align: start;
 		vertical-align: top;
+		overflow-wrap: anywhere;
+	}
+
+	thead th,
+	thead td {
+		border-block-end: 1px solid #c3c4c7;
+		font-weight: 600;
+	}
+
+	tbody tr:nth-child(odd) {
+		background: #f6f7f7;
+	}
+
+	tbody th {
+		font-weight: 400;
 	}
 
 	pre {
 		max-inline-size: 60ch;
 		white-space: pre-wrap;
+	}
+}
+
+.wst-table__check {
+	inline-size: 2.5em;
+
+	input[type="checkbox"] {
+		margin: 0;
+	}
+}
+
+.wst-table__action {
+	display: block;
+	margin-block-start: 4px;
+	font-size: 13px;
+}
+
+// Narrow screens: every row becomes a card; each cell shows its column
+// name from data-label. The header row stays for screen readers only.
+@media screen and (max-width: 782px) {
+
+	.wst-table--cards {
+		border: 0;
+		background: transparent;
+
+		thead {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		tbody,
+		tr,
+		th,
+		td {
+			display: block;
+		}
+
+		tr {
+			position: relative;
+			margin-block-end: 8px;
+			padding-block: 10px;
+			padding-inline: 12px;
+			border: 1px solid #dcdcde;
+			background: #fff;
+		}
+
+		tbody tr:nth-child(odd) {
+			background: #fff;
+		}
+
+		th,
+		td {
+			padding: 2px 0;
+			border: 0;
+		}
+
+		td[data-label] {
+			display: grid;
+			grid-template-columns: minmax(7em, 35%) minmax(0, 1fr);
+			gap: 8px;
+
+			&::before {
+				content: attr(data-label);
+				color: var(--wst-muted);
+				font-weight: 600;
+			}
+		}
+
+		.wst-table__primary {
+			margin-block-end: 6px;
+			font-size: 15px;
+		}
+
+		.wst-table__check {
+			position: absolute;
+			inset-block-start: 10px;
+			inset-inline-end: 12px;
+			inline-size: auto;
+
+			input[type="checkbox"] {
+				inline-size: 24px;
+				block-size: 24px;
+			}
+		}
+
+		tr:has(.wst-table__check) .wst-table__primary {
+			padding-inline-end: 36px;
+		}
 	}
 }
 
@@ -484,12 +604,14 @@
 }
 
 @media screen and (max-width: 960px) {
+
 	.auto-fold .wst-admin__savebar {
 		inset-inline-start: 36px;
 	}
 }
 
 @media screen and (max-width: 782px) {
+
 	.auto-fold .wst-admin__savebar {
 		inset-inline-start: 0;
 	}

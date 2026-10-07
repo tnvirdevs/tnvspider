@@ -76,7 +76,7 @@ function LogViewer() {
 			) }
 			{ entries && entries.length > 0 && (
 				<div className="wst-table-wrap">
-					<table className="widefat striped wst-table">
+					<table className="wst-table wst-table--cards">
 						<thead>
 							<tr>
 								<th scope="col">
@@ -96,39 +96,72 @@ function LogViewer() {
 						<tbody>
 							{ entries.map( ( entry ) => (
 								<tr key={ entry.id }>
-									<td>{ entry.created_at }</td>
-									<td>
-										<Chip
-											tone={
-												entry.level === 'error'
-													? 'error'
-													: 'warning'
-											}
-										>
-											{ entry.level }
-										</Chip>
-									</td>
-									<td>{ entry.source }</td>
-									<td>
-										{ entry.message }
-										{ Object.keys( entry.context ).length >
-											0 && (
-											<details>
-												<summary>
-													{ __(
-														'Details',
-														'wp-site-translator'
-													) }
-												</summary>
-												<pre>
-													{ JSON.stringify(
-														entry.context,
-														null,
-														2
-													) }
-												</pre>
-											</details>
+									<td
+										data-label={ __(
+											'Time (UTC)',
+											'wp-site-translator'
 										) }
+									>
+										<span className="wst-table__value">
+											{ entry.created_at }
+										</span>
+									</td>
+									<td
+										data-label={ __(
+											'Level',
+											'wp-site-translator'
+										) }
+									>
+										<span className="wst-table__value">
+											<Chip
+												tone={
+													entry.level === 'error'
+														? 'error'
+														: 'warning'
+												}
+											>
+												{ entry.level }
+											</Chip>
+										</span>
+									</td>
+									<td
+										data-label={ __(
+											'Source',
+											'wp-site-translator'
+										) }
+									>
+										<span className="wst-table__value">
+											{ entry.source }
+										</span>
+									</td>
+									<td
+										className="wst-table__wide"
+										data-label={ __(
+											'Message',
+											'wp-site-translator'
+										) }
+									>
+										<span className="wst-table__value">
+											{ entry.message }
+											{ Object.keys( entry.context )
+												.length > 0 && (
+												<details>
+													<summary>
+														{ __(
+															'Details',
+															'wp-site-translator'
+														) }
+													</summary>
+													<pre>
+														{ JSON.stringify(
+															entry.context,
+															null,
+															2
+														) }
+													</pre>
+												</details>
+											) }
+										</span>
 									</td>
 								</tr>
 							) ) }

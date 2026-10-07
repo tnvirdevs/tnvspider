@@ -104,7 +104,7 @@ final class Plugin {
 		( new ProvidersController( $status, $tester, $secrets ) )->boot();
 		( new HealthController( $settings, new Health( $settings, $wpdb, self::schema(), $queue, $status, $selector, $logger ), $logger, self::strings(), $status ) )->boot();
 		if ( is_admin() ) {
-			( new AdminPage( $file ) )->boot();
+			( new AdminPage( $file, new Isolation( $file ) ) )->boot();
 		}
 
 		if ( null !== $target ) {
@@ -116,7 +116,7 @@ final class Plugin {
 			// The language must be known before the locale and theme load.
 			( new Router( $settings, $target, $urls ) )->boot();
 			( new EditorRequest( $urls, $target ) )->boot();
-			( new AdminBar( $urls, $target, $modes ) )->boot();
+			( new AdminBar( $urls, $byLang, $target, $file ) )->boot();
 			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
 			( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 			( new OffPages( $settings, $modes, $byLang ) )->boot();

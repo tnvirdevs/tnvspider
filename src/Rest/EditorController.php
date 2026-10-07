@@ -161,6 +161,10 @@ final class EditorController {
 		}
 		$code    = (int) wp_remote_retrieve_response_code( $response );
 		$summary = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $summary ) && $code >= 300 && $code < 400 ) {
+			/* translators: %d: HTTP status */
+			return new \WP_Error( 'wst_scan_redirected', sprintf( __( 'This page sends visitors to another address (HTTP %d), so it cannot be scanned. Cart, checkout and account pages do this without a cart or a login. Their texts are translated wherever the same texts appear on other pages.', 'wp-site-translator' ), $code ), array( 'status' => 422 ) );
+		}
 		if ( ! is_array( $summary ) ) {
 			/* translators: %d: HTTP status */
 			return new \WP_Error( 'wst_loopback_failed', sprintf( __( 'The page answered with HTTP %d and no scan result (a redirect, a login wall or a cached copy?).', 'wp-site-translator' ), $code ), array( 'status' => 502 ) );

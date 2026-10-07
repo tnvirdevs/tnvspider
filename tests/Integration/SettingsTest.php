@@ -73,6 +73,15 @@ final class SettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 1000000, $settings->number( 'discovery_cap_site_hour' ) );
 	}
 
+	public function test_switcher_offset_defaults_and_is_clamped(): void {
+		$registry = new Registry();
+		$this->assertSame( Settings::SWITCHER_OFFSET, ( new Settings( array(), 'en_US', $registry ) )->number( 'switcher_offset' ) );
+		$this->assertSame( 72, ( new Settings( array( 'switcher_offset' => 72 ), 'en_US', $registry ) )->number( 'switcher_offset' ) );
+		$this->assertSame( 0, ( new Settings( array( 'switcher_offset' => 0 ), 'en_US', $registry ) )->number( 'switcher_offset' ) );
+		$this->assertSame( Settings::SWITCHER_OFFSET_MAX, ( new Settings( array( 'switcher_offset' => 99999 ), 'en_US', $registry ) )->number( 'switcher_offset' ) );
+		$this->assertSame( Settings::SWITCHER_OFFSET, ( new Settings( array( 'switcher_offset' => 'tall' ), 'en_US', $registry ) )->number( 'switcher_offset' ) );
+	}
+
 	public function test_load_reads_the_option_and_site_locale(): void {
 		// Core refuses to store WPLANG for a language pack that is not installed.
 		add_filter( 'pre_option_WPLANG', static fn(): string => 'bn_BD' );

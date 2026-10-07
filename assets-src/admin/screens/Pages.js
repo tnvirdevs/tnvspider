@@ -121,9 +121,10 @@ export default function Pages( { data } ) {
 	}
 
 	const items = result ? result.items : [];
+	const editable = items.filter( ( item ) => item.can_edit );
 	const allSelected =
-		items.length > 0 &&
-		items.every( ( item ) => selected.includes( item.id ) );
+		editable.length > 0 &&
+		editable.every( ( item ) => selected.includes( item.id ) );
 
 	const apply = () => {
 		setBusy( true );
@@ -232,6 +233,21 @@ export default function Pages( { data } ) {
 			{ items.length > 0 && (
 				<>
 					<div className="wst-toolbar">
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							label={ __(
+								'Select all on this page',
+								'wp-site-translator'
+							) }
+							checked={ allSelected }
+							onChange={ ( on ) =>
+								setSelected(
+									on
+										? editable.map( ( item ) => item.id )
+										: []
+								)
+							}
+						/>
 						<SelectControl
 							__nextHasNoMarginBottom
 							__next40pxDefaultSize
@@ -263,29 +279,16 @@ export default function Pages( { data } ) {
 						</Button>
 					</div>
 					<div className="wst-table-wrap">
-						<table className="wp-list-table widefat striped wst-table">
+						<table className="wst-table wst-table--cards">
 							<thead>
 								<tr>
-									<td className="check-column">
-										<CheckboxControl
-											__nextHasNoMarginBottom
-											label={ __(
-												'Select all on this page',
+									<td className="wst-table__check">
+										<span className="screen-reader-text">
+											{ __(
+												'Select',
 												'wp-site-translator'
 											) }
-											hideLabelFromVision
-											checked={ allSelected }
-											onChange={ ( on ) =>
-												setSelected(
-													on
-														? items.map(
-																( item ) =>
-																	item.id
-															)
-														: []
-												)
-											}
-										/>
+										</span>
 									</td>
 									<th scope="col">
 										{ __( 'Title', 'wp-site-translator' ) }
@@ -314,61 +317,73 @@ export default function Pages( { data } ) {
 								</tr>
 							</thead>
 							<tbody>
-								{ items.map( ( item ) => (
-									<tr key={ item.id }>
-										<th
-											scope="row"
-											className="check-column"
-										>
-											<CheckboxControl
-												__nextHasNoMarginBottom
-												label={
-													item.title ||
-													__(
-														'(no title)',
-														'wp-site-translator'
-													)
-												}
-												hideLabelFromVision
-												disabled={ ! item.can_edit }
-												checked={ selected.includes(
-													item.id
-												) }
-												onChange={ ( on ) =>
-													setSelected(
-														on
-															? [
-																	...selected,
-																	item.id,
-																]
-															: selected.filter(
-																	( id ) =>
-																		id !==
-																		item.id
-																)
-													)
-												}
-											/>
-										</th>
-										<td>
-											<a href={ item.link }>
-												{ item.title ||
-													__(
-														'(no title)',
-														'wp-site-translator'
+								{ items.map( ( item ) => {
+									const title =
+										item.title ||
+										__(
+											'(no title)',
+											'wp-site-translator'
+										);
+									const checkId = `wst-page-select-${ item.id }`;
+									return (
+										<tr key={ item.id }>
+											<td className="wst-table__check">
+												<input
+													id={ checkId }
+													type="checkbox"
+													disabled={ ! item.can_edit }
+													checked={ selected.includes(
+														item.id
 													) }
-											</a>
-											{ item.status !== 'publish' && (
-												<span className="wst-muted">
-													{ ' ' }
-													· { item.status }
-												</span>
-											) }
-											{ item.status === 'publish' &&
-												item.effective.mode !==
-													'off' && (
-													<div className="row-actions visible">
+													onChange={ ( event ) =>
+														setSelected(
+															event.target.checked
+																? [
+																		...selected,
+																		item.id,
+																	]
+																: selected.filter(
+																		(
+																			id
+																		) =>
+																			id !==
+																			item.id
+																	)
+														)
+													}
+												/>
+												<label
+													className="screen-reader-text"
+													htmlFor={ checkId }
+												>
+													{ sprintf(
+														/* translators: %s: post title */
+														__(
+															'Select %s',
+															'wp-site-translator'
+														),
+														title
+													) }
+												</label>
+											</td>
+											<th
+												scope="row"
+												className="wst-table__primary"
+											>
+												<a href={ item.link }>
+													{ title }
+												</a>
+												{ item.status !== 'publish' && (
+													<span className="wst-muted">
+														{ ' ' }
+														· { item.status }
+													</span>
+												) }
+												{ item.status === 'publish' &&
+													item.effective.mode !==
+														'off' && (
 														<a
+															className="wst-table__action"
 															href={ editorUrl(
 																item.id
 															) }
@@ -378,34 +393,74 @@ export default function Pages( { data } ) {
 																'wp-site-translator'
 															) }
 														</a>
-													</div>
+													) }
+											</th>
+											<td
+												data-label={ __(
+													'Type',
+													'wp-site-translator'
 												) }
-										</td>
-										<td>{ item.type }</td>
-										<td>
-											{ MODE_LABELS[ item.mode ] ||
-												item.mode }
-										</td>
-										<td>
-											{ MODE_LABELS[
-												item.effective.mode
-											] || item.effective.mode }{ ' ' }
-											<span className="wst-muted">
-												(
-												{ SOURCE_LABELS[
-													item.effective.source
-												] || item.effective.source }
-												)
-											</span>
-										</td>
-										<td>
-											<Coverage
-												coverage={ item.coverage }
-												lastScan={ item.last_scan }
-											/>
-										</td>
-									</tr>
-								) ) }
+											>
+												<span className="wst-table__value">
+													{ item.type }
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Page setting',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													{ MODE_LABELS[
+														item.mode
+													] || item.mode }
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Applies',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													{ MODE_LABELS[
+														item.effective.mode
+													] ||
+														item.effective
+															.mode }{ ' ' }
+													<span className="wst-muted">
+														(
+														{ SOURCE_LABELS[
+															item.effective
+																.source
+														] ||
+															item.effective
+																.source }
+														)
+													</span>
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Translated',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													<Coverage
+														coverage={
+															item.coverage
+														}
+														lastScan={
+															item.last_scan
+														}
+													/>
+												</span>
+											</td>
+										</tr>
+									);
+								} ) }
 							</tbody>
 						</table>
 					</div>

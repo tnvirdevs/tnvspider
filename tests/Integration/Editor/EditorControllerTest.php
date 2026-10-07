@@ -127,7 +127,11 @@ final class EditorControllerTest extends WP_UnitTestCase {
 		$this->editor();
 		$draft = self::factory()->post->create( array( 'post_status' => 'draft' ) );
 
-		$this->assertSame( 400, $this->call( 'POST', '/scan/register', array( 'post_id' => $draft ) )->get_status() );
+		$response = $this->call( 'POST', '/scan/register', array( 'post_id' => $draft ) );
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertStringContainsString( 'not published yet', $response->get_data()['message'], 'Drafts get a message that says what to do.' );
+		$private = self::factory()->post->create( array( 'post_status' => 'private' ) );
+		$this->assertStringContainsString( 'Only published, public posts', $this->call( 'POST', '/scan/register', array( 'post_id' => $private ) )->get_data()['message'] );
 		$this->assertSame( 400, $this->call( 'POST', '/scan/register', array() )->get_status(), 'post_id or path is required.' );
 	}
 
@@ -201,6 +205,26 @@ final class EditorControllerTest extends WP_UnitTestCase {
 
 		$this->assertSame( 502, $response->get_status() );
 		$this->assertSame( 'wst_scan_cached', $response->get_data()['code'] );
+	}
+
+	public function test_loopback_explains_pages_that_redirect_visitors(): void {
+		$this->editor();
+		add_filter(
+			'pre_http_request',
+			static fn() => array(
+				'headers'  => array( 'location' => 'http://example.org/bn/cart/' ),
+				'body'     => '',
+				'response' => array( 'code' => 302 ),
+				'cookies'  => array(),
+			)
+		);
+
+		$response = $this->call( 'POST', '/scan/loopback', array( 'post_id' => $this->postId ) );
+
+		$this->assertSame( 422, $response->get_status() );
+		$this->assertSame( 'wst_scan_redirected', $response->get_data()['code'] );
+		$this->assertStringContainsString( 'HTTP 302', $response->get_data()['message'] );
+		$this->assertStringContainsString( 'checkout', $response->get_data()['message'] );
 	}
 
 	public function test_preview_register(): void {

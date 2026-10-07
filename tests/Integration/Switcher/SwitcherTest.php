@@ -94,6 +94,24 @@ final class SwitcherTest extends WP_UnitTestCase {
 		$footer = (string) ob_get_clean();
 		$this->assertStringContainsString( 'class="wst-switcher wst-switcher--dark wst-switcher--floating wst-switcher--top-left"', $footer );
 		$this->assertStringContainsString( 'aria-current="true">বাংলা</a>', $footer );
+		$this->assertStringContainsString( 'style="--wst-switcher-offset:16px"', $footer );
+	}
+
+	public function test_floating_offset_is_a_css_variable_and_inline_switchers_have_none(): void {
+		$this->go_to( '/bn/hello/' );
+		$switcher = $this->switcher(
+			array(
+				'switcher_floating' => true,
+				'switcher_offset'   => 88,
+				'switcher_theme'    => 'custom',
+			)
+		);
+		ob_start();
+		$switcher->printFloating();
+		$footer = (string) ob_get_clean();
+
+		$this->assertStringContainsString( ';--wst-switcher-offset:88px"', $footer );
+		$this->assertStringNotContainsString( '--wst-switcher-offset', $switcher->render() );
 	}
 
 	public function test_menu_item_expands_into_one_link_per_language(): void {

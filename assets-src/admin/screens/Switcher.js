@@ -5,7 +5,7 @@
 import { Button } from '@wordpress/components';
 import { useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
-import { Choice, FieldError, Section, Toggle } from '../fields';
+import { Choice, FieldError, Integer, Section, Toggle } from '../fields';
 import { languageName } from '../format';
 
 const config = window.wstAdmin || { shortcode: '[wst_switcher]', menusUrl: '' };
@@ -47,14 +47,18 @@ function Preview( { draft, languages, floating } ) {
 			`wst-switcher--${ draft.switcher_position }`
 		);
 	}
-	const style =
-		draft.switcher_theme === 'custom'
+	const style = {
+		...( draft.switcher_theme === 'custom'
 			? {
 					'--wst-switcher-text': draft.switcher_colors.text,
 					'--wst-switcher-bg': draft.switcher_colors.background,
 					'--wst-switcher-accent': draft.switcher_colors.accent,
 				}
-			: undefined;
+			: {} ),
+		...( floating && Number.isInteger( draft.switcher_offset )
+			? { '--wst-switcher-offset': `${ draft.switcher_offset }px` }
+			: {} ),
+	};
 	return (
 		<nav
 			className={ classes.join( ' ' ) }
@@ -239,6 +243,16 @@ export default function Switcher( { draft, update, errors, languages } ) {
 									<div
 										className="wst-preview__page"
 										aria-hidden="true"
+										style={ {
+											blockSize: `${ Math.max(
+												160,
+												( Number.isInteger(
+													draft.switcher_offset
+												)
+													? draft.switcher_offset
+													: 16 ) + 90
+											) }px`,
+										} }
 									>
 										<Preview
 											draft={ draft }
@@ -294,6 +308,20 @@ export default function Switcher( { draft, update, errors, languages } ) {
 								label: __( 'Top left', 'wp-site-translator' ),
 							},
 						] }
+					/>
+				) }
+				{ draft.switcher_floating && (
+					<Integer
+						{ ...fields }
+						name="switcher_offset"
+						label={ __(
+							'Distance from the top or bottom edge (pixels)',
+							'wp-site-translator'
+						) }
+						help={ __(
+							'Raise it when the theme has a fixed bar at that edge, for example a bottom navigation bar on phones. 0–400; default 16.',
+							'wp-site-translator'
+						) }
 					/>
 				) }
 			</Section>
