@@ -9,6 +9,7 @@ import { errorText, get, post } from '../api';
 import { Section } from '../fields';
 import { Chip, dateTime, duration, number } from '../format';
 import { Usage } from './ProviderCard';
+import { editorUrl } from './Pages';
 
 function Checklist( { checklist } ) {
 	const steps = [
@@ -385,6 +386,7 @@ export default function Overview( {
 	queue,
 	refreshQueue,
 	refreshProviders,
+	data,
 } ) {
 	const [ overview, setOverview ] = useState( null );
 	const [ error, setError ] = useState( null );
@@ -443,6 +445,16 @@ export default function Overview( {
 						<Checklist checklist={ overview.checklist } />
 					) : (
 						! error && <Spinner />
+					) }
+					{ data.languages.target && (
+						<p>
+							<Button variant="secondary" href={ editorUrl() }>
+								{ __(
+									'Open the translation editor',
+									'wp-site-translator'
+								) }
+							</Button>
+						</p>
 					) }
 				</Section>
 				<Section title={ __( 'Coverage', 'wp-site-translator' ) }>

@@ -5,8 +5,8 @@
 	"description": "Admin UI and front-end assets for WP Site Translator.",
 	"license": "GPL-2.0-or-later",
 	"scripts": {
-		"build": "wp-scripts build post-panel=./assets-src/post-panel/index.js switcher-block=./assets-src/switcher-block/index.js admin=./assets-src/admin/index.js --output-path=build",
-		"start": "wp-scripts start post-panel=./assets-src/post-panel/index.js switcher-block=./assets-src/switcher-block/index.js admin=./assets-src/admin/index.js --output-path=build",
+		"build": "wp-scripts build post-panel=./assets-src/post-panel/index.js switcher-block=./assets-src/switcher-block/index.js admin=./assets-src/admin/index.js editor=./assets-src/editor/index.js --output-path=build",
+		"start": "wp-scripts start post-panel=./assets-src/post-panel/index.js switcher-block=./assets-src/switcher-block/index.js admin=./assets-src/admin/index.js editor=./assets-src/editor/index.js --output-path=build",
 		"lint:js": "wp-scripts lint-js",
 		"lint:css": "wp-scripts lint-style",
 		"env": "wp-env"

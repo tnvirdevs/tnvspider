@@ -43,13 +43,15 @@ final class PostPanel {
 	 * @param Requests    $requests Explicit translation requests.
 	 * @param Language    $target   Target language.
 	 * @param string      $pluginFile Main plugin file (for asset URLs).
+	 * @param bool        $mtOnManual Whether machine translation may be requested on manual pages.
 	 */
 	public function __construct(
 		private StringStore $store,
 		private Resolver $modes,
 		private Requests $requests,
 		private Language $target,
-		private string $pluginFile
+		private string $pluginFile,
+		private bool $mtOnManual = true
 	) {
 	}
 
@@ -107,7 +109,12 @@ final class PostPanel {
 		}
 		$coverage = $this->store->postCoverage( $post->ID, $this->target->locale() );
 		echo '<p>' . esc_html( self::coverageText( $coverage['total'], $coverage['translated'] ) ) . '</p>';
-		if ( Settings::MODE_OFF !== $effective['mode'] && $coverage['total'] > $coverage['translated'] ) {
+		if ( Settings::MODE_OFF !== $effective['mode'] ) {
+			echo is_post_publicly_viewable( $post )
+				? '<p><a class="button button-primary" href="' . esc_url( EditorPage::url( $post->ID ) ) . '">' . esc_html__( 'Open in translation editor', 'wp-site-translator' ) . '</a></p>'
+				: '<p class="description">' . esc_html__( 'Publish the post to translate it in the translation editor.', 'wp-site-translator' ) . '</p>';
+		}
+		if ( Settings::MODE_OFF !== $effective['mode'] && $coverage['total'] > $coverage['translated'] && ( $this->mtOnManual || Settings::MODE_MANUAL !== $effective['mode'] ) ) {
 			$url = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::TRANSLATE_HOOK . '&post_id=' . $post->ID ), self::TRANSLATE_HOOK . '_' . $post->ID );
 			printf( '<p><a class="button" href="%s">%s</a></p>', esc_url( $url ), esc_html__( 'Translate this page now', 'wp-site-translator' ) );
 		}
@@ -192,6 +199,8 @@ final class PostPanel {
 					'canTranslate' => current_user_can( Access::CAPABILITY ),
 					'modes'        => self::modeLabels(),
 					'language'     => $this->target->nativeName(),
+					'editorUrl'    => EditorPage::url(),
+					'mtOnManual'   => $this->mtOnManual,
 				)
 			) . ';',
 			'before'

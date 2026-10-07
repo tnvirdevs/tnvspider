@@ -3,13 +3,10 @@
 		'react-jsx-runtime',
 		'wp-api-fetch',
 		'wp-components',
-		'wp-core-data',
-		'wp-data',
-		'wp-editor',
+		'wp-date',
 		'wp-element',
 		'wp-i18n',
-		'wp-plugins',
 		'wp-url'
 	),
-	'version' => 'bbb93db946a5294eacb9'
+	'version' => '34e88eb575189ddd4b0b'
 );

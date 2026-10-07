@@ -11,10 +11,23 @@ import {
 } from '@wordpress/components';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
+import { addQueryArgs } from '@wordpress/url';
 import { errorText, getWithTotal, post } from '../api';
 import { Section } from '../fields';
 
 const PER_PAGE = 20;
+
+/**
+ * Translation editor URL for a post.
+ *
+ * @param {number} postId Post id.
+ * @return {string} URL.
+ */
+export const editorUrl = ( postId ) =>
+	addQueryArgs( window.location.pathname, {
+		page: 'wst-editor',
+		...( postId ? { post: postId } : {} ),
+	} );
 
 const MODE_LABELS = {
 	inherit: __( 'Default', 'wp-site-translator' ),
@@ -351,6 +364,22 @@ export default function Pages( { data } ) {
 													· { item.status }
 												</span>
 											) }
+											{ item.status === 'publish' &&
+												item.effective.mode !==
+													'off' && (
+													<div className="row-actions visible">
+														<a
+															href={ editorUrl(
+																item.id
+															) }
+														>
+															{ __(
+																'Edit translations',
+																'wp-site-translator'
+															) }
+														</a>
+													</div>
+												) }
 										</td>
 										<td>{ item.type }</td>
 										<td>

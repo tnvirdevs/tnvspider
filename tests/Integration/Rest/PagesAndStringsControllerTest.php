@@ -356,6 +356,7 @@ final class PagesAndStringsControllerTest extends WP_UnitTestCase {
 				'machine'      => 0,
 				'manual'       => 1,
 				'warning'      => 0,
+				'queued'       => 0,
 			),
 			$data['counts']
 		);
@@ -376,6 +377,9 @@ final class PagesAndStringsControllerTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'Soap intro', $item['original'] );
 		$this->assertSame( array( 'failed' ), $item['warnings'] );
+		$this->assertSame( 0, $this->strings()['counts']['queued'], 'Failed rows are not waiting.' );
+		$this->queue->enqueue( array( $this->stringId( 'Soap price' ) ), 'bn_BD', 'translatex', Queue::PRIORITY_EDITOR, time() );
+		$this->assertSame( 1, $this->strings()['counts']['queued'] );
 		$this->assertSame( 'Tags in the translation do not match the original.', $item['error'] );
 	}
 

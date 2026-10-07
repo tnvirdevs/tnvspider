@@ -168,6 +168,18 @@ export default function Translation( props ) {
 						},
 					] }
 				/>
+				<Toggle
+					{ ...fields }
+					name="editor_mt_on_manual"
+					label={ __(
+						'Allow machine translation in the editor on manual pages',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'Manual pages never send strings automatically. With this on, editors can still ask the provider for a translation.',
+						'wp-site-translator'
+					) }
+				/>
 			</Section>
 			<Section
 				title={ __( 'Translation providers', 'wp-site-translator' ) }

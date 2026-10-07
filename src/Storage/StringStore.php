@@ -309,7 +309,8 @@ final class StringStore {
 	/**
 	 * Strings for the translation editor (plan §11): those recorded on one
 	 * page (plus the site-wide ones), or all strings when $pageKey is null.
-	 * Each row carries its translation, provider, flags and queue state.
+	 * Each row carries its translation, provider, flags and queue state;
+	 * counts include how many are waiting for machine translation (queued).
 	 *
 	 * @param string      $lang          Target locale.
 	 * @param string|null $pageKey       Page key, or null for every string.
@@ -343,7 +344,7 @@ final class StringStore {
 		$warning = "(COALESCE(t.flags, 0) <> 0 OR q.state = 'failed')";
 		$counts  = $this->first(
 			$this->prepare(
-				'SELECT COUNT(*) AS total, COALESCE(SUM(t.id IS NULL), 0) AS untranslated, COALESCE(SUM(t.status = %d), 0) AS machine, COALESCE(SUM(t.status = %d), 0) AS manual, COALESCE(SUM(' . $warning . '), 0) AS warning' . $from . $where, // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed SQL fragments with placeholders.
+				'SELECT COUNT(*) AS total, COALESCE(SUM(t.id IS NULL), 0) AS untranslated, COALESCE(SUM(t.status = %d), 0) AS machine, COALESCE(SUM(t.status = %d), 0) AS manual, COALESCE(SUM(' . $warning . '), 0) AS warning, COALESCE(SUM(q.state IN (\'pending\', \'processing\')), 0) AS queued' . $from . $where, // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Fixed SQL fragments with placeholders.
 				array_merge( array( self::STATUS_MACHINE, self::STATUS_MANUAL ), $args )
 			)
 		);
@@ -377,7 +378,7 @@ final class StringStore {
 			);
 		}
 		$all = array( 'all' => null === $counts ? 0 : (int) $counts->total );
-		foreach ( array( 'untranslated', 'machine', 'manual', 'warning' ) as $name ) {
+		foreach ( array( 'untranslated', 'machine', 'manual', 'warning', 'queued' ) as $name ) {
 			$all[ $name ] = null === $counts ? 0 : (int) $counts->$name;
 		}
 

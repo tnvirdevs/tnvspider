@@ -61,6 +61,8 @@ final class AdminPage {
 			81
 		);
 		$this->hook = $hook;
+		// The first submenu entry names this screen; Editor is added after it.
+		add_submenu_page( self::MENU_SLUG, __( 'Translator settings', 'wp-site-translator' ), __( 'Settings', 'wp-site-translator' ), 'manage_options', self::MENU_SLUG );
 	}
 
 	/**

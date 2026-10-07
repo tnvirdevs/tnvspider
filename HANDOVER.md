@@ -33,6 +33,15 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - REST (all `manage_options`, REST nonce via `apiFetch`): `GET/POST /settings` (secrets write-only; invalid or unknown values → 400 naming each field, nothing saved), `GET /languages`, `GET /providers`, `POST /providers/{id}/test`, `GET /queue`, `POST /queue/retry-failed`, `POST /queue/clear`, `GET /overview`, `GET /health` (`loopback=true` for the loopback test), `GET /log`, `POST /data/machine/clear` (confirm), `GET /data/orphans` (dry run), `POST /data/orphans/clear` (confirm). Settings changes purge every cached page (`litespeed_purge_all`, `rocket_clean_domain()`, `wst_purge_all`).
 - `uninstall.php` deletes data only when "Delete all translator data" is on.
 
+**Phase 5 — Editor: done, waiting for owner approval (2026-10-07).** Acceptance lines below ("Phase 5 acceptance"). Also done before it: known issue 11 fixed (P45) and a release zip (`bin/build-zip.sh`, see "Release zip").
+- Screen **Translator → Editor** (`wst_translate`, so editors reach it; settings stay `manage_options`). On this screen third-party plugin, must-use plugin and theme callbacks are removed from the admin script/style/head/footer/notice hooks and their assets are dequeued before printing (`Admin\Isolation`); core and our bundle stay.
+- **Scan**: the admin's browser fetches the target page with a one-time, page-bound token (`?wst_scan=`); the page renders as a logged-out visitor, every string is recorded for the page without caps, stale occurrences are removed, and a JSON summary comes back (no-store, noindex, `X-WST-Scan-Id`). Cached copies are detected and retried with a cache-busting parameter; on any browser failure the server scans by loopback. Personal pages (search, cart, checkout, account) ask first and are never auto-queued; auto pages queue untranslated strings, manual pages never do; off pages answer without recording. Pages never scanned are scanned when the editor opens.
+- **String list**: page strings plus site-wide strings (toggle), filters all / untranslated / machine / manual / has warning with counts, search over originals and translations, pagination; inline originals show their tags; `dir="auto"` and `lang` on inputs. **Autosave on blur** with "Saving… / Saved", errors with "Try again" (typed text kept); Ctrl+Enter save and next, Esc undo, Alt+↑/↓ move. Row actions: Translate with provider (now), Keep as manual, Revert to machine translation, Remove translation. Warnings: piece-by-piece translation, repaired tags, failed with the reason.
+- **Bulk**: "Translate untranslated with provider" queues all untranslated strings of the page at editor priority (1); a live indicator polls while strings wait.
+- **Safe preview** (optional): sandboxed frame (`allow-scripts` only); without "Run page scripts" every executable script and inline handler is removed; our `assets/preview.js` marks strings, click ↔ row highlighting. No ready message within 8 s → "The preview did not load… The string list works without it." + retry; mobile shows the list only.
+- **Entry points**: Pages screen "Edit translations", block-editor panel and classic meta box "Open in translation editor" (published posts), toolbar "Translate this page" on the front end, Overview button.
+- New setting "Allow machine translation in the editor on manual pages" (default on, plan §9): off refuses editor/post-panel MT on manual pages (409) and hides the buttons.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -229,6 +238,30 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | Empty / loading / error states exist | **PASS** | Every screen: spinner while loading, `Notice` with "Try again" on request errors, empty texts (no path rules, no pages, empty log, no target language, no strings yet, no provider set up); save errors list each invalid field. |
 | Health | **PASS** | `AdminRoutesTest::test_health_reports_each_check_and_the_loopback` (PHP, WordPress + HTML API, tables, `GET_LOCK`, languages, provider incl. not verified, cron incl. `DISABLE_WP_CRON` command, render failures, loopback only on request); live Health screen all OK except "provider not verified" before the test. |
 
+## Decision log (Phase 5)
+
+| # | Decision | Reason |
+|---|---|---|
+| P46 | Scan and preview tokens: 128 random bits, issued over REST to `wst_translate` users, bound to one page path, stored only as a SHA-256-derived transient name; scan tokens are single-use (5 min), preview tokens reusable until expiry (15 min). The token is the authorisation of the front-end request. | Plan §11 "short-lived signed scan token"; the server loopback fallback has no cookies, so the token must stand alone. Nothing usable is stored. |
+| P47 | Scans and previews render **as a logged-out visitor** (`wp_set_current_user(0)` on init, no admin bar). | Otherwise the scan records the admin bar and logged-in variants ("Logged in as admin…"), which visitors never see. Consequence: only published, public posts can be scanned (drafts → 400 with a reason). |
+| P48 | A scan records every string of the page (also strings first seen elsewhere) and deletes occurrences no longer on it; visits keep recording only new strings within the caps. | The editor list is the page's real content; plan §11 "source: wst_occurrences produced by a scan". |
+| P49 | Editor list = page occurrences **plus site-wide strings** (toggle, default on), marked "Site-wide". | Header/menu/footer strings are what owners most often want to fix in context; a translation applies everywhere anyway. |
+| P50 | "Revert to machine translation" = remove the manual translation and translate the string now. "Remove translation" shows the original again. No old machine text is kept. | No schema change; the provider is the source of machine text. |
+| P51 | Editor isolation removes third-party callbacks by **file location** (plugins, must-use plugins, themes; the longest matching directory decides) from 15 admin hooks, and dequeues their assets by URL just before printing. Core callbacks/assets stay. | Plan §11 "only our bundle loads". Limitation: inline code a plugin attaches to a *core* script handle (`wp_add_inline_script('wp-element', …)`) is not removed; recorded as known issue 13. |
+| P52 | Safe preview keeps non-executable scripts (JSON, JSON-LD, templates) and removes executable ones plus every `on*` attribute; the frame is sandboxed without `allow-same-origin` even with "Run page scripts". | Page scripts, if run, cannot reach the editor, cookies or storage of the admin. |
+| P53 | "Translate entire site" (plan §8) is **not** in this phase: the owner's Phase 5 list is scan flow, list, autosave, bulk queue actions, preview, entry points. Bulk here is per page. | No dead controls; it needs a site URL list and a budget confirmation (to schedule; see "Exact next step"). |
+
+## Phase 5 acceptance (plan §16) — one line per criterion
+
+| Criterion | Result | Proof |
+|---|---|---|
+| Hostile plugin: the editor still opens and every string is editable | **PASS** | `tests/fixtures/hostile-plugin/` (removes jQuery and `window.wp`, throws, prints scripts in head/notices/footer, enqueues a breaking JS and CSS on front end and admin). `EditorScreenTest`: its callbacks are gone from all 15 hooks on the editor screen only, its assets dequeued, core and ours kept. Live (dev site, hostile plugin as must-use plugin, editor-role user): the plugin breaks `edit.php` (errors + notice); the editor page contains none of its code, **0 JavaScript errors**, scan found 130 strings, a translation typed and blurred → "Saved", persisted after reload, shown on `/bn/live-check/`. |
+| Preview failure degrades to list mode with a clear message | **PASS** | Live: with `preview.js` blocked the pane shows "The preview did not load … The string list works without it." after 8 s and a row still saves. Safe mode: the frame has no hostile script, shows the saved translation, click ↔ row highlight works. `PreviewTest`, `ScanTest::test_preview_*`. |
+| Scan flow | **PASS** | `ScanTest` (no caps, stale occurrences removed, manual no queue, off no redirect, personal confirmation, single-use token, page-bound token, default-language URL refused, visitor view), `EditorControllerTest` (capability, same-origin path validation incl. other host / `//` / `..` / admin / REST, drafts refused, loopback summary, cached copy detected, hashed token storage). |
+| String list, autosave, row and bulk actions | **PASS** | `PagesAndStringsControllerTest` (list with site-wide strings, filters/counts/search, warnings, queued count, manual save + purge + dequeue, inline markup check, mark manual, remove, capability, MT on manual pages switch). Live: autosave, invalid inline edit shows the reason and keeps the text, Esc restores. |
+| Entry points | **PASS** | `EditorScreenTest::test_toolbar_entry_on_front_end_pages`, `test_editors_reach_the_editor_but_not_the_settings`; live toolbar link `…?page=wst-editor&post=1852`; Pages screen, post panels and Overview link to `?page=wst-editor`. |
+| RTL, mobile | **PASS** | Live: RTL editor mirrored (list and preview swap sides); 390 px: list only, no horizontal overflow. |
+
 ## Phase 7 acceptance (planned) — moved here and added by the owner
 
 | Item | Status |
@@ -264,7 +297,11 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 - Phases 4–7 per plan §16.
 - Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
-- Deferred by design (built together with their phases, no dead settings now): "Open in translation editor", "Edit translations" on the Pages screen and "Allow MT suggestions in the editor on manual pages" (Phase 5); "Translate entire site" and safe preview (Phase 5 scans); §13A settings without a backend yet — digit conversion, dynamic content, language suggestion, sitemap alternates, CSV, TranslatePress (Phase 6); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Deferred by design (built together with their phases, no dead settings now): "Translate entire site" (P53, to schedule); §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, CSV, TranslatePress (Phase 6); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+
+## Files changed (Phase 5)
+
+`src/Editor/{Tokens,EditorRequest,PageTarget,Preview,AdminBar}.php`, `src/Admin/{EditorPage,Isolation}.php`, `src/Rest/{EditorController,StringsController}.php`, `src/Render/{Pipeline,PageContext,DiscoveryGate}.php`, `src/Modes/OffPages.php`, `src/Storage/StringStore.php` (scan recording, page times, editor list, by id, mark manual, delete translation), `src/Queue/Requests.php`, `src/Settings.php` (`editor_mt_on_manual`), `src/Admin/{AdminPage,PostPanel}.php`, `src/Plugin.php`, `assets/preview.js`, `assets-src/editor/*`, `assets-src/admin/{api.js,screens/{Pages,Overview,Translation}.js}`, `assets-src/post-panel/index.js`, `build/{editor,admin,post-panel}.*`, `package.json`; issue 11: `src/Html/InlineMarkup.php`, `src/Providers/RequestPlan.php`, `src/Queue/Worker.php`; release: `bin/build-zip.sh`, `.distignore`; tests `tests/Integration/Editor/*`, `tests/Integration/Rest/PagesAndStringsControllerTest.php`, `tests/Integration/{Html/InlineMarkupTest,Queue/WorkerTest,Storage/StringStoreTest}.php`, `tests/fixtures/hostile-plugin/*`, `tests/Support/FakeProvider.php`.
 
 ## Files changed (Phase 4)
 
@@ -289,11 +326,15 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 115 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,237 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 4 included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,283 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 5 included.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
-- `npm run lint:js`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`.
-- Live admin checks: a Playwright script in the session scratchpad (headless Chromium; not committed) — see Phase 4 acceptance.
+- `npm run lint:js`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
+- Live checks with Playwright scripts in the session scratchpad (headless Chromium; not committed) — see Phase 4 and Phase 5 acceptance.
+
+## Release zip
+
+`bin/build-zip.sh [--secret-file PATH]` builds `dist/wp-site-translator-<version>.zip` from the committed HEAD minus `.distignore`: it refuses a dirty tree, rebuilds `build/` and fails if it differs from the commit, checks the plugin header version against `Config::VERSION`, requires the runtime files (`uninstall.php`, `build/*`, `assets/*`, `blocks/*`), fails on development files (tests, fixtures, bin, docs, sources, configs, dotfiles, markdown, `*-rtl.css`) and on anything that looks like a key, and with `--secret-file` fails if that secret appears. 0.1.0 built from `3d73b8a` + the script commit: 93 files, 172 KB; installed from the zip on the dev site (front end and admin app working).
 
 ## Known issues
 
@@ -309,6 +350,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 10. Yoast SEO / Rank Math print their own canonical; the `off_behavior = original` canonical override uses core's `get_canonical_url` only. Check with those plugins in the Phase 7 compatibility pass.
 11. ~~Comment-form string failed with a tag mismatch on TranslateX~~ **fixed (P45)**: our bug, not the provider. `InlineMarkup::sanitize()` (`wp_kses` → `safecss_filter_attr`) rewrites `style="display:none;"` as `style="display:none"`, and `sameStructure()` compared attribute values byte for byte, so the original failed against its own sanitised copy whatever the provider returned (sentence and segment form alike; manual saves too). Live after the fix: both rows translated by TranslateX in one run, whole sentence (flags 0).
 12. Dev-only RTL check: an mu-plugin on the dev site sets `$wp_locale->text_direction = 'rtl'` on `after_setup_theme` and disables script concatenation (load-styles.php does not run plugins). Not part of the plugin.
+13. Editor isolation does not remove inline code that a plugin attaches to a **core** script handle (`wp_add_inline_script( 'wp-element', … )`) or core-handle data; such a plugin could still break the editor. Not seen in practice; the hostile fixture covers enqueued files, printed scripts, notices and head/footer output.
+14. Scans render as a visitor, so only published, public posts can be scanned; content shown only to logged-in users is not recorded.
 
 ## Dev environment setup (scripted)
 
@@ -336,5 +379,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner review of Phase 4 (screens, provider cards, decisions P35–P44).
-2. After approval, Phase 5 (Editor, plan §11, §16): conflict-proof translation editor with `GET /strings`, `POST /strings/{id}/translation`, scans (`POST /scan/register`), then add "Open editor", "Edit translations" and "Translate entire site" to the existing screens.
+1. Owner review of Phase 5 (editor, isolation, scan/preview decisions P46–P53) and a decision on "Translate entire site" (P53): build it now as a small follow-up (site URL list, client-side scans with progress, budget confirmation) or move it to Phase 6.
+2. After approval, Phase 6a (CSV import/export, plan §13A.3).

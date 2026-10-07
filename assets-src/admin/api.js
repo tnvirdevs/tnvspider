@@ -15,6 +15,10 @@ export function post( path, data = {} ) {
 	return apiFetch( { path: BASE + path, method: 'POST', data } );
 }
 
+export function del( path ) {
+	return apiFetch( { path: BASE + path, method: 'DELETE' } );
+}
+
 /**
  * GET returning the raw Response (for pagination headers).
  *

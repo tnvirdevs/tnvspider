@@ -10,13 +10,16 @@ declare(strict_types=1);
 namespace WST;
 
 use WST\Admin\AdminPage;
+use WST\Admin\EditorPage;
 use WST\Admin\Health;
+use WST\Admin\Isolation;
 use WST\Admin\PostPanel;
 use WST\Cache\Purger;
 use WST\Cli\ProviderCommand;
 use WST\Cli\QueueCommand;
 use WST\Cli\StringCommand;
 use WST\Database\Schema;
+use WST\Editor\AdminBar;
 use WST\Editor\EditorRequest;
 use WST\Editor\PageTarget;
 use WST\Editor\Preview;
@@ -113,6 +116,7 @@ final class Plugin {
 			// The language must be known before the locale and theme load.
 			( new Router( $settings, $target, $urls ) )->boot();
 			( new EditorRequest( $urls, $target ) )->boot();
+			( new AdminBar( $urls, $target, $modes ) )->boot();
 			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
 			( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 			( new OffPages( $settings, $modes, $byLang ) )->boot();
@@ -126,7 +130,8 @@ final class Plugin {
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
 			( new EditorController( $pageTarget ) )->boot();
 			if ( is_admin() ) {
-				( new PostPanel( self::strings(), $modes, $requests, $target, $file ) )->boot();
+				( new PostPanel( self::strings(), $modes, $requests, $target, $file, $settings->flag( 'editor_mt_on_manual' ) ) )->boot();
+				( new EditorPage( $settings, $target, $selector, new Isolation( $file ), $file ) )->boot();
 			}
 		}
 

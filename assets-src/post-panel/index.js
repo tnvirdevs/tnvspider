@@ -1,5 +1,6 @@
 /**
- * Block editor panel: page translation mode, coverage, "Translate this page now".
+ * Block editor panel: page translation mode, coverage, "Translate this page now"
+ * and the link to the translation editor.
  */
 import { registerPlugin } from '@wordpress/plugins';
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
@@ -8,6 +9,7 @@ import { useSelect } from '@wordpress/data';
 import { useEntityProp } from '@wordpress/core-data';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { addQueryArgs } from '@wordpress/url';
 import { __, _n, sprintf } from '@wordpress/i18n';
 
 const META_KEY = '_wst_mode';
@@ -15,6 +17,8 @@ const config = window.wstPostPanel || {
 	canTranslate: false,
 	modes: {},
 	language: '',
+	editorUrl: '',
+	mtOnManual: true,
 };
 
 const SOURCES = {
@@ -43,14 +47,18 @@ function coverageText( coverage ) {
 }
 
 function TranslationPanel() {
-	const { postType, postId, isSaving } = useSelect( ( select ) => {
-		const editor = select( 'core/editor' );
-		return {
-			postType: editor.getCurrentPostType(),
-			postId: editor.getCurrentPostId(),
-			isSaving: editor.isSavingPost() && ! editor.isAutosavingPost(),
-		};
-	}, [] );
+	const { postType, postId, isSaving, isPublished } = useSelect(
+		( select ) => {
+			const editor = select( 'core/editor' );
+			return {
+				postType: editor.getCurrentPostType(),
+				postId: editor.getCurrentPostId(),
+				isPublished: editor.isCurrentPostPublished(),
+				isSaving: editor.isSavingPost() && ! editor.isAutosavingPost(),
+			};
+		},
+		[]
+	);
 	const [ meta, setMeta ] = useEntityProp( 'postType', postType, 'meta' );
 	const [ info, setInfo ] = useState( null );
 	const [ status, setStatus ] = useState( null );
@@ -85,7 +93,15 @@ function TranslationPanel() {
 		info &&
 		! unsaved &&
 		'off' !== effective.mode &&
+		( config.mtOnManual || 'manual' !== effective.mode ) &&
 		info.coverage.total > info.coverage.translated;
+	const canEdit =
+		config.canTranslate &&
+		config.editorUrl &&
+		isPublished &&
+		info &&
+		! unsaved &&
+		'off' !== effective.mode;
 
 	const translateNow = () => {
 		setBusy( true );
@@ -163,6 +179,21 @@ function TranslationPanel() {
 			) }
 			{ config.canTranslate && ! info && ! status && <Spinner /> }
 			{ info && <p>{ coverageText( info.coverage ) }</p> }
+			{ canEdit && (
+				<p>
+					<Button
+						variant="primary"
+						href={ addQueryArgs( config.editorUrl, {
+							post: postId,
+						} ) }
+					>
+						{ __(
+							'Open in translation editor',
+							'wp-site-translator'
+						) }
+					</Button>
+				</p>
+			) }
 			{ canQueue && (
 				<Button
 					variant="secondary"

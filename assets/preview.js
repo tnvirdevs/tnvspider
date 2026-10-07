@@ -28,8 +28,12 @@
 				byText.set( text, String( item.id ) );
 			}
 		} );
-		document.querySelectorAll( '[' + ATTR + ']' ).forEach( ( el ) => el.removeAttribute( ATTR ) );
-		const elements = Array.from( document.body.querySelectorAll( '*' ) ).reverse();
+		document
+			.querySelectorAll( '[' + ATTR + ']' )
+			.forEach( ( el ) => el.removeAttribute( ATTR ) );
+		const elements = Array.from(
+			document.body.querySelectorAll( '*' )
+		).reverse();
 		elements.forEach( ( el ) => {
 			const id = byText.get( normalize( el.textContent || '' ) );
 			if ( id && ! el.querySelector( '[' + ATTR + '="' + id + '"]' ) ) {
@@ -50,13 +54,28 @@
 	}
 
 	window.addEventListener( 'message', ( event ) => {
-		if ( event.source !== parentWindow || ! event.data || 'object' !== typeof event.data ) {
+		if (
+			event.source !== parentWindow ||
+			! event.data ||
+			'object' !== typeof event.data
+		) {
 			return;
 		}
-		if ( 'wst-strings' === event.data.type && Array.isArray( event.data.items ) ) {
+		if (
+			'wst-strings' === event.data.type &&
+			Array.isArray( event.data.items )
+		) {
 			mark( event.data.items );
 		} else if ( 'wst-highlight' === event.data.type ) {
-			highlight( document.querySelector( '[' + ATTR + '="' + String( event.data.id ).replace( /[^0-9]/g, '' ) + '"]' ) );
+			highlight(
+				document.querySelector(
+					'[' +
+						ATTR +
+						'="' +
+						String( event.data.id ).replace( /[^0-9]/g, '' ) +
+						'"]'
+				)
+			);
 		}
 	} );
 
@@ -64,15 +83,25 @@
 		'click',
 		( event ) => {
 			event.preventDefault();
-			const el = event.target instanceof Element ? event.target.closest( '[' + ATTR + ']' ) : null;
+			const el =
+				event.target instanceof window.Element
+					? event.target.closest( '[' + ATTR + ']' )
+					: null;
 			if ( el ) {
 				highlight( el );
-				send( { type: 'wst-select', id: Number( el.getAttribute( ATTR ) ) } );
+				send( {
+					type: 'wst-select',
+					id: Number( el.getAttribute( ATTR ) ),
+				} );
 			}
 		},
 		true
 	);
-	document.addEventListener( 'submit', ( event ) => event.preventDefault(), true );
+	document.addEventListener(
+		'submit',
+		( event ) => event.preventDefault(),
+		true
+	);
 
 	function ready() {
 		send( { type: 'wst-preview-ready' } );
