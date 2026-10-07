@@ -24,6 +24,9 @@ final class EditorRequest {
 	public const SCAN_PARAM    = 'wst_scan';
 	public const PREVIEW_PARAM = 'wst_preview';
 
+	/** Cache-busting parameter the editor adds when a cached copy came back. */
+	public const NOCACHE_PARAM = 'wst_nocache';
+
 	/**
 	 * The verified request, or null.
 	 *
@@ -71,6 +74,7 @@ final class EditorRequest {
 			wp_die( esc_html__( 'This scan or preview link is invalid or has expired. Start it again from the translation editor.', 'wp-site-translator' ), '', array( 'response' => 403 ) );
 		}
 		self::header( 'X-WST-Scan-Id: ' . $token );
+		self::hideParams();
 		self::$current = array(
 			'type'  => $type,
 			'token' => $token,
@@ -115,6 +119,21 @@ final class EditorRequest {
 	public static function header( string $line ): void {
 		if ( ! headers_sent() ) {
 			header( $line );
+		}
+	}
+
+	/**
+	 * Remove our parameters from the request, so URLs WordPress builds from
+	 * the current request (the comment "Cancel reply" link, pagination) are
+	 * the visitor's URLs and never record the one-time token as text.
+	 */
+	private static function hideParams(): void {
+		$names = array( self::SCAN_PARAM, self::PREVIEW_PARAM, self::NOCACHE_PARAM );
+		if ( isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ) {
+			$_SERVER['REQUEST_URI'] = remove_query_arg( $names, wp_unslash( $_SERVER['REQUEST_URI'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only our parameters are removed.
+		}
+		foreach ( $names as $name ) {
+			unset( $_GET[ $name ], $_REQUEST[ $name ] );
 		}
 	}
 

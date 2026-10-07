@@ -249,6 +249,7 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P50 | "Revert to machine translation" = remove the manual translation and translate the string now. "Remove translation" shows the original again. No old machine text is kept. | No schema change; the provider is the source of machine text. |
 | P51 | Editor isolation removes third-party callbacks by **file location** (plugins, must-use plugins, themes; the longest matching directory decides) from 15 admin hooks, and dequeues their assets by URL just before printing. Core callbacks/assets stay. | Plan §11 "only our bundle loads". Limitation: inline code a plugin attaches to a *core* script handle (`wp_add_inline_script('wp-element', …)`) is not removed; recorded as known issue 13. |
 | P52 | Safe preview keeps non-executable scripts (JSON, JSON-LD, templates) and removes executable ones plus every `on*` attribute; the frame is sandboxed without `allow-same-origin` even with "Run page scripts". | Page scripts, if run, cannot reach the editor, cookies or storage of the admin. |
+| P54 | After the token is verified, `wst_scan`, `wst_preview` and `wst_nocache` are removed from `REQUEST_URI`, `$_GET` and `$_REQUEST`. | Found live: core builds the comment "Cancel reply" link from the current URL, so every scan recorded a new string containing its own token and queued it. Regression test `ScanTest::test_urls_built_from_the_request_do_not_carry_the_token`; live rescan: 0 new strings. |
 | P53 | "Translate entire site" (plan §8) is **not** in this phase: the owner's Phase 5 list is scan flow, list, autosave, bulk queue actions, preview, entry points. Bulk here is per page. | No dead controls; it needs a site URL list and a budget confirmation (to schedule; see "Exact next step"). |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -326,7 +327,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 115 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,283 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 5 included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,284 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 5 included.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
 - `npm run lint:js`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
@@ -379,5 +380,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner review of Phase 5 (editor, isolation, scan/preview decisions P46–P53) and a decision on "Translate entire site" (P53): build it now as a small follow-up (site URL list, client-side scans with progress, budget confirmation) or move it to Phase 6.
+1. Owner review of Phase 5 (editor, isolation, scan/preview decisions P46–P54) and a decision on "Translate entire site" (P53): build it now as a small follow-up (site URL list, client-side scans with progress, budget confirmation) or move it to Phase 6.
 2. After approval, Phase 6a (CSV import/export, plan §13A.3).

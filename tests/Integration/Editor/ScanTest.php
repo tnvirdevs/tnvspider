@@ -290,4 +290,14 @@ final class ScanTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<p>Scan one</p>', $html );
 		$this->assertStringContainsString( 'id="wst-preview-js"', $html );
 	}
+
+	public function test_urls_built_from_the_request_do_not_carry_the_token(): void {
+		$token = $this->token();
+
+		$this->scan( '/bn/scan-page/?wst_scan=' . $token . '&wst_nocache=123' );
+
+		$this->assertStringNotContainsString( 'wst_', (string) $_SERVER['REQUEST_URI'] );
+		$this->assertArrayNotHasKey( EditorRequest::SCAN_PARAM, $_GET ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Inspecting the test request.
+		$this->assertStringNotContainsString( $token, remove_query_arg( 'replytocom' ), 'The comment "Cancel reply" link is built like this.' );
+	}
 }
