@@ -148,6 +148,23 @@ final class RouterTest extends WP_UnitTestCase {
 		$this->assertTrue( Current::isTarget() );
 	}
 
+	public function test_unprefixed_wc_ajax_takes_the_language_of_the_page(): void {
+		$_SERVER['REQUEST_URI']  = '/?wc-ajax=get_refreshed_fragments';
+		$_GET['wc-ajax']         = 'get_refreshed_fragments';
+		$_SERVER['HTTP_REFERER'] = 'http://example.org/bn/shop/';
+		Router::forSite( new Settings( array( 'target_language' => 'bn_BD' ), 'en_US', new Registry() ) )?->detect();
+		$this->assertTrue( Current::isTarget(), 'Referer of a translated page.' );
+
+		$_SERVER['HTTP_REFERER'] = 'http://example.org/shop/';
+		Router::forSite( new Settings( array( 'target_language' => 'bn_BD' ), 'en_US', new Registry() ) )?->detect();
+		$this->assertFalse( Current::isTarget() );
+
+		$_SERVER['REQUEST_URI'] = '/bn/?wc-ajax=get_refreshed_fragments';
+		Router::forSite( new Settings( array( 'target_language' => 'bn_BD' ), 'en_US', new Registry() ) )?->detect();
+		$this->assertTrue( Current::isTarget(), 'A prefixed AJAX URL is in the target language whatever the referer.' );
+		unset( $_GET['wc-ajax'] );
+	}
+
 	public function test_admin_requests_are_never_target(): void {
 		$_SERVER['REQUEST_URI']  = '/wp-admin/edit.php';
 		$_SERVER['HTTP_REFERER'] = 'http://example.org/bn/shop/';

@@ -19,7 +19,7 @@ use WST\Storage\StringStore;
  */
 final class StringCommand {
 
-	private const KINDS = array( Segment::TEXT, Segment::INLINE, Segment::ATTR, Segment::TITLE, Segment::META );
+	private const KINDS = array( Segment::TEXT, Segment::INLINE, Segment::ATTR, Segment::TITLE, Segment::META, Segment::DYNAMIC );
 
 	/**
 	 * Create the command.

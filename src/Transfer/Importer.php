@@ -45,7 +45,7 @@ final class Importer {
 	/** Most data rows per file. */
 	public const MAX_FILE_ROWS = 100000;
 
-	private const KINDS = array( Segment::TEXT, Segment::INLINE, Segment::ATTR, Segment::TITLE, Segment::META );
+	private const KINDS = array( Segment::TEXT, Segment::INLINE, Segment::ATTR, Segment::TITLE, Segment::META, Segment::DYNAMIC );
 
 	/**
 	 * Create the importer.

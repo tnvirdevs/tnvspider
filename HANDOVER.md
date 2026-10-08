@@ -62,6 +62,12 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - **Translator → Migration** (shown while the TranslatePress plugin, its settings or its dictionary tables exist): pair and row counts per status; (1) TranslatePress vs our languages, URL slugs and default-language prefix side by side, one button copies them (through the normal settings validation); (2) dry run and import in chunks of 1,000 TranslatePress rows with a progress bar, conflict policy (keep existing = default, overwrite machine, overwrite all), rows needing attention listed; (3) match report for up to 20 paths; content references (posts, widgets, menus with edit links) and the `[language-switcher]` alias toggle; **Go live** checklist with live state: deactivate TranslatePress → flush permalinks (button) → slugs match → scan key pages (link to "Translate entire site") → compare translated URLs (ours vs TranslatePress, "Same"/"Different").
 - REST (`manage_options`): `GET /migration/status`, `POST /migration/settings`, `POST /migration/import`, `POST /migration/match`, `POST /migration/flush`.
 
+**Phase 6c — Dynamic content: done (2026-10-08).** Plan §13A.5; acceptance in "Phase 6c acceptance".
+- **(a) Fragments**: target-language AJAX (`admin-ajax.php`, WooCommerce `wc-ajax` — cart fragments, add to cart, order review, checkout) and REST responses are translated with existing translations: JSON values containing HTML (as fragments, internal links prefixed) and plain text under allowlisted keys (default `message, messages, notice, notices, error, errors, html, content, label, title`, editable), ≤ 5 levels; keys, numbers, booleans, ids, URLs, hashes, nonces and tokens untouched; unchanged bodies come back byte for byte; fail-open with a log entry. Toggle "Translate AJAX and REST responses" (default on).
+- **(b) Lookup**: toggle "Translate dynamic content" (default off) loads `assets/dynamic.js` (5.6 KB, 2.2 KB gzipped) on translated target pages; it observes added nodes (debounced 100 ms), skips excluded areas, form fields and `contenteditable`, and asks `POST /wst/v1/lookup` (public, read-only, ≤ 100 texts × 2,000 characters, 60 requests/minute per visitor IP, never creates strings) for existing translations. Visitor IP from the trusted-proxy setting (none / Cloudflare / X-Forwarded-For last address / custom header).
+- **(c) Dynamic scan**: editor button "Scan dynamic content" opens the page in a new tab with a signed token (30 min, bound to the user and page); a small bar counts texts found and new ones; texts go to `POST /scan/dynamic` (wst_translate + nonce), stored as kind `dynamic` with the page occurrence, queued as the page's mode allows (never on personal pages).
+- Settings on Advanced → "Dynamic content", with the known limit (text assembled by script concatenation) in the help.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -294,6 +300,13 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P76 | Settings prefill copies default language, target language, both URL slugs and the default-language prefix from TranslatePress for the chosen table, through `SettingsController::apply()` (the normal validation, cache purge); a language our registry lacks is refused (409) with its code. With more than two TranslatePress languages the owner picks one table (V1 has one target). | Same addresses after the switch; no second validation path. |
 | P77 | `[language-switcher]` alias (setting `trp_switcher_alias`, default on) is registered only when TranslatePress is inactive and nobody else registered it; `[trp_language]`, `[language-include]`, `[language-exclude]` are only reported. | Plan: optional alias, default on during migration; the others need content decisions. |
 | P78 | Test fixture tables for TranslatePress are real tables created once per class (`wpSetUpBeforeClass`); per-test data is deleted inside the test transaction. | DDL inside a test commits the WordPress test transaction (found when leftovers appeared); temporary tables are invisible to `SHOW TABLES`. |
+| P79 | Fragments are translated by one output buffer for AJAX requests (and `rest_post_dispatch` for REST) instead of per-endpoint WooCommerce filters; existing translations only, no discovery or queueing. | One path covers all four wc-ajax endpoints and other plugins' AJAX; cart/checkout fragments may carry personal data (§6A), so they never create strings. |
+| P80 | JSON is decoded as objects (so `{}` stays `{}`), only string values change, and the body is re-encoded with `wp_json_encode` only when something changed. Protected keys: `/nonce|token|hash|key|url|href|src|redirect|^ids?$|_ids?$|^id_/i`. | Keeps responses identical when there is nothing to translate; never touches what scripts use as identifiers. |
+| P81 | Router fix (found live): unprefixed AJAX/REST URLs (`/?wc-ajax=`, `?rest_route=`) now take the language from `wst_lang` or the referer; before, only exempt paths (admin-ajax, wp-json) did. Prefixed AJAX URLs (`/bn/?wc-ajax=`, what WooCommerce builds on translated pages) were already target. Regression test `RouterTest::test_unprefixed_wc_ajax_takes_the_language_of_the_page`. | Plan §13A.5: language from `wst_lang`, else the referer. |
+| P82 | `/lookup` is registered only while "Translate dynamic content" is on; rate limit 60 requests/minute per IP in a transient keyed by a hash of IP + minute (no raw IP stored); X-Forwarded-For uses the **last** address (the one the trusted proxy added); invalid header values fall back to `REMOTE_ADDR`. No REST nonce (cached pages, logged-out visitors). | Plan: public, read-only, per-IP limit, trusted proxy. |
+| P83 | `dynamic.js` is plain JS (not built), deferred in the footer, observes nodes added **after it starts**; text that scripts insert while the page is still loading is not seen (found live on the slow dev server). | Observing from the start of parsing would send every server-rendered string; dynamic content normally arrives after load (mini-cart, AJAX, popups). |
+| P84 | Dynamic-scan strings: new segment kind `dynamic` (also accepted by CSV import and WP-CLI); token type `dynamic` (30 min, reusable, bound to the user who started it); the token is removed from the request so links built from the URL do not carry it; queued at visitor priority when the page is auto and not personal. | Plan §13A.5c "queued according to the resolved mode". |
+| P85 | The editor's "Scan dynamic content" button keeps its visible text as the accessible name; the explanation is its `description` (found when the button's `label` replaced the name). | WCAG label-in-name. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -352,6 +365,17 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Phase 6c acceptance (plan §16)
+
+- PASS — WooCommerce fragments translated: live on the dev site (WooCommerce PHP from source), `POST /bn/?wc-ajax=get_refreshed_fragments` and `/?wc-ajax=…` with a `/bn/` referer return the mini-cart with "কার্টে কোনো পণ্য নেই।"; the same request from an English page is untouched. Add-to-cart uses the same response path; the browser flow could not run because this WooCommerce has no JavaScript build (known issue 9). `DynamicContentTest::test_woocommerce_fragments_json_is_translated_safely` (selectors, hash, nonce, numbers untouched; links prefixed; allowlisted keys), `test_unchanged_invalid_or_deep_bodies_come_back_byte_for_byte`, `test_html_bodies_and_rest_responses_are_translated_only_on_target_requests`.
+- PASS — `/lookup` cannot create strings and is rate-limited: `test_lookup_is_public_read_only_and_limited` (route absent when off, only existing translations, string count unchanged, 100/2,000 limits), `test_lookup_rate_limit_per_visitor_ip_with_trusted_proxy` (61st request 429, another visitor behind the proxy not limited), `test_client_ip_from_each_trusted_proxy_setting`. Live: a page whose script adds "View cart" and a placeholder after load shows "কার্ট দেখুন" / "পণ্য খুঁজুন", unknown text stays English, 2 lookup requests, string count unchanged (3,046).
+- PASS — Dynamic scan stores strings: `test_dynamic_scan_records_kind_dynamic_and_queues_by_mode` (kind `dynamic`, page occurrence, queued on auto pages only, token bound to its user, editors only). Live: editor → "Scan dynamic content" → new tab with the bar "3 texts found, 1 new"; the new text stored as `dynamic`, on the page, queued at priority 5; no link on the page carries the token.
+- PASS — Script loading: `test_script_loads_for_lookup_and_scan_mode_only_where_it_should` (target pages only, not "off" pages, no nonce/token on cached pages, token stripped from the request). Advanced → Dynamic content at 1280 and 390 px without overflow.
+
+## Files changed (Phase 6c)
+
+`src/Dynamic/{Fragments,Client}.php`, `src/Rest/DynamicController.php`, `assets/dynamic.js`, `src/Render/Pipeline.php` (`translateFragment`, `translateTexts`, extracted `neutralKinds`/`translationsFor`), `src/Routing/Router.php` (P81), `src/Settings.php` (`dynamic_fragments`, `dynamic_json_keys`, `dynamic_lookup`, `trusted_proxy`, `trusted_proxy_header`), `src/Html/Segment.php` (`DYNAMIC`), `src/Editor/Tokens.php` (`DYNAMIC`), `src/Transfer/Importer.php`, `src/Cli/StringCommand.php` (kinds), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `assets-src/editor/Editor.js`, `build/{admin,editor}.*`, tests `tests/Integration/Dynamic/DynamicContentTest.php`, `tests/Integration/Routing/RouterTest.php`.
 
 ## Phase 6b acceptance (plan §16)
 
@@ -422,7 +446,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,336 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6b included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,345 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6c included.
 - `npm run test:js` (Node's built-in test runner, no extra dependency): 4 tests green.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
@@ -451,6 +475,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 14. Scans render as a visitor, so only published, public posts can be scanned (drafts get a message, P58); content shown only to logged-in users is not recorded; pages that redirect visitors (checkout without a cart) cannot be scanned.
 15. Dev site (scratchpad, not the plugin): TranslatePress 3.3.7 installed and **inactive** with its dictionary filled for 6b checks; `DISABLE_WP_CRON` is set in its `wp-config.php` so bulk queue tests send nothing to TranslateX (`wp cron event run --due-now` to run the queue on purpose); a "Contact" page and "TP Menu" menu exist for the references check.
 16. The 6b dataset is TranslatePress-generated originals with translations filled in by script (TranslatePress needs a paid/keyed provider to translate itself); the owner's real export is the remaining check.
+17. Dynamic lookup does not see text that scripts insert while the page is still loading (P83); such text is not translated on the page (server-rendered HTML is).
 
 ## Dev environment setup (scripted)
 
@@ -478,5 +503,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: review "Translate entire site" (P67–P71) and Phase 6b (P72–P78); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
-2. Phase 6c (plan §13A.5): dynamic content.
+1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) and 6c (P79–P85); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
+2. Phase 6d (plan §13A.6): digit conversion.

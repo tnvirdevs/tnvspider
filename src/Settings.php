@@ -55,6 +55,15 @@ final class Settings {
 	/** Largest vertical offset accepted, in pixels. */
 	public const SWITCHER_OFFSET_MAX = 400;
 
+	/** JSON keys whose plain-text values are translated in AJAX/REST responses (plan §13A.5). */
+	public const DYNAMIC_JSON_KEYS = array( 'message', 'messages', 'notice', 'notices', 'error', 'errors', 'html', 'content', 'label', 'title' );
+
+	/** Where the visitor IP for the lookup rate limit comes from: REMOTE_ADDR, CF-Connecting-IP, X-Forwarded-For or a custom header. */
+	public const TRUSTED_PROXIES = array( 'none', 'cloudflare', 'forwarded', 'custom' );
+
+	/** JSON keys and header names: letters, digits, "_" and "-". */
+	private const KEY_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/';
+
 	/** Switcher colours: follow the theme, light, dark, or custom colours. */
 	public const SWITCHER_THEMES = array( 'inherit', 'light', 'dark', 'custom' );
 
@@ -126,7 +135,12 @@ final class Settings {
 	 *     terms_case_insensitive: bool,
 	 *     terms_whole_word: bool,
 	 *     editor_mt_on_manual: bool,
-	 *     trp_switcher_alias: bool
+	 *     trp_switcher_alias: bool,
+	 *     dynamic_fragments: bool,
+	 *     dynamic_json_keys: list<string>,
+	 *     dynamic_lookup: bool,
+	 *     trusted_proxy: string,
+	 *     trusted_proxy_header: string
 	 * }
 	 */
 	private array $values;
@@ -286,13 +300,29 @@ final class Settings {
 	}
 
 	/**
+	 * JSON keys whose plain-text values are translated in AJAX/REST responses.
+	 *
+	 * @return list<string>
+	 */
+	public function dynamicJsonKeys(): array {
+		return $this->values['dynamic_json_keys'];
+	}
+
+	/**
+	 * Custom header with the visitor IP (trusted_proxy = custom), or ''.
+	 */
+	public function trustedProxyHeader(): string {
+		return $this->values['trusted_proxy_header'];
+	}
+
+	/**
 	 * A choice setting (name_style, switcher_style, switcher_position, switcher_theme).
 	 *
 	 * @param string $key Setting key.
 	 * @throws \InvalidArgumentException For a key that is not a choice.
 	 */
 	public function choice( string $key ): string {
-		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level' ), true ) ) {
+		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level', 'trusted_proxy' ), true ) ) {
 			throw new \InvalidArgumentException( 'Not a choice setting: ' . esc_html( $key ) );
 		}
 
@@ -383,7 +413,12 @@ final class Settings {
 	 *     terms_case_insensitive: bool,
 	 *     terms_whole_word: bool,
 	 *     editor_mt_on_manual: bool,
-	 *     trp_switcher_alias: bool
+	 *     trp_switcher_alias: bool,
+	 *     dynamic_fragments: bool,
+	 *     dynamic_json_keys: list<string>,
+	 *     dynamic_lookup: bool,
+	 *     trusted_proxy: string,
+	 *     trusted_proxy_header: string
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -431,6 +466,11 @@ final class Settings {
 			'terms_whole_word'        => self::readBool( $raw, 'terms_whole_word', true ),
 			'editor_mt_on_manual'     => self::readBool( $raw, 'editor_mt_on_manual', true ),
 			'trp_switcher_alias'      => self::readBool( $raw, 'trp_switcher_alias', true ),
+			'dynamic_fragments'       => self::readBool( $raw, 'dynamic_fragments', true ),
+			'dynamic_json_keys'       => array_values( array_filter( self::readList( $raw, 'dynamic_json_keys', self::DYNAMIC_JSON_KEYS ), static fn( string $key ): bool => 1 === preg_match( self::KEY_PATTERN, $key ) ) ),
+			'dynamic_lookup'          => self::readBool( $raw, 'dynamic_lookup', false ),
+			'trusted_proxy'           => self::readChoice( $raw, 'trusted_proxy', self::TRUSTED_PROXIES ),
+			'trusted_proxy_header'    => isset( $raw['trusted_proxy_header'] ) && is_string( $raw['trusted_proxy_header'] ) && 1 === preg_match( self::KEY_PATTERN, trim( $raw['trusted_proxy_header'] ) ) ? trim( $raw['trusted_proxy_header'] ) : '',
 		);
 	}
 

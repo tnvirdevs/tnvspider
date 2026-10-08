@@ -23,6 +23,9 @@ final class Segment {
 	public const TITLE  = 'title';
 	public const META   = 'meta';
 
+	/** Text added by JavaScript, found by the dynamic scan (plan §13A.5c); never produced by the extractor. */
+	public const DYNAMIC = 'dynamic';
+
 	/**
 	 * Inline segment this one sits inside, if any. When the parent is
 	 * replaced, this segment is not applied separately.

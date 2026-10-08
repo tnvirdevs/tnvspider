@@ -91,9 +91,10 @@ final class Router {
 		$relative = $this->urls->relativePath( '' === $uri ? '/' : $uri );
 		$isTarget = false;
 
-		if ( null !== $relative && ! $this->urls->isExempt( $relative ) ) {
-			$isTarget = $this->urls->hasPrefix( $relative, $this->target->slug() );
+		if ( null !== $relative && ! $this->urls->isExempt( $relative ) && $this->urls->hasPrefix( $relative, $this->target->slug() ) ) {
+			$isTarget = true;
 		} elseif ( $this->isAjaxOrRest( (string) $relative ) ) {
+			// Unprefixed AJAX/REST URLs (admin-ajax.php, /wp-json/, ?wc-ajax=, ?rest_route=) take the page's language.
 			$isTarget = $this->targetFromAjax();
 		}
 

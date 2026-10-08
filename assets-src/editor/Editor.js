@@ -149,6 +149,29 @@ export default function Editor() {
 			.catch( ( e ) => setListError( errorText( e ) ) );
 	}, [ page, query ] );
 
+	const scanDynamic = () => {
+		// Opened before the request so popup blockers allow it.
+		const tab = window.open( '', '_blank' );
+		post( '/scan/dynamic/register', pageRef )
+			.then( ( response ) => {
+				if ( tab ) {
+					tab.location.href = response.url;
+				} else {
+					window.location.href = response.url;
+				}
+			} )
+			.catch( ( e ) => {
+				if ( tab ) {
+					tab.close();
+				}
+				setScan( {
+					running: false,
+					notice: { status: 'error', text: errorText( e ) },
+					confirm: false,
+				} );
+			} );
+	};
+
 	const runScan = useCallback(
 		( allowPersonal = false ) => {
 			setScan( { running: true, notice: null, confirm: false } );
@@ -500,6 +523,22 @@ export default function Editor() {
 					>
 						{ __( 'Scan page', 'wp-site-translator' ) }
 					</Button>
+					{ ! config.paused && page.mode !== 'off' && (
+						<Button
+							variant="secondary"
+							onClick={ scanDynamic }
+							description={ __(
+								'Opens the page in a new tab; texts that its scripts add (menus, mini-cart, tabs, popups) are collected while you use it.',
+								'wp-site-translator'
+							) }
+							showTooltip
+						>
+							{ __(
+								'Scan dynamic content',
+								'wp-site-translator'
+							) }
+						</Button>
+					) }
 					{ canMt && page.mode !== 'off' && (
 						<Button
 							variant="primary"

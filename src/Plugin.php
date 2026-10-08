@@ -19,6 +19,8 @@ use WST\Cli\ProviderCommand;
 use WST\Cli\QueueCommand;
 use WST\Cli\StringCommand;
 use WST\Database\Schema;
+use WST\Dynamic\Client;
+use WST\Dynamic\Fragments;
 use WST\Editor\AdminBar;
 use WST\Editor\EditorRequest;
 use WST\Editor\PageTarget;
@@ -45,6 +47,7 @@ use WST\Queue\Worker;
 use WST\Render\DiscoveryGate;
 use WST\Render\HeadTags;
 use WST\Render\Pipeline;
+use WST\Rest\DynamicController;
 use WST\Rest\EditorController;
 use WST\Rest\HealthController;
 use WST\Rest\ImportController;
@@ -128,6 +131,7 @@ final class Plugin {
 			$byLang = new LanguageUrls( $urls, $target, LanguageUrls::origin( $home ) );
 			$modes  = new Resolver( $settings, $urls, $target );
 
+			$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
 			if ( ! $frontEndOff ) {
 				// The language must be known before the locale and theme load.
 				( new Router( $settings, $target, $urls ) )->boot();
@@ -136,8 +140,10 @@ final class Plugin {
 				( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
 				( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 				( new OffPages( $settings, $modes, $byLang ) )->boot();
-				$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
-				( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) ) )->boot();
+				$pipeline = new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) );
+				$pipeline->boot();
+				( new Fragments( $settings, $pipeline, $logger ) )->boot();
+				( new Client( $settings, $modes, $file ) )->boot();
 			}
 			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
 			$purger->boot();
@@ -146,6 +152,9 @@ final class Plugin {
 			( new StringsController( $requests, $target, $scheduler, $worker, self::strings(), $pageTarget ) )->boot();
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
 			( new EditorController( $pageTarget ) )->boot();
+			if ( ! $frontEndOff ) {
+				( new DynamicController( $settings, $pipeline, self::strings(), $pageTarget, $modes, $auto, $target ) )->boot();
+			}
 			( new ImportController( new Importer( self::strings(), $target ) ) )->boot();
 			( new SiteController( new SitePages( $settings, $modes, $urls, $target ), self::strings(), $requests, $queue, $status, $target ) )->boot();
 			( new Exporter( self::strings(), $target ) )->boot();

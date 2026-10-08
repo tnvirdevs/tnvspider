@@ -16,6 +16,7 @@ use WST\Html\Extractor;
 use WST\Html\InlineMarkup;
 use WST\Html\Replacer;
 use WST\Html\Segment;
+use WST\Html\Text;
 use WST\Html\Selectors;
 use WST\Languages\Current;
 use WST\Languages\Language;
@@ -172,8 +173,86 @@ final class Pipeline {
 			return $this->forPreview( $this->setDocumentLanguage( $html, $this->settings->defaultLanguage() ), $context );
 		}
 
-		// Inline originals are stored language-neutral: internal links in
-		// them lose the language prefix, so the slug never changes a hash.
+		[ $kinds, $neutral ] = $this->neutralKinds( $segments );
+		$lang                = $this->target->locale();
+		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $lang );
+		if ( Tokens::SCAN === $context->editor ) {
+			return (string) wp_json_encode( $this->scan( $kinds, $found, $context ) );
+		}
+		[ $translations, $untranslated ] = $this->translationsFor( $kinds, $neutral, $found );
+
+		if ( $context->discoverable ) {
+			$untranslated = array_merge( $untranslated, array_values( $this->discover( array_diff_key( $kinds, $found ), $context ) ) );
+			$this->auto->queue( $untranslated, $this->target );
+		}
+		// Rows waiting for a provider that cannot run now (none selected,
+		// paused, out of budget) must not keep the page out of caches.
+		$this->pending = array() === $untranslated || '' === $this->auto->provider( $this->target ) ? 0 : $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
+
+		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+
+		return $this->forPreview( $this->setDocumentLanguage( $html, $this->target ), $context );
+	}
+
+	/**
+	 * Translate an HTML fragment of an AJAX or REST response (plan §13A.5a)
+	 * with existing translations only: no discovery, no queueing, no
+	 * document language, head or cache work. Internal links get the prefix.
+	 *
+	 * @param string $html Fragment.
+	 */
+	public function translateFragment( string $html ): string {
+		$extractor           = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
+		$segments            = $extractor->extract( $html );
+		[ $kinds, $neutral ] = $this->neutralKinds( $segments );
+		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $this->target->locale() );
+		[ $translations ]    = $this->translationsFor( $kinds, $neutral, $found );
+
+		return ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+	}
+
+	/**
+	 * Existing translations of plain texts (JSON values, text added by
+	 * scripts), keeping each text's leading and trailing whitespace.
+	 *
+	 * @param string[] $texts Texts as they appear.
+	 * @phpstan-param list<string> $texts
+	 * @return array<string, string> Text => translation, only for translated texts.
+	 */
+	public function translateTexts( array $texts ): array {
+		$normalized = array();
+		foreach ( $texts as $text ) {
+			$core = Text::normalize( $text );
+			if ( Text::isTranslatable( $core ) ) {
+				$normalized[ $text ] = $core;
+			}
+		}
+		if ( array() === $normalized ) {
+			return array();
+		}
+		$found = $this->store->lookup( array_values( array_unique( $normalized ) ), $this->target->locale() );
+		$out   = array();
+		foreach ( $normalized as $text => $core ) {
+			$translation = $found[ $core ]['translated'] ?? null;
+			if ( null !== $translation ) {
+				[ $lead, , $trail ]    = Text::splitEdges( (string) $text );
+				$out[ (string) $text ] = $lead . $translation . $trail;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Kind of each language-neutral original and the neutral form of each
+	 * segment text. Inline originals are stored language-neutral: internal
+	 * links in them lose the language prefix, so the slug never changes a hash.
+	 *
+	 * @param Segment[] $segments Segments.
+	 * @phpstan-param list<Segment> $segments
+	 * @return array{0: array<string, string>, 1: array<string, string>} Neutral original => kind; segment text => neutral original.
+	 */
+	private function neutralKinds( array $segments ): array {
 		$kinds   = array();
 		$neutral = array();
 		foreach ( $segments as $segment ) {
@@ -182,12 +261,20 @@ final class Pipeline {
 			}
 			$kinds[ $neutral[ $segment->text ] ] = $kinds[ $neutral[ $segment->text ] ] ?? $segment->kind;
 		}
-		$lang  = $this->target->locale();
-		$found = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $lang );
-		if ( Tokens::SCAN === $context->editor ) {
-			return (string) wp_json_encode( $this->scan( $kinds, $found, $context ) );
-		}
 
+		return array( $kinds, $neutral );
+	}
+
+	/**
+	 * Usable translations by segment text, and the ids of known strings
+	 * without a translation.
+	 *
+	 * @param array<string, string>                                                    $kinds   Neutral original => kind.
+	 * @param array<string, string>                                                    $neutral Segment text => neutral original.
+	 * @param array<string, array{id: int, translated: string|null, status: int|null}> $found   Known strings.
+	 * @return array{0: array<string, string>, 1: list<int>}
+	 */
+	private function translationsFor( array $kinds, array $neutral, array $found ): array {
 		$byNeutral    = array();
 		$untranslated = array();
 		foreach ( $found as $text => $entry ) {
@@ -207,17 +294,7 @@ final class Pipeline {
 			}
 		}
 
-		if ( $context->discoverable ) {
-			$untranslated = array_merge( $untranslated, array_values( $this->discover( array_diff_key( $kinds, $found ), $context ) ) );
-			$this->auto->queue( $untranslated, $this->target );
-		}
-		// Rows waiting for a provider that cannot run now (none selected,
-		// paused, out of budget) must not keep the page out of caches.
-		$this->pending = array() === $untranslated || '' === $this->auto->provider( $this->target ) ? 0 : $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
-
-		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
-
-		return $this->forPreview( $this->setDocumentLanguage( $html, $this->target ), $context );
+		return array( $translations, $untranslated );
 	}
 
 	/**

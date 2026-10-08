@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import { errorText, get, post } from '../api';
-import { Choice, Lines, Section, Toggle } from '../fields';
+import { Choice, Lines, Section, Text, Toggle } from '../fields';
 import { Chip, number } from '../format';
 
 function LogViewer() {
@@ -428,6 +428,93 @@ export default function Advanced( {
 						'wp-site-translator'
 					) }
 				/>
+			</Section>
+			<Section
+				title={ __( 'Dynamic content', 'wp-site-translator' ) }
+				description={ __(
+					'Text that arrives after the page loads: cart fragments, AJAX responses and text that scripts add. Only existing translations are used; nothing here creates strings or calls a provider.',
+					'wp-site-translator'
+				) }
+			>
+				<Toggle
+					{ ...fields }
+					name="dynamic_fragments"
+					label={ __(
+						'Translate AJAX and REST responses on translated pages (WooCommerce cart fragments, add to cart, order review, checkout messages)',
+						'wp-site-translator'
+					) }
+				/>
+				<Lines
+					{ ...fields }
+					name="dynamic_json_keys"
+					label={ __(
+						'JSON keys whose plain-text values are translated',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'One per line. Values that contain HTML are translated under any key; keys, numbers, IDs, URLs and nonces never change.',
+						'wp-site-translator'
+					) }
+				/>
+				<Toggle
+					{ ...fields }
+					name="dynamic_lookup"
+					label={ __(
+						'Translate dynamic content: text that scripts add to the page',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'A small script asks for existing translations of new text (public, read-only, limited to 60 requests a minute per visitor). Text assembled by scripts, such as "Items: " plus a number, cannot be matched. Use "Scan dynamic content" in the editor to collect such texts.',
+						'wp-site-translator'
+					) }
+				/>
+				<Choice
+					{ ...fields }
+					name="trusted_proxy"
+					label={ __(
+						'Visitor address for the rate limit',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'Behind Cloudflare or another proxy every visitor arrives from the proxy address; choose the header the proxy sets, or all visitors share one limit. Only choose a header your proxy always sets: visitors can send any header themselves.',
+						'wp-site-translator'
+					) }
+					options={ [
+						{
+							value: 'none',
+							label: __(
+								'Direct connection (no proxy)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'cloudflare',
+							label: __(
+								'Cloudflare (CF-Connecting-IP)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'forwarded',
+							label: __(
+								'Proxy or load balancer (X-Forwarded-For, last address)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'custom',
+							label: __( 'Custom header', 'wp-site-translator' ),
+						},
+					] }
+				/>
+				{ fields.draft.trusted_proxy === 'custom' && (
+					<Text
+						{ ...fields }
+						name="trusted_proxy_header"
+						label={ __( 'Header name', 'wp-site-translator' ) }
+						placeholder="X-Real-IP"
+					/>
+				) }
 			</Section>
 			<Section title={ __( 'Log', 'wp-site-translator' ) }>
 				<Choice

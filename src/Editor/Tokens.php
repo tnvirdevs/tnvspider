@@ -15,18 +15,20 @@ use WST\Config;
  * A token is 128 random bits, issued over REST to a user with the
  * wst_translate capability and bound to one page path. Only a hash of it is
  * stored (as a transient), so the database never holds a usable token.
- * Scan tokens work once; preview tokens until they expire (the frame may
- * reload).
+ * Scan tokens work once; preview and dynamic-scan tokens until they expire
+ * (the frame may reload; the admin browses the page for a while).
  */
 final class Tokens {
 
 	public const SCAN    = 'scan';
 	public const PREVIEW = 'preview';
+	public const DYNAMIC = 'dynamic';
 
 	/** Lifetime in seconds. */
 	private const TTL = array(
 		self::SCAN    => 300,
 		self::PREVIEW => 900,
+		self::DYNAMIC => 1800,
 	);
 
 	/**
