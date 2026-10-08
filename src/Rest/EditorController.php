@@ -45,8 +45,8 @@ final class EditorController {
 	 * Register the routes.
 	 */
 	public function register(): void {
-		$can    = static fn(): bool => current_user_can( Access::CAPABILITY );
-		$page   = array(
+		$can  = static fn(): bool => current_user_can( Access::CAPABILITY );
+		$page = array(
 			'post_id' => array(
 				'type'    => 'integer',
 				'minimum' => 1,
@@ -56,27 +56,28 @@ final class EditorController {
 				'maxLength' => 255,
 			),
 		);
-		$routes = array(
+		// record_only: record the strings but queue nothing ("Translate entire site" queues after confirmation).
+		$scanArgs = array(
+			'allow_personal' => array(
+				'type'    => 'boolean',
+				'default' => false,
+			),
+			'record_only'    => array(
+				'type'    => 'boolean',
+				'default' => false,
+			),
+		);
+		$routes   = array(
 			'/editor/page'      => array( 'GET', 'page', $page ),
 			'/scan/register'    => array(
 				'POST',
 				'registerScan',
-				$page + array(
-					'allow_personal' => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
-				),
+				$page + $scanArgs,
 			),
 			'/scan/loopback'    => array(
 				'POST',
 				'loopback',
-				$page + array(
-					'allow_personal' => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
-				),
+				$page + $scanArgs,
 			),
 			'/preview/register' => array(
 				'POST',
@@ -126,7 +127,14 @@ final class EditorController {
 		if ( $page instanceof \WP_Error ) {
 			return $page;
 		}
-		$token = Tokens::issue( Tokens::SCAN, $page['path'], array( 'allow_personal' => true === $request->get_param( 'allow_personal' ) ) );
+		$token = Tokens::issue(
+			Tokens::SCAN,
+			$page['path'],
+			array(
+				'allow_personal' => true === $request->get_param( 'allow_personal' ),
+				'record_only'    => true === $request->get_param( 'record_only' ),
+			)
+		);
 
 		return array(
 			'token' => $token,

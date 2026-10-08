@@ -268,6 +268,20 @@ final class Queue {
 	}
 
 	/**
+	 * Characters waiting (pending or processing) for one provider.
+	 *
+	 * @param string $provider Provider id.
+	 */
+	public function charsWaiting( string $provider ): int {
+		return (int) $this->db->get_var(
+			$this->prepare(
+				"SELECT COALESCE(SUM(s.char_count), 0) FROM %i q JOIN %i s ON s.id = q.string_id WHERE q.provider = %s AND q.state IN ('pending', 'processing')",
+				array( $this->table(), $this->schema->table( 'strings' ), $provider )
+			)
+		);
+	}
+
+	/**
 	 * Counts for status displays and CLI.
 	 *
 	 * @return array{pending: int, processing: int, failed: int, chars_pending: int, by_provider: array<string, int>, last_errors: array<string, string>}

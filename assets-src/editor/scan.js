@@ -61,13 +61,16 @@ async function browserScan( url, token ) {
  *
  * @param {Object}  ref           { post_id } or { path }.
  * @param {boolean} allowPersonal Whether a personal page may be recorded.
+ * @param {boolean} recordOnly    Record the strings but queue nothing.
  * @return {Promise<Object>} Summary.
  */
-export async function scanPage( ref, allowPersonal ) {
-	const registered = await post( '/scan/register', {
+export async function scanPage( ref, allowPersonal, recordOnly = false ) {
+	const args = {
 		...ref,
 		allow_personal: allowPersonal,
-	} );
+		record_only: recordOnly,
+	};
+	const registered = await post( '/scan/register', args );
 	try {
 		return await browserScan( registered.url, registered.token );
 	} catch ( error ) {
@@ -75,9 +78,6 @@ export async function scanPage( ref, allowPersonal ) {
 			throw error;
 		}
 		// Network error, redirect, login wall or cache: let the server try.
-		return post( '/scan/loopback', {
-			...ref,
-			allow_personal: allowPersonal,
-		} );
+		return post( '/scan/loopback', args );
 	}
 }

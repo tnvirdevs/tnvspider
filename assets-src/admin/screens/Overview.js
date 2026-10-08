@@ -447,14 +447,20 @@ export default function Overview( {
 						! error && <Spinner />
 					) }
 					{ data.languages.target && (
-						<p>
+						<div className="wst-toolbar">
 							<Button variant="secondary" href={ editorUrl() }>
 								{ __(
 									'Open the translation editor',
 									'wp-site-translator'
 								) }
 							</Button>
-						</p>
+							<Button variant="secondary" href="#/site">
+								{ __(
+									'Translate entire site',
+									'wp-site-translator'
+								) }
+							</Button>
+						</div>
 					) }
 				</Section>
 				<Section title={ __( 'Coverage', 'wp-site-translator' ) }>

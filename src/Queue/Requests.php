@@ -94,6 +94,48 @@ final class Requests {
 	}
 
 	/**
+	 * Queue strings for "Translate entire site" at bulk priority (8). The
+	 * caller chose untranslated strings of pages that may be translated.
+	 *
+	 * @param int[]    $stringIds String ids.
+	 * @phpstan-param list<int> $stringIds
+	 * @param Language $target    Target language.
+	 * @return array{queued: int, provider: string}
+	 * @throws RequestRefused When no provider can translate now.
+	 */
+	public function site( array $stringIds, Language $target ): array {
+		$ids = array_values( array_unique( $stringIds ) );
+
+		return array(
+			'queued'   => count( $ids ),
+			'provider' => $this->enqueue( $ids, $target, Queue::PRIORITY_BULK ),
+		);
+	}
+
+	/**
+	 * The provider that would translate now, or null with the reason.
+	 *
+	 * @param Language $target Target language.
+	 * @return array{id: string|null, problem: string}
+	 */
+	public function activeProvider( Language $target ): array {
+		$period = Usage::period();
+		$active = $this->selector->active( $this->settings->defaultLanguage(), $target, $period );
+		if ( null !== $active ) {
+			return array(
+				'id'      => $active['id'],
+				'problem' => '',
+			);
+		}
+		$primary = $this->settings->provider();
+
+		return array(
+			'id'      => null,
+			'problem' => '' === $primary ? 'No translation provider is selected.' : 'No provider can translate now: ' . $this->selector->problem( $primary, $this->settings->defaultLanguage(), $target, $period ),
+		);
+	}
+
+	/**
 	 * Refuse explicit machine translation on manual pages when the owner
 	 * turned "Allow machine translation in the editor on manual pages" off.
 	 *

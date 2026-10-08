@@ -255,7 +255,8 @@ final class Pipeline {
 	/**
 	 * Record every string of the page for the editor and queue what the
 	 * page's mode allows (plan §11, §6A: no caps; personal pages only after
-	 * confirmation and never auto-queued).
+	 * confirmation and never auto-queued). A record-only scan ("Translate
+	 * entire site") queues nothing.
 	 *
 	 * @param array<string, string>                                                    $kinds   Normalised original => kind.
 	 * @param array<string, array{id: int, translated: string|null, status: int|null}> $found Known strings.
@@ -286,7 +287,8 @@ final class Pipeline {
 				++$translated;
 			}
 		}
-		$queued = Settings::MODE_AUTO === $context->mode && ! $context->personal && array() !== $untranslated && $this->auto->queue( $untranslated, $this->target );
+		$recordOnly = true === ( EditorRequest::current()['data']['record_only'] ?? false );
+		$queued     = ! $recordOnly && Settings::MODE_AUTO === $context->mode && ! $context->personal && array() !== $untranslated && $this->auto->queue( $untranslated, $this->target );
 
 		return $this->summary(
 			$context,

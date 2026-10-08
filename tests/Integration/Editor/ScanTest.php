@@ -193,6 +193,14 @@ final class ScanTest extends WP_UnitTestCase {
 		$this->assertFalse( apply_filters( 'show_admin_bar', true ), 'No admin bar strings.' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core filter.
 	}
 
+	public function test_record_only_scan_queues_nothing(): void {
+		$summary = $this->scan( '/bn/scan-page/?wst_scan=' . $this->token( '/scan-page/', array( 'record_only' => true ) ) );
+
+		$this->assertSame( array( 'auto', 4, 4, 0 ), array( $summary['mode'], $summary['strings'], $summary['untranslated'], $summary['queued'] ) );
+		$this->assertSame( 0, $this->queue->stats()['pending'], '"Translate entire site" queues only after confirmation.' );
+		$this->assertCount( 4, $this->occurrences() );
+	}
+
 	public function test_rescan_removes_strings_no_longer_on_the_page(): void {
 		$this->store->recordOnPage( array( 'Removed since' => 'text' ), '/scan-page/', $this->postId );
 

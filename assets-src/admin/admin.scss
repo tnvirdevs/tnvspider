@@ -278,6 +278,20 @@
 	}
 }
 
+.wst-disclosure {
+	margin-block: 8px;
+
+	summary {
+		cursor: pointer;
+	}
+
+	ul {
+		margin-block: 8px 0;
+		padding-inline-start: 20px;
+		list-style: disc;
+	}
+}
+
 .wst-usage {
 
 	label {

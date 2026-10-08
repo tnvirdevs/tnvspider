@@ -50,10 +50,12 @@ use WST\Rest\PagesController;
 use WST\Rest\ProvidersController;
 use WST\Rest\QueueController;
 use WST\Rest\SettingsController;
+use WST\Rest\SiteController;
 use WST\Rest\StringsController;
 use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
 use WST\Routing\Urls;
+use WST\Site\SitePages;
 use WST\Storage\StringStore;
 use WST\Transfer\Exporter;
 use WST\Transfer\Importer;
@@ -133,6 +135,7 @@ final class Plugin {
 			( new PagesController( self::strings(), $modes, $target, $purger ) )->boot();
 			( new EditorController( $pageTarget ) )->boot();
 			( new ImportController( new Importer( self::strings(), $target ) ) )->boot();
+			( new SiteController( new SitePages( $settings, $modes, $urls, $target ), self::strings(), $requests, $queue, $status, $target ) )->boot();
 			( new Exporter( self::strings(), $target ) )->boot();
 			if ( is_admin() ) {
 				( new PostPanel( self::strings(), $modes, $requests, $target, $file, $settings->flag( 'editor_mt_on_manual' ) ) )->boot();

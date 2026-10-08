@@ -53,6 +53,10 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - **Import**: the browser reads the file (`assets-src/admin/csv.js`, RFC 4180, BOM tolerated, header by name, `original` and `translated` required), checks it in a **dry run** (`POST /import/check`, writes nothing), then applies it (`POST /import/apply`) in chunks of 500 with a progress bar. Options: import as manual (default) / machine / as in the file; conflict policy add only / overwrite machine, keep manual (default) / overwrite all. Summary: rows, new, updates, unchanged, kept by the policy, skipped (no translation), invalid with line and reason. Limits: 20 MB and 100,000 rows per file (screen), 500 rows per request and 64 KB per cell (server).
 - Every row is checked like an editor save (`StringStore::checkTranslation()`: inline translations keep the original's tags and attributes, then `wp_kses`), plus language (must be the target locale or empty), kind, status, UTF-8 and duplicates within a chunk. Imported rows leave the queue (translated now) and finished pages are purged (`wst_strings_translated`).
 
+**Translate entire site: done (2026-10-08).** Owner decision: yes, before 6b (P53 closed). Acceptance in "Translate entire site acceptance".
+- Overview → "Translate entire site" opens `#/site` (`manage_options`): lists the pages (home, public post type archives, every published post of a public type, every non-empty term of a public taxonomy; slices of 500), shows what is left out and why (§6A/§9), scans the rest in the browser (3 at a time, record-only scans: strings are recorded but nothing is queued; failures listed, "Stop and estimate what was scanned"), then shows strings, estimated characters and the active provider's monthly budget (used, already queued, left, reset date; warning when the estimate is larger), and queues only after a confirmation checkbox, at bulk priority 8.
+- REST: `GET /site/pages?page=N`, `POST /site/estimate` and `POST /site/queue` (page keys, ≤ 200 per request); scan routes take `record_only`.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -273,7 +277,12 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P64 | Import status option "as in the file" (besides manual/machine). Machine imports are stored with provider `csv`, manual ones without provider. | Plan §16: export → import must round-trip losslessly, which needs the file's status. |
 | P65 | Apply writes row by row without a transaction; each write is idempotent (insert-ignore string, upsert translation, drop queue row), so a failed chunk can be sent again; the screen says how many rows were imported and that re-importing is safe. | A nested `START TRANSACTION` would silently commit any transaction already open (WordPress's test framework runs each test in one). |
 | P66 | Non-inline kinds are stored as plain text (no `wp_kses`): they are encoded when printed (`Text::encodeText`, attribute setters). Inline translations go through `wp_kses` via `InlineMarkup::sanitize`. The §6.5 placeholder checks apply to provider output only (CSV text has no placeholders). | Same rules as the editor, so a value saved in one is accepted by the other; `wp_kses` on plain text would corrupt texts such as `a < b`. |
-| P53 | "Translate entire site" (plan §8) is **not** in this phase: the owner's Phase 5 list is scan flow, list, autosave, bulk queue actions, preview, entry points. Bulk here is per page. | No dead controls; it needs a site URL list and a budget confirmation (to schedule; see "Exact next step"). |
+| P67 | "Translate entire site" leaves out (with the reason shown): pages set to "off"; manual pages unless "Allow machine translation in the editor on manual pages" is on (same rule as the editor's bulk button); WooCommerce cart, checkout and account pages (`wc_get_page_id`, filter `wst_personal_post_ids`); password-protected posts; "never discover" paths; links to another host. Paginated archive pages are not listed. | Plan §6A/§9 and the owner's "respect §6A for excluded pages". |
+| P68 | Estimate and queue take **page keys** and the server checks every page again and recomputes the strings (untranslated in the target language, not already queued, plus site-wide strings); the browser never sends string ids. | The browser cannot widen what is sent to the provider; estimate and queue use the same query, so the confirmed number is what gets queued (live: 2,783 strings / 179,066 characters estimated = queued). |
+| P69 | Scans for this feature are **record-only** (`record_only` token flag): auto pages do not queue during the scan. | The plan requires confirmation before enqueueing; a normal scan of an auto page queues at visitor priority. |
+| P70 | Budget shown = the active provider (primary, or the fallback when the primary cannot translate): monthly cap − used this month − characters already waiting for it; no cap → "no monthly character limit". Over the budget is a warning, not a block: rows stay queued until the reset or the fallback takes over (§8 behaviour). | The owner decides; the queue already stops at the cap. |
+| P71 | The view is a sub-screen of the settings app (`#/site`, not in the navigation), reached from the Overview. | One entry point as the plan lists it (Overview quick action), no extra menu item. |
+| P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
 
@@ -321,7 +330,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 - Phases 4–7 per plan §16.
 - Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
-- Deferred by design (built together with their phases, no dead settings now): "Translate entire site" (P53, to schedule); §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, TranslatePress (Phase 6; CSV done in 6a); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Deferred by design (built together with their phases, no dead settings now): §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, TranslatePress (Phase 6; CSV done in 6a); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
 
 ## Staging fixes acceptance
 
@@ -331,6 +340,18 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Translate entire site acceptance
+
+- PASS — URL list: home (static front page as the home entry, not twice), post type archives, posts of public types (not attachments, drafts or non-public types), non-empty terms; stable slices across sources (511 entries in 2 slices, no duplicates); exclusions with reasons: `SiteTranslationTest::test_list_has_home_archives_posts_and_terms_with_exclusions`, `test_slices_are_stable_across_sources`. Live: 288 pages listed, 1 left out (password-protected); WooCommerce cart/checkout/account detected (ids 1838–1840).
+- PASS — Scans record without queueing: `ScanTest::test_record_only_scan_queues_nothing`; live: 288 pages scanned in 15–17 s, queue empty afterwards.
+- PASS — Estimate vs remaining budget: `test_estimate_counts_untranslated_strings_of_allowed_pages_and_the_budget` (translated, queued and off-page strings excluded; site-wide included; cap 1000 − used 300 − waiting 16 = 684; reset date). Live: 2,783 strings, 179,066 characters vs 47,138 left of a 50,000 test cap → warning shown.
+- PASS — Confirmation and priority 8: queue button disabled until the checkbox is ticked (live); `test_queue_uses_bulk_priority_and_rechecks_the_pages` (priority 8, existing rows keep their priority, off pages never queued, second run finds nothing); refused without a provider (409) and `manage_options` only: `test_queue_is_refused_without_a_provider_and_routes_need_manage_options`. Live: 2,783 rows at priority 8 with exactly 179,066 characters (then cleared with `wp wst queue clear`; WP-Cron off on the dev site, so nothing was sent to TranslateX).
+- PASS — Screens at 1280 and 390 px, no horizontal overflow; no JavaScript errors from our code.
+
+## Files changed (Translate entire site)
+
+`src/Site/SitePages.php`, `src/Rest/SiteController.php`, `src/Rest/EditorController.php` (`record_only`), `src/Render/Pipeline.php` (record-only scans), `src/Storage/StringStore.php` (`pagesByKeys`, `untranslatedOnPages`), `src/Queue/{Queue,Requests}.php` (`charsWaiting`, `site`, `activeProvider`), `src/Plugin.php`, `assets-src/admin/{App.js,admin.scss,screens/{SiteTranslation,Overview}.js}`, `assets-src/editor/scan.js` (`recordOnly`), `build/{admin,editor}.*`, tests `tests/Integration/Site/SiteTranslationTest.php`, `tests/Integration/Editor/ScanTest.php`.
 
 ## Phase 6a acceptance (plan §16) — one line per criterion
 
@@ -376,7 +397,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,320 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6a included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,326 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), "Translate entire site" included.
 - `npm run test:js` (Node's built-in test runner, no extra dependency): 4 tests green.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
@@ -430,5 +451,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: re-test the staging fixes (P55–P60) on the phone; send the logo `<img src>` from the English page if it is still broken; review Phase 6a (P61–P66). Decision on "Translate entire site" (P53) still open.
+1. Owner: review "Translate entire site" (P67–P71). TranslatePress 3.3.7 source and an optional table export were announced but had not arrived in the session (uploads empty on 2026-10-08).
 2. Phase 6b (plan §13A.4): TranslatePress importer (read-only, idempotent, match-rate report, all three statuses, entity/whitespace normalisation) against a fixture dataset, coexistence guard (our front end stays off while TranslatePress is active), Migration screen shown only while TranslatePress data or the plugin is present.

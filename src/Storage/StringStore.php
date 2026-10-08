@@ -821,6 +821,70 @@ final class StringStore {
 	}
 
 	/**
+	 * Recorded pages by key.
+	 *
+	 * @param string[] $pageKeys Page keys.
+	 * @phpstan-param list<string> $pageKeys
+	 * @return list<array{page_key: string, path: string, post_id: int|null}>
+	 */
+	public function pagesByKeys( array $pageKeys ): array {
+		if ( array() === $pageKeys ) {
+			return array();
+		}
+		$rows = $this->results(
+			$this->prepare(
+				'SELECT page_key, path, post_id FROM %i WHERE page_key IN (' . implode( ',', array_fill( 0, count( $pageKeys ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				array_merge( array( $this->schema->table( 'pages' ) ), $pageKeys )
+			)
+		);
+
+		return array_values(
+			array_map(
+				static fn( \stdClass $row ): array => array(
+					'page_key' => (string) $row->page_key,
+					'path'     => (string) $row->path,
+					'post_id'  => null === $row->post_id ? null : (int) $row->post_id,
+				),
+				$rows
+			)
+		);
+	}
+
+	/**
+	 * Strings on these pages, plus the site-wide ones, that have no
+	 * translation in $lang and are not in the queue for it ("Translate
+	 * entire site", plan §8).
+	 *
+	 * @param string[] $pageKeys Page keys.
+	 * @phpstan-param list<string> $pageKeys
+	 * @param string   $lang     Target locale.
+	 * @return array<int, int> String id => characters.
+	 */
+	public function untranslatedOnPages( array $pageKeys, string $lang ): array {
+		if ( array() === $pageKeys ) {
+			return array();
+		}
+		$rows  = $this->results(
+			$this->prepare(
+				'SELECT s.id, s.char_count FROM %i s JOIN (SELECT string_id FROM %i WHERE page_key IN (' . implode( ',', array_fill( 0, count( $pageKeys ), '%s' ) ) . ') UNION SELECT id FROM %i WHERE is_global = 1) u ON u.string_id = s.id' // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholder list built above.
+				. ' LEFT JOIN %i t ON t.string_id = s.id AND t.lang = %s LEFT JOIN %i q ON q.string_id = s.id AND q.lang = %s'
+				. ' WHERE t.string_id IS NULL AND q.id IS NULL ORDER BY s.id',
+				array_merge(
+					array( $this->schema->table( 'strings' ), $this->schema->table( 'occurrences' ) ),
+					$pageKeys,
+					array( $this->schema->table( 'strings' ), $this->schema->table( 'translations' ), $lang, $this->schema->table( 'queue' ), $lang )
+				)
+			)
+		);
+		$found = array();
+		foreach ( $rows as $row ) {
+			$found[ (int) $row->id ] = (int) $row->char_count;
+		}
+
+		return $found;
+	}
+
+	/**
 	 * Of these strings, the ids that have a manual translation in $lang.
 	 *
 	 * @param int[]  $stringIds String ids.

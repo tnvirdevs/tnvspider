@@ -15,6 +15,7 @@ import Pages from './screens/Pages';
 import Advanced from './screens/Advanced';
 import Health from './screens/Health';
 import ImportExport from './screens/ImportExport';
+import SiteTranslation from './screens/SiteTranslation';
 
 const SCREENS = [
 	[ 'overview', __( 'Overview', 'wp-site-translator' ), Overview ],
@@ -31,11 +32,16 @@ const SCREENS = [
 	[ 'health', __( 'Health', 'wp-site-translator' ), Health ],
 ];
 
+// Screens reached from another screen, not listed in the navigation.
+const SUBSCREENS = [ [ 'site', SiteTranslation ] ];
+
 const QUEUE_POLL_MS = 20000;
 
 function currentRoute() {
 	const route = window.location.hash.replace( /^#\/?/, '' );
-	return SCREENS.some( ( [ id ] ) => id === route ) ? route : 'overview';
+	return [ ...SCREENS, ...SUBSCREENS ].some( ( [ id ] ) => id === route )
+		? route
+		: 'overview';
 }
 
 /**
@@ -313,7 +319,10 @@ export default function App() {
 		);
 	}
 
-	const Screen = SCREENS.find( ( [ id ] ) => id === route )[ 2 ];
+	const Screen = (
+		SCREENS.find( ( [ id ] ) => id === route ) ||
+		SUBSCREENS.find( ( [ id ] ) => id === route )
+	).slice( -1 )[ 0 ];
 	const fieldErrors = Object.keys( errors );
 
 	return (
