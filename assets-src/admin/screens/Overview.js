@@ -420,6 +420,17 @@ export default function Overview( {
 					</Button>
 				</Notice>
 			) }
+			{ ( window.wstAdmin || {} ).paused && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'TranslatePress is active, so the translated front end of WP Site Translator is paused.',
+						'wp-site-translator'
+					) }{ ' ' }
+					<a href="#/migration">
+						{ __( 'Import and go live', 'wp-site-translator' ) }
+					</a>
+				</Notice>
+			) }
 			{ overview && overview.render_errors > 0 && (
 				<Notice status="error" isDismissible={ false }>
 					{ sprintf(

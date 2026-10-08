@@ -111,9 +111,20 @@ final class SettingsController {
 	 */
 	public function save( \WP_REST_Request $request ) {
 		$submitted = $request->get_param( 'settings' );
-		$submitted = is_array( $submitted ) ? $submitted : array();
 		$secrets   = $request->get_param( 'secrets' );
-		$secrets   = is_array( $secrets ) ? $secrets : array();
+
+		return $this->apply( is_array( $submitted ) ? $submitted : array(), is_array( $secrets ) ? $secrets : array() );
+	}
+
+	/**
+	 * Validate and store settings (top-level keys replace stored ones) and
+	 * secrets: all or nothing. Also used by the TranslatePress migration.
+	 *
+	 * @param array<mixed> $submitted Settings.
+	 * @param array<mixed> $secrets   Secrets.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function apply( array $submitted, array $secrets = array() ) {
 
 		$stored = get_option( Settings::OPTION, array() );
 		$stored = is_array( $stored ) ? $stored : array();

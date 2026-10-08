@@ -13,6 +13,7 @@ import { number } from '../format';
 import { scanPage } from '../../editor/scan';
 
 const CONCURRENT_SCANS = 3;
+const paused = !! ( window.wstAdmin || {} ).paused;
 const KEYS_PER_REQUEST = 200;
 const LISTED_MAX = 50;
 
@@ -333,7 +334,17 @@ export default function SiteTranslation( { refreshQueue } ) {
 					<p>{ error }</p>
 				</Notice>
 			) }
-			{ step === 'start' && (
+			{ paused && (
+				<Notice status="warning" isDismissible={ false }>
+					<p>
+						{ __(
+							'TranslatePress is active, so the translated front end is paused and pages cannot be scanned. Deactivate TranslatePress first (Translator → Migration).',
+							'wp-site-translator'
+						) }
+					</p>
+				</Notice>
+			) }
+			{ step === 'start' && ! paused && (
 				<Button variant="primary" onClick={ list }>
 					{ __( 'List the site’s pages', 'wp-site-translator' ) }
 				</Button>

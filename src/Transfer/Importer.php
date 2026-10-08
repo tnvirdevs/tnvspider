@@ -64,10 +64,12 @@ final class Importer {
 	 * @param string       $statusOption One of STATUSES.
 	 * @param bool         $apply  False for a dry run (nothing is written).
 	 * @param int          $userId Importing user.
+	 * @param bool         $guarded Whether cells carry the CSV-injection guard (CSV files; not TranslatePress rows).
+	 * @param string       $source  Provider recorded for imported machine translations.
 	 * @return array{counts: array<string, int>, rows: list<array{line: int, outcome: string, reason: string}>} Counts per outcome; rows listed only for conflict, skipped and invalid.
 	 * @throws \InvalidArgumentException For an unknown policy or status, or too many rows.
 	 */
-	public function run( array $rows, string $policy, string $statusOption, bool $apply, int $userId ): array {
+	public function run( array $rows, string $policy, string $statusOption, bool $apply, int $userId, bool $guarded = true, string $source = StringStore::IMPORT_PROVIDER ): array {
 		if ( ! in_array( $policy, self::POLICIES, true ) || ! in_array( $statusOption, self::STATUSES, true ) ) {
 			throw new \InvalidArgumentException( 'Unknown conflict policy or import status.' );
 		}
@@ -82,7 +84,7 @@ final class Importer {
 		foreach ( array_values( $rows ) as $index => $raw ) {
 			$line = is_array( $raw ) && isset( $raw['line'] ) && is_int( $raw['line'] ) ? $raw['line'] : $index + 1;
 			try {
-				$row = $this->parse( $raw, $statusOption );
+				$row = $this->parse( $raw, $statusOption, $guarded );
 			} catch ( \InvalidArgumentException $e ) {
 				++$counts['invalid'];
 				$listed[] = self::listed( $line, 'invalid', $e->getMessage() );
@@ -134,7 +136,7 @@ final class Importer {
 			// Each write is idempotent, so after a failure the same chunk can be sent again.
 			$ids = array();
 			foreach ( $writes as $write ) {
-				$ids[] = $this->store->importTranslation( $write['original'], $write['kind'], $lang, $write['translation'], $write['status'], $userId );
+				$ids[] = $this->store->importTranslation( $write['original'], $write['kind'], $lang, $write['translation'], $write['status'], $userId, $source );
 			}
 			/** Purges the cached pages these strings finish (see Cache\Purger). */
 			do_action( 'wst_strings_translated', $ids, $lang );
@@ -153,10 +155,11 @@ final class Importer {
 	 *
 	 * @param mixed  $raw Row.
 	 * @param string $statusOption  Import status option.
+	 * @param bool   $guarded       Whether cells carry the CSV-injection guard.
 	 * @return array{original: string, translated: string, kind: string, status: int}|null Null when the row has no translation.
 	 * @throws \InvalidArgumentException With the reason the row is invalid.
 	 */
-	private function parse( $raw, string $statusOption ): ?array {
+	private function parse( $raw, string $statusOption, bool $guarded ): ?array {
 		// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Reasons are REST data, shown as text by the import screen.
 		if ( ! is_array( $raw ) ) {
 			throw new \InvalidArgumentException( __( 'Malformed row.', 'wp-site-translator' ) );
@@ -175,7 +178,7 @@ final class Importer {
 				/* translators: %s: column name */
 				throw new \InvalidArgumentException( sprintf( __( 'The %s cell is not valid UTF-8.', 'wp-site-translator' ), $column ) );
 			}
-			$cells[ $column ] = Csv::unguard( $value );
+			$cells[ $column ] = $guarded ? Csv::unguard( $value ) : $value;
 		}
 
 		$original = Text::normalize( $cells['original'] );

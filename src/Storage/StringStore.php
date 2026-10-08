@@ -648,10 +648,11 @@ final class StringStore {
 	 * @param string $translation Checked translation (see checkTranslation()).
 	 * @param int    $status      STATUS_MACHINE or STATUS_MANUAL.
 	 * @param int    $userId      Importing user.
+	 * @param string $source      Provider recorded for machine translations (where they came from).
 	 * @return int String id.
 	 * @throws \InvalidArgumentException For an unknown status.
 	 */
-	public function importTranslation( string $original, string $kind, string $lang, string $translation, int $status, int $userId ): int {
+	public function importTranslation( string $original, string $kind, string $lang, string $translation, int $status, int $userId, string $source = self::IMPORT_PROVIDER ): int {
 		if ( self::STATUS_MACHINE !== $status && self::STATUS_MANUAL !== $status ) {
 			throw new \InvalidArgumentException( 'Unknown translation status.' );
 		}
@@ -679,7 +680,7 @@ final class StringStore {
 				$lang,
 				$translation,
 				$status,
-				self::STATUS_MACHINE === $status ? self::IMPORT_PROVIDER : '',
+				self::STATUS_MACHINE === $status ? substr( $source, 0, 24 ) : '',
 				$userId,
 				$now
 			)

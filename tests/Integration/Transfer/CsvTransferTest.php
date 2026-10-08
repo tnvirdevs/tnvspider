@@ -41,6 +41,12 @@ final class CsvTransferTest extends WP_UnitTestCase {
 		wp_cache_flush();
 	}
 
+	public function tear_down(): void {
+		global $wp_rest_server;
+		$wp_rest_server = null; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's REST server global: later tests get a fresh one.
+		parent::tear_down();
+	}
+
 	/**
 	 * Manual, machine and untranslated strings on two pages.
 	 *

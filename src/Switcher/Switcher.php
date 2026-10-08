@@ -13,6 +13,7 @@ use WST\Assets;
 use WST\Config;
 use WST\Languages\Current;
 use WST\Languages\Language;
+use WST\Migration\TranslatePress;
 use WST\Modes\Resolver;
 use WST\Routing\LanguageUrls;
 use WST\Settings;
@@ -25,10 +26,13 @@ use WST\Settings;
  */
 final class Switcher {
 
-	public const SHORTCODE    = Config::PREFIX . 'switcher';
-	public const BLOCK        = 'wst/switcher';
-	public const STYLE_HANDLE = 'wst-switcher';
-	public const BLOCK_SCRIPT = 'wst-switcher-block';
+	public const SHORTCODE = Config::PREFIX . 'switcher';
+
+	/** TranslatePress's switcher shortcode, served by ours after a migration (setting trp_switcher_alias). */
+	public const TRP_SHORTCODE = 'language-switcher';
+	public const BLOCK         = 'wst/switcher';
+	public const STYLE_HANDLE  = 'wst-switcher';
+	public const BLOCK_SCRIPT  = 'wst-switcher-block';
 
 	/** URL of the menu item that stands for the switcher. */
 	public const MENU_URL = '#wst-switcher';
@@ -58,6 +62,10 @@ final class Switcher {
 	 */
 	public function boot(): void {
 		add_shortcode( self::SHORTCODE, array( $this, 'render' ) );
+		// After a TranslatePress migration, its [language-switcher] shortcode in content shows ours.
+		if ( $this->settings->flag( 'trp_switcher_alias' ) && ! TranslatePress::isActive() && ! shortcode_exists( self::TRP_SHORTCODE ) ) {
+			add_shortcode( self::TRP_SHORTCODE, array( $this, 'render' ) );
+		}
 		add_action( 'init', array( $this, 'registerBlock' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueueStyle' ) );
 		add_filter( 'wp_nav_menu_objects', array( $this, 'expandMenuItems' ) );

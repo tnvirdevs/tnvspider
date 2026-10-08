@@ -26,6 +26,8 @@ use WST\Editor\Preview;
 use WST\Languages\Registry;
 use WST\Log\Logger;
 use WST\Modes\OffPages;
+use WST\Migration\Guard;
+use WST\Migration\TranslatePress;
 use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
@@ -46,6 +48,7 @@ use WST\Render\Pipeline;
 use WST\Rest\EditorController;
 use WST\Rest\HealthController;
 use WST\Rest\ImportController;
+use WST\Rest\MigrationController;
 use WST\Rest\PagesController;
 use WST\Rest\ProvidersController;
 use WST\Rest\QueueController;
@@ -105,11 +108,18 @@ final class Plugin {
 		$tester   = new Tester( $settings, $providers, $state, $secrets );
 		$status   = new StatusReport( $settings, $secrets, $providers, $state, $tester, new Usage( $wpdb, self::schema() ), $queue );
 		( new QueueController( $queue, $scheduler, $worker, $settings, $selector, $providers ) )->boot();
-		( new SettingsController( $secrets, $queue, $scheduler ) )->boot();
+		$settingsSaver = new SettingsController( $secrets, $queue, $scheduler );
+		$settingsSaver->boot();
 		( new ProvidersController( $status, $tester, $secrets ) )->boot();
 		( new HealthController( $settings, new Health( $settings, $wpdb, self::schema(), $queue, $status, $selector, $logger ), $logger, self::strings(), $status ) )->boot();
 		if ( is_admin() ) {
 			( new AdminPage( $file, new Isolation( $file ) ) )->boot();
+		}
+		( new MigrationController( new TranslatePress( $wpdb ), $settings, $settingsSaver, self::strings(), $wpdb ) )->boot();
+		// While TranslatePress is active our front end stays off (plan §13A.4).
+		$frontEndOff = Guard::frontEndOff();
+		if ( $frontEndOff ) {
+			( new Guard() )->boot();
 		}
 
 		if ( null !== $target ) {
@@ -118,15 +128,17 @@ final class Plugin {
 			$byLang = new LanguageUrls( $urls, $target, LanguageUrls::origin( $home ) );
 			$modes  = new Resolver( $settings, $urls, $target );
 
-			// The language must be known before the locale and theme load.
-			( new Router( $settings, $target, $urls ) )->boot();
-			( new EditorRequest( $urls, $target ) )->boot();
-			( new AdminBar( $urls, $byLang, $target, $file ) )->boot();
-			( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
-			( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
-			( new OffPages( $settings, $modes, $byLang ) )->boot();
-			$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
-			( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) ) )->boot();
+			if ( ! $frontEndOff ) {
+				// The language must be known before the locale and theme load.
+				( new Router( $settings, $target, $urls ) )->boot();
+				( new EditorRequest( $urls, $target ) )->boot();
+				( new AdminBar( $urls, $byLang, $target, $file ) )->boot();
+				( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
+				( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
+				( new OffPages( $settings, $modes, $byLang ) )->boot();
+				$auto = new AutoQueue( $settings, $selector, $queue, $scheduler );
+				( new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) ) )->boot();
+			}
 			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
 			$purger->boot();
 			$requests   = new Requests( $settings, self::strings(), $queue, $selector, $scheduler, $modes );

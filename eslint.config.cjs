@@ -7,6 +7,10 @@ const defaults = require( '@wordpress/scripts/config/eslint.config.cjs' );
 module.exports = [
 	...defaults,
 	{
+		// Third-party reference source (gitignored), never linted.
+		ignores: [ 'reference/**' ],
+	},
+	{
 		settings: {
 			'import/core-modules': [
 				'@wordpress/api-fetch',

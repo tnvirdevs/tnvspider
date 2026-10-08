@@ -10,3 +10,6 @@
 /.tools/
 # rtlcss output: the admin stylesheet uses logical properties and serves both directions.
 /build/*-rtl.css
+
+# TranslatePress source (behavioural reference only, owner-supplied; never committed)
+/reference/

@@ -29,3 +29,4 @@
 /composer.local.json
 /composer.local.lock
 /build/*-rtl.css
+/reference

@@ -16,6 +16,7 @@ import Advanced from './screens/Advanced';
 import Health from './screens/Health';
 import ImportExport from './screens/ImportExport';
 import SiteTranslation from './screens/SiteTranslation';
+import Migration from './screens/Migration';
 
 const SCREENS = [
 	[ 'overview', __( 'Overview', 'wp-site-translator' ), Overview ],
@@ -30,6 +31,16 @@ const SCREENS = [
 		ImportExport,
 	],
 	[ 'health', __( 'Health', 'wp-site-translator' ), Health ],
+	// Only while TranslatePress or its data is present (plan §13A.4).
+	...( ( window.wstAdmin || {} ).migration
+		? [
+				[
+					'migration',
+					__( 'Migration', 'wp-site-translator' ),
+					Migration,
+				],
+			]
+		: [] ),
 ];
 
 // Screens reached from another screen, not listed in the navigation.
@@ -389,6 +400,7 @@ export default function App() {
 					refreshProviders={ refreshProviders }
 					queue={ queue }
 					refreshQueue={ refreshQueue }
+					reloadSettings={ loadSettings }
 				/>
 			</main>
 			{ dirty && (

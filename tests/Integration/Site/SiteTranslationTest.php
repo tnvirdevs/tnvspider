@@ -140,6 +140,8 @@ final class SiteTranslationTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		global $wp_rest_server;
+		$wp_rest_server = null; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's REST server global: later tests get a fresh one.
 		unregister_post_type( 'product' );
 		unregister_post_type( 'private_thing' );
 		wp_clear_scheduled_hook( Scheduler::HOOK );

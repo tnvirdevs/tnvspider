@@ -11,6 +11,8 @@ namespace WST\Admin;
 
 use WST\Assets;
 use WST\Config;
+use WST\Migration\Guard;
+use WST\Migration\TranslatePress;
 use WST\Switcher\Switcher;
 use WST\Transfer\Csv;
 use WST\Transfer\Exporter;
@@ -115,6 +117,7 @@ final class AdminPage {
 	 * @return array<string, mixed>
 	 */
 	private function data(): array {
+		global $wpdb;
 		$cronDisabled = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
 
 		return array(
@@ -126,6 +129,8 @@ final class AdminPage {
 				'action' => Exporter::ACTION,
 				'nonce'  => wp_create_nonce( Exporter::ACTION ),
 			),
+			'migration'  => ( new TranslatePress( $wpdb ) )->present(),
+			'paused'     => Guard::frontEndOff(),
 			'import'     => array(
 				'chunk'        => Importer::MAX_ROWS,
 				'maxFileBytes' => Importer::MAX_FILE_BYTES,

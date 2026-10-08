@@ -125,7 +125,8 @@ final class Settings {
 	 *     never_translate_terms: list<string>,
 	 *     terms_case_insensitive: bool,
 	 *     terms_whole_word: bool,
-	 *     editor_mt_on_manual: bool
+	 *     editor_mt_on_manual: bool,
+	 *     trp_switcher_alias: bool
 	 * }
 	 */
 	private array $values;
@@ -226,7 +227,8 @@ final class Settings {
 	 * Boolean setting.
 	 *
 	 * @param string $key One of discover_on_visit, block_crawlers, force_language_links,
-	 *                    hreflang_x_default, hreflang_drop_region.
+	 *                    hreflang_x_default, hreflang_drop_region, editor_mt_on_manual,
+	 *                    trp_switcher_alias.
 	 */
 	public function flag( string $key ): bool {
 		return (bool) ( $this->values[ $key ] ?? false );
@@ -380,7 +382,8 @@ final class Settings {
 	 *     never_translate_terms: list<string>,
 	 *     terms_case_insensitive: bool,
 	 *     terms_whole_word: bool,
-	 *     editor_mt_on_manual: bool
+	 *     editor_mt_on_manual: bool,
+	 *     trp_switcher_alias: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -427,6 +430,7 @@ final class Settings {
 			'terms_case_insensitive'  => self::readBool( $raw, 'terms_case_insensitive', true ),
 			'terms_whole_word'        => self::readBool( $raw, 'terms_whole_word', true ),
 			'editor_mt_on_manual'     => self::readBool( $raw, 'editor_mt_on_manual', true ),
+			'trp_switcher_alias'      => self::readBool( $raw, 'trp_switcher_alias', true ),
 		);
 	}
 

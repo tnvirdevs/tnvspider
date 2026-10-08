@@ -104,7 +104,7 @@ export default function Editor() {
 	const [ bulk, setBulk ] = useState( null );
 	const [ selectedId, setSelectedId ] = useState( null );
 	const [ showPreview, setShowPreview ] = useState(
-		() => window.innerWidth >= 1200
+		() => ! config.paused && window.innerWidth >= 1200
 	);
 	const [ previewKey, setPreviewKey ] = useState( 0 );
 	const fields = useRef( {} );
@@ -214,7 +214,12 @@ export default function Editor() {
 			return;
 		}
 		loadPage().then( ( data ) => {
-			if ( data && ! data.last_scan && data.mode !== 'off' ) {
+			if (
+				data &&
+				! data.last_scan &&
+				data.mode !== 'off' &&
+				! config.paused
+			) {
 				runScan();
 			}
 		} );
@@ -491,7 +496,7 @@ export default function Editor() {
 						variant="secondary"
 						onClick={ () => runScan() }
 						isBusy={ scan.running }
-						disabled={ scan.running }
+						disabled={ scan.running || config.paused }
 					>
 						{ __( 'Scan page', 'wp-site-translator' ) }
 					</Button>
@@ -512,14 +517,24 @@ export default function Editor() {
 							) }
 						</Button>
 					) }
-					<CheckboxControl
-						__nextHasNoMarginBottom
-						label={ __( 'Show preview', 'wp-site-translator' ) }
-						checked={ showPreview }
-						onChange={ setShowPreview }
-					/>
+					{ ! config.paused && (
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							label={ __( 'Show preview', 'wp-site-translator' ) }
+							checked={ showPreview }
+							onChange={ setShowPreview }
+						/>
+					) }
 				</div>
 			</header>
+			{ config.paused && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'TranslatePress is active, so the translated front end is paused: scanning and the preview are unavailable. The string list and your edits work; they show on the site once TranslatePress is deactivated.',
+						'wp-site-translator'
+					) }
+				</Notice>
+			) }
 			{ page.mode === 'off' && (
 				<Notice status="warning" isDismissible={ false }>
 					{ __(

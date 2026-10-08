@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace WST\Admin;
 
+use WST\Migration\Guard;
 use WST\Access;
 use WST\Assets;
 use WST\Config;
@@ -161,6 +162,7 @@ final class EditorPage {
 			),
 			'providerReady' => $mt,
 			'mtOnManual'    => $this->settings->flag( 'editor_mt_on_manual' ),
+			'paused'        => Guard::frontEndOff(),
 			'settingsUrl'   => current_user_can( 'manage_options' ) ? admin_url( 'admin.php?page=' . AdminPage::MENU_SLUG ) : '',
 		);
 	}
