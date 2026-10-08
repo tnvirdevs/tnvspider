@@ -53,6 +53,13 @@ final class Pipeline {
 	private int $pending = 0;
 
 	/**
+	 * Digit converter, built on first use.
+	 *
+	 * @var DigitConverter|null
+	 */
+	private ?DigitConverter $digitConverter = null;
+
+	/**
 	 * Create the pipeline.
 	 *
 	 * @param Settings      $settings Plugin settings.
@@ -190,6 +197,7 @@ final class Pipeline {
 		$this->pending = array() === $untranslated || '' === $this->auto->provider( $this->target ) ? 0 : $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
 
 		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+		$html = $this->digits()?->html( $html ) ?? $html;
 
 		return $this->forPreview( $this->setDocumentLanguage( $html, $this->target ), $context );
 	}
@@ -208,7 +216,9 @@ final class Pipeline {
 		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $this->target->locale() );
 		[ $translations ]    = $this->translationsFor( $kinds, $neutral, $found );
 
-		return ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+
+		return $this->digits()?->html( $html ) ?? $html;
 	}
 
 	/**
@@ -236,11 +246,32 @@ final class Pipeline {
 			$translation = $found[ $core ]['translated'] ?? null;
 			if ( null !== $translation ) {
 				[ $lead, , $trail ]    = Text::splitEdges( (string) $text );
-				$out[ (string) $text ] = $lead . $translation . $trail;
+				$out[ (string) $text ] = $lead . ( $this->digits()?->text( $translation ) ?? $translation ) . $trail;
 			}
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Digit conversion for target output, or null when it is off.
+	 */
+	private function digits(): ?DigitConverter {
+		$mode = $this->settings->digitsMode();
+		if ( 'off' === $mode ) {
+			return null;
+		}
+		if ( null === $this->digitConverter ) {
+			$selectors            = $this->settings->excludeSelectors();
+			$this->digitConverter = new DigitConverter(
+				$mode,
+				$this->settings->flag( 'digits_skip_prices' ) ? array_values( array_merge( $selectors, DigitConverter::PRICE_SELECTORS ) ) : $selectors,
+				$this->settings->neverTranslateTerms(),
+				$this->settings->flag( 'terms_case_insensitive' )
+			);
+		}
+
+		return $this->digitConverter;
 	}
 
 	/**

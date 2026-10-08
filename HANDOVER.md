@@ -68,6 +68,8 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 - **(c) Dynamic scan**: editor button "Scan dynamic content" opens the page in a new tab with a signed token (30 min, bound to the user and page); a small bar counts texts found and new ones; texts go to `POST /scan/dynamic` (wst_translate + nonce), stored as kind `dynamic` with the page occurrence, queued as the page's mode allows (never on personal pages).
 - Settings on Advanced → "Dynamic content", with the known limit (text assembled by script concatenation) in the help.
 
+**Phase 6d — Digit conversion: done (2026-10-08).** Plan §13A.6; acceptance in "Phase 6d acceptance". Advanced → "Digits": Automatic (Arabic-Indic for an Arabic target, owner decision; unchanged for others) · Unchanged · Bengali · Arabic-Indic · Persian (also Urdu), with a suggestion for Bengali/Urdu/Persian that is never applied by itself; "Keep WooCommerce prices as they are" (default on, `.woocommerce-Price-amount`, `.price`). Applied to target-language output only: pages, AJAX/REST fragments and looked-up texts.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -307,6 +309,9 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P83 | `dynamic.js` is plain JS (not built), deferred in the footer, observes nodes added **after it starts**; text that scripts insert while the page is still loading is not seen (found live on the slow dev server). | Observing from the start of parsing would send every server-rendered string; dynamic content normally arrives after load (mini-cart, AJAX, popups). |
 | P84 | Dynamic-scan strings: new segment kind `dynamic` (also accepted by CSV import and WP-CLI); token type `dynamic` (30 min, reusable, bound to the user who started it); the token is removed from the request so links built from the URL do not carry it; queued at visitor priority when the page is auto and not personal. | Plan §13A.5c "queued according to the resolved mode". |
 | P85 | The editor's "Scan dynamic content" button keeps its visible text as the accessible name; the explanation is its `description` (found when the button's `label` replaced the name). | WCAG label-in-name. |
+| P86 | `digits_mode` has an `auto` value (default) that resolves at render time: Arabic-Indic when the target locale starts with `ar`, otherwise off. | Every save stores all keys, so a stored "off" would hide the owner's Arabic default after a later target change. |
+| P87 | Conversion is a pass over the final translated HTML using the extractor's visible text spans (new `Extractor::textSpans()`), so it honours the same exclusions as translation (code, pre, svg, math, noscript, template, no-translate markers, exclude selectors) plus the price selectors; script, style, textarea and title are never text tokens; attributes are never touched. | One definition of "visible text"; inline strings are covered after replacement. |
+| P88 | Inside text, character references (`&#8217;`, `&#038;`), URLs, e-mail addresses and never-translate terms that contain digits keep their ASCII digits; digits already in another script are left alone. | Plan: never in URLs, e-mails or protected tokens; references must stay valid HTML. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -365,6 +370,17 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Phase 6d acceptance (plan §16)
+
+- PASS — Never touches URLs, attributes, prices when skipped: `DigitConverterTest::test_only_visible_text_outside_protected_areas_changes` (href/title/data attributes, URLs, e-mails, character references, input values, textarea, code/pre, no-translate, exclude selector, WooCommerce price markup skipped by default and converted when the toggle is off, never-translate term "iPhone 15", title/style/script). Live: `/bn/product/wordpress-pennant/` with Bengali digits → 120 converted digits in text (e.g. "অক্টোবর ২০২৬"), 0 in attributes (`/bn/2026/10/` links keep ASCII), 0 on the English page.
+- PASS — Round-trips: `test_each_set_round_trips` (Bengali, Arabic-Indic, Persian; whole test page and plain text restored to ASCII equal the input).
+- PASS — Defaults: `test_auto_mode_is_arabic_indic_for_arabic_only`; pipeline output, fragments and looked-up texts: `test_pipeline_converts_target_output_fragments_and_texts`. Advanced → Digits at 1280 and 390 px without overflow.
+- Not checked live: WooCommerce price skipping (this WooCommerce build renders no prices).
+
+## Files changed (Phase 6d)
+
+`src/Render/DigitConverter.php`, `src/Html/Extractor.php` (`textSpans()`), `src/Render/Pipeline.php` (digits on page output, fragments, texts), `src/Settings.php` (`digits_mode`, `digits_skip_prices`, `digitsMode()`), `assets-src/admin/screens/Advanced.js`, `build/admin.*`, tests `tests/Integration/Render/DigitConverterTest.php`.
 
 ## Phase 6c acceptance (plan §16)
 
@@ -446,7 +462,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,345 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6c included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,352 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6d included.
 - `npm run test:js` (Node's built-in test runner, no extra dependency): 4 tests green.
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
@@ -503,5 +519,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) and 6c (P79–P85); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
-2. Phase 6d (plan §13A.6): digit conversion.
+1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) 6c (P79–P85) and 6d (P86–P88); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
+2. Phase 6e (plan §13A.7): browser-language suggestion (bar / redirect).

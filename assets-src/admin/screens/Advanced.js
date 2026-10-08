@@ -344,6 +344,29 @@ function Orphans() {
 	);
 }
 
+/**
+ * Digit set suggested for a target language (never enabled automatically,
+ * plan §13A.6).
+ *
+ * @param {string} locale Target locale.
+ */
+function digitsSuggestion( locale ) {
+	const language = ( locale || '' ).split( '_' )[ 0 ];
+	if ( language === 'bn' ) {
+		return __(
+			'Suggested for Bengali: Bengali digits.',
+			'wp-site-translator'
+		);
+	}
+	if ( language === 'ur' || language === 'fa' ) {
+		return __(
+			'Suggested for Urdu and Persian: Persian digits.',
+			'wp-site-translator'
+		);
+	}
+	return '';
+}
+
 export default function Advanced( {
 	draft,
 	update,
@@ -425,6 +448,69 @@ export default function Advanced( {
 					name="hreflang_drop_region"
 					label={ __(
 						'Use language codes without region (bn instead of bn-BD) in hreflang and the lang attribute',
+						'wp-site-translator'
+					) }
+				/>
+			</Section>
+			<Section
+				title={ __( 'Digits', 'wp-site-translator' ) }
+				description={ __(
+					'Write numbers with the digits of the target language on translated pages. Only visible text changes: links, attributes, e-mail addresses, form values, code and never-translate terms keep their digits.',
+					'wp-site-translator'
+				) }
+			>
+				<Choice
+					{ ...fields }
+					radio
+					name="digits_mode"
+					label={ __(
+						'Digits on translated pages',
+						'wp-site-translator'
+					) }
+					help={ digitsSuggestion( fields.draft.target_language ) }
+					options={ [
+						{
+							value: 'auto',
+							label: __(
+								'Automatic: Arabic-Indic digits for Arabic, unchanged for other languages',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'off',
+							label: __(
+								'Unchanged (0123456789)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'bengali',
+							label: __(
+								'Bengali (০১২৩৪৫৬৭৮৯)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'arabic_indic',
+							label: __(
+								'Arabic-Indic (٠١٢٣٤٥٦٧٨٩)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'persian',
+							label: __(
+								'Persian, also used for Urdu (۰۱۲۳۴۵۶۷۸۹)',
+								'wp-site-translator'
+							),
+						},
+					] }
+				/>
+				<Toggle
+					{ ...fields }
+					name="digits_skip_prices"
+					label={ __(
+						'Keep WooCommerce prices as they are',
 						'wp-site-translator'
 					) }
 				/>

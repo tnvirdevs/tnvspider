@@ -61,6 +61,12 @@ final class Settings {
 	/** Where the visitor IP for the lookup rate limit comes from: REMOTE_ADDR, CF-Connecting-IP, X-Forwarded-For or a custom header. */
 	public const TRUSTED_PROXIES = array( 'none', 'cloudflare', 'forwarded', 'custom' );
 
+	/**
+	 * Digit conversion on target pages (plan §13A.6). "auto" = Arabic-Indic
+	 * digits for an Arabic target (owner decision), off for any other.
+	 */
+	public const DIGITS_MODES = array( 'auto', 'off', 'bengali', 'arabic_indic', 'persian' );
+
 	/** JSON keys and header names: letters, digits, "_" and "-". */
 	private const KEY_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/';
 
@@ -140,7 +146,9 @@ final class Settings {
 	 *     dynamic_json_keys: list<string>,
 	 *     dynamic_lookup: bool,
 	 *     trusted_proxy: string,
-	 *     trusted_proxy_header: string
+	 *     trusted_proxy_header: string,
+	 *     digits_mode: string,
+	 *     digits_skip_prices: bool
 	 * }
 	 */
 	private array $values;
@@ -309,6 +317,19 @@ final class Settings {
 	}
 
 	/**
+	 * Effective digit conversion: off, bengali, arabic_indic or persian.
+	 * "auto" means Arabic-Indic digits for an Arabic target language, off otherwise.
+	 */
+	public function digitsMode(): string {
+		$mode = $this->values['digits_mode'];
+		if ( 'auto' !== $mode ) {
+			return $mode;
+		}
+
+		return str_starts_with( $this->values['target_language'], 'ar' ) ? 'arabic_indic' : 'off';
+	}
+
+	/**
 	 * Custom header with the visitor IP (trusted_proxy = custom), or ''.
 	 */
 	public function trustedProxyHeader(): string {
@@ -322,7 +343,7 @@ final class Settings {
 	 * @throws \InvalidArgumentException For a key that is not a choice.
 	 */
 	public function choice( string $key ): string {
-		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level', 'trusted_proxy' ), true ) ) {
+		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level', 'trusted_proxy', 'digits_mode' ), true ) ) {
 			throw new \InvalidArgumentException( 'Not a choice setting: ' . esc_html( $key ) );
 		}
 
@@ -418,7 +439,9 @@ final class Settings {
 	 *     dynamic_json_keys: list<string>,
 	 *     dynamic_lookup: bool,
 	 *     trusted_proxy: string,
-	 *     trusted_proxy_header: string
+	 *     trusted_proxy_header: string,
+	 *     digits_mode: string,
+	 *     digits_skip_prices: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -470,6 +493,8 @@ final class Settings {
 			'dynamic_json_keys'       => array_values( array_filter( self::readList( $raw, 'dynamic_json_keys', self::DYNAMIC_JSON_KEYS ), static fn( string $key ): bool => 1 === preg_match( self::KEY_PATTERN, $key ) ) ),
 			'dynamic_lookup'          => self::readBool( $raw, 'dynamic_lookup', false ),
 			'trusted_proxy'           => self::readChoice( $raw, 'trusted_proxy', self::TRUSTED_PROXIES ),
+			'digits_mode'             => self::readChoice( $raw, 'digits_mode', self::DIGITS_MODES ),
+			'digits_skip_prices'      => self::readBool( $raw, 'digits_skip_prices', true ),
 			'trusted_proxy_header'    => isset( $raw['trusted_proxy_header'] ) && is_string( $raw['trusted_proxy_header'] ) && 1 === preg_match( self::KEY_PATTERN, trim( $raw['trusted_proxy_header'] ) ) ? trim( $raw['trusted_proxy_header'] ) : '',
 		);
 	}

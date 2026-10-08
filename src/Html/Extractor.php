@@ -204,6 +204,13 @@ final class Extractor {
 	private array $links = array();
 
 	/**
+	 * Visible text tokens of the last extraction, outside excluded areas: [start, length].
+	 *
+	 * @var list<array{0: int, 1: int}>
+	 */
+	private array $spans = array();
+
+	/**
 	 * Extract the translatable segments of a document or fragment.
 	 *
 	 * @param string $html Document or fragment.
@@ -215,6 +222,7 @@ final class Extractor {
 		$this->frames   = array();
 		$this->segments = array();
 		$this->links    = array();
+		$this->spans    = array();
 
 		while ( $this->lexer->next_token() ) {
 			switch ( $this->lexer->get_token_type() ) {
@@ -314,6 +322,18 @@ final class Extractor {
 	}
 
 	/**
+	 * Every non-blank text token of the last extract() call that is outside
+	 * excluded areas (code, pre, svg, no-translate markers, exclude
+	 * selectors), as [start, length] in bytes, in document order. Text
+	 * inside script, style, textarea and title is never a text token.
+	 *
+	 * @return list<array{0: int, 1: int}>
+	 */
+	public function textSpans(): array {
+		return $this->spans;
+	}
+
+	/**
 	 * Link targets of the last extract() call: href of A and AREA, action of
 	 * FORM, as [start, length, attribute, decoded value] of the tag token.
 	 * Links that carry hreflang point at a specific language and are left out.
@@ -369,6 +389,7 @@ final class Extractor {
 		if ( '' === $normalized || ( null !== $frame && $frame->excluded ) ) {
 			return;
 		}
+		$this->spans[] = array( $start, $length );
 		if ( null !== $frame ) {
 			++$frame->textNodes;
 		}
