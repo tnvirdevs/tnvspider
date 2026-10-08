@@ -11,3 +11,4 @@ parameters:
 	scanFiles:
 		- tests/phpstan/wp-cli-stubs.php
 		- tests/phpstan/cache-plugin-stubs.php
+		- tests/phpstan/seo-plugin-stubs.php

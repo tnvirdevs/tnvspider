@@ -62,6 +62,9 @@ use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
 use WST\Routing\Urls;
 use WST\Site\SitePages;
+use WST\Sitemap\SeoPlugins;
+use WST\Sitemap\Sitemaps;
+use WST\Sitemap\TargetProvider;
 use WST\Storage\StringStore;
 use WST\Transfer\Exporter;
 use WST\Transfer\Importer;
@@ -146,6 +149,9 @@ final class Plugin {
 				$pipeline->boot();
 				( new Fragments( $settings, $pipeline, $logger ) )->boot();
 				( new Client( $settings, $modes, $file ) )->boot();
+				if ( $settings->flag( 'sitemap_alternates' ) ) {
+					( new Sitemaps( new TargetProvider( $byLang, $urls, $modes, new SeoPlugins() ) ) )->boot();
+				}
 			}
 			$purger = new Purger( self::strings(), $urls, $target, LanguageUrls::origin( $home ) );
 			$purger->boot();

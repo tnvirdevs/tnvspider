@@ -451,6 +451,18 @@ export default function Advanced( {
 						'wp-site-translator'
 					) }
 				/>
+				<Toggle
+					{ ...fields }
+					name="sitemap_alternates"
+					label={ __(
+						'List translated pages in the XML sitemap',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'Adds a sitemap of the translated URLs to the WordPress, Yoast SEO or Rank Math sitemap index. Pages set to Off and pages marked noindex are left out.',
+						'wp-site-translator'
+					) }
+				/>
 			</Section>
 			<Section
 				title={ __( 'Language suggestion', 'wp-site-translator' ) }

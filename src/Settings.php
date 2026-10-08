@@ -158,7 +158,8 @@ final class Settings {
 	 *     lang_suggestion: string,
 	 *     suggestion_position: string,
 	 *     suggestion_text_default: string,
-	 *     suggestion_text_target: string
+	 *     suggestion_text_target: string,
+	 *     sitemap_alternates: bool
 	 * }
 	 */
 	private array $values;
@@ -260,7 +261,7 @@ final class Settings {
 	 *
 	 * @param string $key One of discover_on_visit, block_crawlers, force_language_links,
 	 *                    hreflang_x_default, hreflang_drop_region, editor_mt_on_manual,
-	 *                    trp_switcher_alias.
+	 *                    trp_switcher_alias, sitemap_alternates.
 	 */
 	public function flag( string $key ): bool {
 		return (bool) ( $this->values[ $key ] ?? false );
@@ -464,7 +465,8 @@ final class Settings {
 	 *     lang_suggestion: string,
 	 *     suggestion_position: string,
 	 *     suggestion_text_default: string,
-	 *     suggestion_text_target: string
+	 *     suggestion_text_target: string,
+	 *     sitemap_alternates: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -522,6 +524,7 @@ final class Settings {
 			'suggestion_position'     => self::readChoice( $raw, 'suggestion_position', array( 'bottom', 'top' ) ),
 			'suggestion_text_default' => self::readShortText( $raw, 'suggestion_text_default' ),
 			'suggestion_text_target'  => self::readShortText( $raw, 'suggestion_text_target' ),
+			'sitemap_alternates'      => self::readBool( $raw, 'sitemap_alternates', true ),
 			'trusted_proxy_header'    => isset( $raw['trusted_proxy_header'] ) && is_string( $raw['trusted_proxy_header'] ) && 1 === preg_match( self::KEY_PATTERN, trim( $raw['trusted_proxy_header'] ) ) ? trim( $raw['trusted_proxy_header'] ) : '',
 		);
 	}

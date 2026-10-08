@@ -72,6 +72,8 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 6e — Browser-language suggestion: done (2026-10-08).** Plan §13A.7; acceptance in "Phase 6e acceptance". Advanced → "Language suggestion": Off (default) · Bar (asks) · Redirect (first visit, automatic), bar position, bar text per language (written by the owner in that language; empty = language name). `assets/suggest.js` (4.5 KB, 1.9 KB gzipped) decides in the browser from `navigator.languages` and the `wst_lang_choice` cookie (180 days, first-party, mentioned in the help for cookie policies); the page carries the same data for every visitor.
 
+**Phase 6f — Sitemap language alternates: done (2026-10-08).** Plan §13A.8; acceptance in "Phase 6f acceptance". Advanced → "Links and search engines" → "List translated pages in the XML sitemap" (default on; there is no separate "published" state for the target language, so on means on once a target exists). A core sitemap provider `wst` lists the target-language URL of every URL the core posts and taxonomies sitemaps list (home included), with the post's `lastmod`, leaving out pages whose mode is "off" and pages the SEO plugin marks noindex: `/wp-sitemap-wst-posts-{type}-N.xml`, `/wp-sitemap-wst-terms-{taxonomy}-N.xml`, listed in `/wp-sitemap.xml`. With Yoast SEO or Rank Math (they switch core sitemaps off) the same URLs are served by the plugin and added to their index (`wpseo_sitemap_index`, `rank_math/sitemap/index`). No `xhtml:link` alternates anywhere (P96); `<head>` hreflang stays the baseline.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -318,6 +320,10 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P90 | The server never reads the cookie or `Accept-Language`; per page it prints only the other language's URL, tag, name and bar text, so cached pages are identical for everyone (verified on a static copy). Nothing is printed for "off" pages (no equivalent, so never a redirect there), 404s, feeds and editor scan/preview requests. | Plan §13A.7, §15 caching. |
 | P91 | The cookie is set when the bar is dismissed (page language), when its link is followed (other language), on any click on a link with `hreflang` of our two languages (switcher, menu items) and just before a redirect, so a redirect happens at most once and a switcher choice always wins. | Plan: "never twice", "a switcher click always wins". |
 | P92 | The bar is a `role="region"` labelled with the other language's name and `lang` of that language; its close button is labelled in the page language; it is not focused on show, and focus returns to the page when it is dismissed from the keyboard. Script size 4.5 KB unminified (1.9 KB gzipped), above the plan's "~1 KB", because plain assets are not minified (like `preview.js`). | Accessibility; no build step for front-end assets. |
+| P93 | The target-language sitemap is a separate core provider (`wst`, subtypes `posts-{type}` / `terms-{taxonomy}`) whose queries are the core providers' own (`WP_Sitemaps_Posts` / `WP_Sitemaps_Taxonomies` subclasses exposing their protected query arguments): same post types, statuses, order, page size and every `wp_sitemaps_*` filter. Users (author archives) are not listed (plan: post types, taxonomies, home). | Plan §13A.8; no drift from the default sitemap. |
+| P94 | Left out: mode "off" (page meta and path rules, via `Resolver`), drafts/private (core query), and noindex as decided by the active SEO plugin: Yoast SEO through its documented Surfaces API (`YoastSEO()->meta->for_post()` / `for_url()` → `robots`, `helpers->post_type/taxonomy->is_indexable()`) and the documented `wpseo_exclude_from_sitemap_by_post_ids`; Rank Math through its public `RankMath\Helper::is_post_indexable / is_term_indexable / is_post_type_indexable / is_taxonomy_indexable` (the checks its own sitemap uses; **not** in Rank Math's filter docs, verified in the 1.0.280 source). Without either plugin WordPress has no per-page noindex. If those APIs disappear the call throws (fails loudly). | Plan: honour noindex; VERIFY against official docs (Yoast docs fetched 2026-10-08; Rank Math filter KB fetched the same day). |
+| P95 | Yoast SEO and Rank Math disable core sitemaps (`wp_sitemaps_enabled`), but core keeps its rewrite rules; while one of them is active on a public site we serve `/wp-sitemap-wst-*.xml` ourselves at `template_redirect` priority 0 (HTTP 200, core's renderer, no core XSL because its URL then answers 404) and add those URLs to their index through the documented `wpseo_sitemap_index` and `rank_math/sitemap/index` filters. Sites that block search engines get no sitemap, as in core. Rank Math loads its sitemap module only after registration or the wizard's "skip"; before that core sitemaps stay on and ours is in the core index. | Plan §13A.8; both filters verified in the official docs. |
+| P96 | No `xhtml:link` alternates: core has no hook for them (plan), Yoast documents only a `urlset` namespace filter but no per-URL output filter, and Rank Math's documented `rank_math/sitemap/entry` gives URL parts that its renderer does not print as `xhtml:link`. Documented limitation; `<head>` hreflang tags (§5) remain the baseline. | Plan: "if none exists, document the limitation". |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -364,9 +370,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Remaining
 
-- Phases 4–7 per plan §16.
-- Phase 7: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
-- Deferred by design (built together with their phases, no dead settings now): §13A settings without a backend yet — digit conversion, dynamic content and dynamic scan (6c), language suggestion, sitemap alternates, TranslatePress (Phase 6; CSV done in 6a); TranslatePress coexistence guard (6b); AJAX/REST fragment translation (6c).
+- Phase 7 per plan §16: Microsoft and Gemini live verification and the staging-site compatibility matrix (see "Phase 7 acceptance (planned)").
+- All §13A features are built (Phase 6a–6f); no settings without a backend remain.
 
 ## Staging fixes acceptance
 
@@ -376,6 +381,16 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Phase 6f acceptance (plan §16)
+
+- PASS — The sitemap lists target URLs, omitting "off" and noindex pages: `SitemapTest` (home first with latest posts on front, page "off" by meta and by path rule left out, drafts left out, `lastmod` from the post, categories, unknown subtype empty, Rank Math noindex post/term/taxonomy left out through a stand-in helper). Live, core: `/wp-sitemap.xml` lists 5 `wst` sitemaps; counts equal the core ones (posts 119, pages 33, categories 71, tags 68, formats 9); a post set to "off" → 118 while core keeps 119. Live, **Yoast SEO 28.6**: `/wp-sitemap.xml` → 301 to `/sitemap_index.xml`, which lists our 4 sitemaps (post formats not indexable in Yoast); each answers 200 with the same count as Yoast's own sitemap; `sample-page` set noindex in Yoast (`<meta name='robots' content='noindex, follow'>`) → 32 vs 33. Live, **Rank Math 1.0.280** (after the wizard's skip): its index lists our 3 sitemaps (tags and formats noindex by Rank Math default); counts equal Rank Math's own; `rank_math_robots = noindex` on `sample-page` → 32. Toggle off → no `wst` entries, 404.
+- PASS — Validated against the sitemap XML rules: `SitemapTest` validates the core index and every target sitemap against the official sitemaps.org 0.9 XSDs (`tests/fixtures/sitemaps/`); live XML from core, Yoast and Rank Math runs validates with `xmllint --schema` (`siteindex.xsd`, `sitemap.xsd`).
+- Screenshots (scratchpad `shots6f/`): `core-index.png`, `yoast-index.png`, `rankmath-index.png`, `rankmath-wst-page.png`, `advanced-toggle.png`. Yoast SEO and Rank Math are installed **inactive** on the dev site.
+
+## Files changed (Phase 6f)
+
+`src/Sitemap/{TargetProvider,Sitemaps,SeoPlugins,PostQueries,TermQueries}.php`, `src/Settings.php` (`sitemap_alternates`), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `build/admin.*`, `phpstan.neon.dist` + `tests/phpstan/seo-plugin-stubs.php` (`YoastSEO()` signature), tests `tests/Integration/Sitemap/SitemapTest.php`, fixtures `tests/fixtures/sitemaps/` (sitemaps.org XSDs, CC BY-SA 2.5; Rank Math helper stand-in).
 
 ## Phase 6e acceptance (plan §16)
 
@@ -478,7 +493,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,357 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6e included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,363 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6f included.
 - `npm run test:js` (Node's built-in test runner, no extra dependency): 20 tests green (CSV reader, suggestion decision table).
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
@@ -508,6 +523,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 15. Dev site (scratchpad, not the plugin): TranslatePress 3.3.7 installed and **inactive** with its dictionary filled for 6b checks; `DISABLE_WP_CRON` is set in its `wp-config.php` so bulk queue tests send nothing to TranslateX (`wp cron event run --due-now` to run the queue on purpose); a "Contact" page and "TP Menu" menu exist for the references check.
 16. The 6b dataset is TranslatePress-generated originals with translations filled in by script (TranslatePress needs a paid/keyed provider to translate itself); the owner's real export is the remaining check.
 17. Dynamic lookup does not see text that scripts insert while the page is still loading (P83); such text is not translated on the page (server-rendered HTML is).
+18. Sitemaps carry no `xhtml:link` alternates (P96); a sitemap page whose posts are all "off" or noindex answers 404 although the index lists it (pages follow the core page size).
 
 ## Dev environment setup (scripted)
 
@@ -535,5 +551,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) 6c (P79–P85), 6d (P86–P88) and 6e (P89–P92); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
-2. Phase 6f (plan §13A.8): sitemap language alternates (core provider; Yoast / Rank Math filters, VERIFY their APIs).
+1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78), 6c (P79–P85), 6d (P86–P88), 6e (P89–P92) and 6f (P93–P96); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
+2. Phase 6 is complete. Next: Phase 7 per plan §16 (Microsoft and Gemini live checks — ask for those keys only then — compatibility pass incl. known issue 10, CI matrix, hardening items in known issue 5).
