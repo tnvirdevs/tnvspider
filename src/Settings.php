@@ -67,6 +67,12 @@ final class Settings {
 	 */
 	public const DIGITS_MODES = array( 'auto', 'off', 'bengali', 'arabic_indic', 'persian' );
 
+	/** Browser-language suggestion (plan §13A.7): off, a bar that asks, or an automatic first-visit redirect. */
+	public const SUGGESTION_MODES = array( 'off', 'bar', 'redirect' );
+
+	/** Longest suggestion bar text. */
+	public const SUGGESTION_TEXT_MAX = 200;
+
 	/** JSON keys and header names: letters, digits, "_" and "-". */
 	private const KEY_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/';
 
@@ -148,7 +154,11 @@ final class Settings {
 	 *     trusted_proxy: string,
 	 *     trusted_proxy_header: string,
 	 *     digits_mode: string,
-	 *     digits_skip_prices: bool
+	 *     digits_skip_prices: bool,
+	 *     lang_suggestion: string,
+	 *     suggestion_position: string,
+	 *     suggestion_text_default: string,
+	 *     suggestion_text_target: string
 	 * }
 	 */
 	private array $values;
@@ -317,6 +327,15 @@ final class Settings {
 	}
 
 	/**
+	 * Suggestion bar text written in a language: "default" or "target" ('' = use the language name).
+	 *
+	 * @param string $which default or target.
+	 */
+	public function suggestionText( string $which ): string {
+		return 'target' === $which ? $this->values['suggestion_text_target'] : $this->values['suggestion_text_default'];
+	}
+
+	/**
 	 * Effective digit conversion: off, bengali, arabic_indic or persian.
 	 * "auto" means Arabic-Indic digits for an Arabic target language, off otherwise.
 	 */
@@ -343,7 +362,7 @@ final class Settings {
 	 * @throws \InvalidArgumentException For a key that is not a choice.
 	 */
 	public function choice( string $key ): string {
-		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level', 'trusted_proxy', 'digits_mode' ), true ) ) {
+		if ( ! in_array( $key, array( 'name_style', 'switcher_style', 'switcher_position', 'switcher_theme', 'off_behavior', 'log_level', 'trusted_proxy', 'digits_mode', 'lang_suggestion', 'suggestion_position' ), true ) ) {
 			throw new \InvalidArgumentException( 'Not a choice setting: ' . esc_html( $key ) );
 		}
 
@@ -441,7 +460,11 @@ final class Settings {
 	 *     trusted_proxy: string,
 	 *     trusted_proxy_header: string,
 	 *     digits_mode: string,
-	 *     digits_skip_prices: bool
+	 *     digits_skip_prices: bool,
+	 *     lang_suggestion: string,
+	 *     suggestion_position: string,
+	 *     suggestion_text_default: string,
+	 *     suggestion_text_target: string
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -495,6 +518,10 @@ final class Settings {
 			'trusted_proxy'           => self::readChoice( $raw, 'trusted_proxy', self::TRUSTED_PROXIES ),
 			'digits_mode'             => self::readChoice( $raw, 'digits_mode', self::DIGITS_MODES ),
 			'digits_skip_prices'      => self::readBool( $raw, 'digits_skip_prices', true ),
+			'lang_suggestion'         => self::readChoice( $raw, 'lang_suggestion', self::SUGGESTION_MODES ),
+			'suggestion_position'     => self::readChoice( $raw, 'suggestion_position', array( 'bottom', 'top' ) ),
+			'suggestion_text_default' => self::readShortText( $raw, 'suggestion_text_default' ),
+			'suggestion_text_target'  => self::readShortText( $raw, 'suggestion_text_target' ),
 			'trusted_proxy_header'    => isset( $raw['trusted_proxy_header'] ) && is_string( $raw['trusted_proxy_header'] ) && 1 === preg_match( self::KEY_PATTERN, trim( $raw['trusted_proxy_header'] ) ) ? trim( $raw['trusted_proxy_header'] ) : '',
 		);
 	}
@@ -627,6 +654,18 @@ final class Settings {
 	 */
 	private static function readLocale( $value ): string {
 		return is_string( $value ) && 1 === preg_match( '/^[a-z]{2,3}(_[A-Za-z0-9]{2,8})*$/', $value ) ? $value : '';
+	}
+
+	/**
+	 * Single-line plain text, at most SUGGESTION_TEXT_MAX characters.
+	 *
+	 * @param array<string, mixed> $raw Raw values.
+	 * @param string               $key Setting key.
+	 */
+	private static function readShortText( array $raw, string $key ): string {
+		$value = isset( $raw[ $key ] ) && is_string( $raw[ $key ] ) ? sanitize_text_field( $raw[ $key ] ) : '';
+
+		return mb_substr( $value, 0, self::SUGGESTION_TEXT_MAX );
 	}
 
 	/**

@@ -65,6 +65,7 @@ use WST\Site\SitePages;
 use WST\Storage\StringStore;
 use WST\Transfer\Exporter;
 use WST\Transfer\Importer;
+use WST\Switcher\Suggestion;
 use WST\Switcher\Switcher;
 
 /**
@@ -139,6 +140,7 @@ final class Plugin {
 				( new AdminBar( $urls, $byLang, $target, $file ) )->boot();
 				( new HeadTags( $settings, $settings->defaultLanguage(), $target, $byLang, $modes ) )->boot();
 				( new Switcher( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
+				( new Suggestion( $settings, $settings->defaultLanguage(), $target, $byLang, $modes, $file ) )->boot();
 				( new OffPages( $settings, $modes, $byLang ) )->boot();
 				$pipeline = new Pipeline( $settings, $target, self::strings(), new DiscoveryGate( $settings, $logger ), $logger, $urls, $auto, $modes, new Preview( plugins_url( 'assets/preview.js', $file ) ) );
 				$pipeline->boot();

@@ -453,6 +453,103 @@ export default function Advanced( {
 				/>
 			</Section>
 			<Section
+				title={ __( 'Language suggestion', 'wp-site-translator' ) }
+				description={ __(
+					'When a visitor’s browser prefers the other language, suggest the same page in that language. The page is the same for everyone (works with page caches); the choice is made in the browser.',
+					'wp-site-translator'
+				) }
+			>
+				<Choice
+					{ ...fields }
+					radio
+					name="lang_suggestion"
+					label={ __( 'Suggestion', 'wp-site-translator' ) }
+					options={ [
+						{
+							value: 'off',
+							label: __( 'Off', 'wp-site-translator' ),
+						},
+						{
+							value: 'bar',
+							label: __(
+								'Bar: asks the visitor with a link to the other language',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'redirect',
+							label: __(
+								'Redirect: sends the visitor there automatically on the first visit',
+								'wp-site-translator'
+							),
+						},
+					] }
+					help={
+						fields.draft.lang_suggestion === 'redirect'
+							? __(
+									'Redirects never apply to search engines and other bots, never go to a page set to "off", happen once (the choice is remembered) and are skipped with ?wst_no_redirect=1. Automatic redirects can surprise visitors who opened a link on purpose; the bar is the gentler choice.',
+									'wp-site-translator'
+								)
+							: __(
+									'The visitor’s choice (dismissing the bar, following it or using the language switcher) is remembered for 180 days in the first-party cookie wst_lang_choice; mention it in your cookie policy.',
+									'wp-site-translator'
+								)
+					}
+				/>
+				{ fields.draft.lang_suggestion !== 'off' && (
+					<>
+						<Choice
+							{ ...fields }
+							name="suggestion_position"
+							label={ __( 'Bar position', 'wp-site-translator' ) }
+							options={ [
+								{
+									value: 'bottom',
+									label: __( 'Bottom', 'wp-site-translator' ),
+								},
+								{
+									value: 'top',
+									label: __( 'Top', 'wp-site-translator' ),
+								},
+							] }
+						/>
+						<Text
+							{ ...fields }
+							name="suggestion_text_target"
+							label={ sprintf(
+								/* translators: %s: language name */
+								__(
+									'Bar text in %s (shown on default-language pages)',
+									'wp-site-translator'
+								),
+								data.languages.target
+									? data.languages.target.english
+									: __(
+											'the target language',
+											'wp-site-translator'
+										)
+							) }
+							help={ __(
+								'Write it in that language; it links to the translated page. Empty: the language name.',
+								'wp-site-translator'
+							) }
+						/>
+						<Text
+							{ ...fields }
+							name="suggestion_text_default"
+							label={ sprintf(
+								/* translators: %s: language name */
+								__(
+									'Bar text in %s (shown on translated pages)',
+									'wp-site-translator'
+								),
+								data.languages.default.english
+							) }
+						/>
+					</>
+				) }
+			</Section>
+			<Section
 				title={ __( 'Digits', 'wp-site-translator' ) }
 				description={ __(
 					'Write numbers with the digits of the target language on translated pages. Only visible text changes: links, attributes, e-mail addresses, form values, code and never-translate terms keep their digits.',

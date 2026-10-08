@@ -70,6 +70,8 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 6d — Digit conversion: done (2026-10-08).** Plan §13A.6; acceptance in "Phase 6d acceptance". Advanced → "Digits": Automatic (Arabic-Indic for an Arabic target, owner decision; unchanged for others) · Unchanged · Bengali · Arabic-Indic · Persian (also Urdu), with a suggestion for Bengali/Urdu/Persian that is never applied by itself; "Keep WooCommerce prices as they are" (default on, `.woocommerce-Price-amount`, `.price`). Applied to target-language output only: pages, AJAX/REST fragments and looked-up texts.
 
+**Phase 6e — Browser-language suggestion: done (2026-10-08).** Plan §13A.7; acceptance in "Phase 6e acceptance". Advanced → "Language suggestion": Off (default) · Bar (asks) · Redirect (first visit, automatic), bar position, bar text per language (written by the owner in that language; empty = language name). `assets/suggest.js` (4.5 KB, 1.9 KB gzipped) decides in the browser from `navigator.languages` and the `wst_lang_choice` cookie (180 days, first-party, mentioned in the help for cookie policies); the page carries the same data for every visitor.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -312,6 +314,10 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P86 | `digits_mode` has an `auto` value (default) that resolves at render time: Arabic-Indic when the target locale starts with `ar`, otherwise off. | Every save stores all keys, so a stored "off" would hide the owner's Arabic default after a later target change. |
 | P87 | Conversion is a pass over the final translated HTML using the extractor's visible text spans (new `Extractor::textSpans()`), so it honours the same exclusions as translation (code, pre, svg, math, noscript, template, no-translate markers, exclude selectors) plus the price selectors; script, style, textarea and title are never text tokens; attributes are never touched. | One definition of "visible text"; inline strings are covered after replacement. |
 | P88 | Inside text, character references (`&#8217;`, `&#038;`), URLs, e-mail addresses and never-translate terms that contain digits keep their ASCII digits; digits already in another script are left alone. | Plan: never in URLs, e-mails or protected tokens; references must stay valid HTML. |
+| P89 | The decision is one pure function (`decide`, exported for Node when loaded as a module) covering browser languages × page language × cookie × bot × mode × `wst_no_redirect` × equivalent page; `tests/js/suggest.test.mjs` is the plan's decision table (16 cases). The bar is also not shown to bots and automated browsers (`navigator.webdriver`), not only the redirect. | Testable without a browser; crawlers have no language preference and would otherwise render the bar text. |
+| P90 | The server never reads the cookie or `Accept-Language`; per page it prints only the other language's URL, tag, name and bar text, so cached pages are identical for everyone (verified on a static copy). Nothing is printed for "off" pages (no equivalent, so never a redirect there), 404s, feeds and editor scan/preview requests. | Plan §13A.7, §15 caching. |
+| P91 | The cookie is set when the bar is dismissed (page language), when its link is followed (other language), on any click on a link with `hreflang` of our two languages (switcher, menu items) and just before a redirect, so a redirect happens at most once and a switcher choice always wins. | Plan: "never twice", "a switcher click always wins". |
+| P92 | The bar is a `role="region"` labelled with the other language's name and `lang` of that language; its close button is labelled in the page language; it is not focused on show, and focus returns to the page when it is dismissed from the keyboard. Script size 4.5 KB unminified (1.9 KB gzipped), above the plan's "~1 KB", because plain assets are not minified (like `preview.js`). | Accessibility; no build step for front-end assets. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -370,6 +376,16 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Switcher offset 80 px: 80 px above the bottom edge over a 64 px fake fixed bar at 390 px; right 16 px in LTR, left 16 px with `dir="rtl"` (what the pipeline prints for an RTL target); settings preview mirrors in the RTL admin (gaps 17/128 → 128/17, bottom 81). `SettingsTest::test_switcher_offset_defaults_and_is_clamped`, `SwitcherTest::test_floating_offset_is_a_css_variable_and_inline_switchers_have_none`.
 - PASS — Hostile notice: shown on `edit.php`, absent on Overview, Pages and Switcher screens. `EditorScreenTest::test_settings_screen_hides_other_plugins_notices_but_keeps_their_scripts`, `test_other_screens_keep_other_plugins_notices`.
 - Logo (owner's staging report): **no plugin cause found.** Default-language pages are not buffered (`PipelineTest` covers it); on the dev site the English page with the plugin on vs. off differs only in the hreflang links and the switcher stylesheet; the logo `src` is unchanged and loads 200, also with the default-language prefix on. To check on staging: the logo `<img src>` on the English page (and whether it is a CDN/optimisation URL or an `http://` URL on an `https://` site).
+
+## Phase 6e acceptance (plan §16)
+
+- PASS — Suggestion bar works on a fully cached page: live, a Bengali browser on `/hello-world/` and on a **static HTML copy** of that page (served as a file) sees "এই পাতাটি বাংলায় পড়ুন" linking to `/bn/hello-world/` (`role=region`, `lang=bn-BD`); after dismissing, cookie `wst_lang_choice=en` (180 days) and no bar on reload; an English browser sees nothing on the English page and "Read this page in English" on the Bengali page. HTML for different browsers and cookies is identical apart from the theme's own category order. `SuggestionTest` (data per page, nothing when off / on "off" pages / 404 / feed, same data whatever the cookie or browser language, text sanitising).
+- PASS — Redirect never fires for bots or twice: live, a Bengali browser is sent from `/hello-world/` to `/bn/hello-world/` once; choosing English in the switcher stays on `/hello-world/`; Googlebot and `?wst_no_redirect=1` stay. `tests/js/suggest.test.mjs` decision table (16 cases incl. cookie, bot, no-redirect, off page).
+- Advanced → Language suggestion at 1280 and 390 px without overflow.
+
+## Files changed (Phase 6e)
+
+`assets/suggest.js`, `src/Switcher/Suggestion.php`, `src/Settings.php` (`lang_suggestion`, `suggestion_position`, `suggestion_text_default`, `suggestion_text_target`), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `build/admin.*`, tests `tests/Integration/Switcher/SuggestionTest.php`, `tests/js/suggest.test.mjs`.
 
 ## Phase 6d acceptance (plan §16)
 
@@ -462,8 +478,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,352 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6d included.
-- `npm run test:js` (Node's built-in test runner, no extra dependency): 4 tests green.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,357 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6e included.
+- `npm run test:js` (Node's built-in test runner, no extra dependency): 20 tests green (CSV reader, suggestion decision table).
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
 - `npm run lint:js` and `npm run lint:css`: clean. `npm run build`: builds `post-panel`, `switcher-block`, `admin`, `editor`.
@@ -519,5 +535,5 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) 6c (P79–P85) and 6d (P86–P88); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
-2. Phase 6e (plan §13A.7): browser-language suggestion (bar / redirect).
+1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78) 6c (P79–P85), 6d (P86–P88) and 6e (P89–P92); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
+2. Phase 6f (plan §13A.8): sitemap language alternates (core provider; Yoast / Rank Math filters, VERIFY their APIs).
