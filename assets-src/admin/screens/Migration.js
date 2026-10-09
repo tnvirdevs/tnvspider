@@ -275,7 +275,7 @@ function Import( { table, targetReady, reload } ) {
 							? __( 'Importing…', 'wp-site-translator' )
 							: __( 'Checking…', 'wp-site-translator' ) }{ ' ' }
 						{ sprintf(
-							/* translators: 1: rows read, 2: all rows */
+							/* translators: 1: rows processed so far, 2: all rows */
 							__( '%1$s of %2$s rows', 'wp-site-translator' ),
 							number( progress.read ),
 							number( table.counts.total )

@@ -74,6 +74,10 @@ Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Wor
 
 **Phase 6f — Sitemap language alternates: done (2026-10-08).** Plan §13A.8; acceptance in "Phase 6f acceptance". Advanced → "Links and search engines" → "List translated pages in the XML sitemap" (default on; there is no separate "published" state for the target language, so on means on once a target exists). A core sitemap provider `wst` lists the target-language URL of every URL the core posts and taxonomies sitemaps list (home included), with the post's `lastmod`, leaving out pages whose mode is "off" and pages the SEO plugin marks noindex: `/wp-sitemap-wst-posts-{type}-N.xml`, `/wp-sitemap-wst-terms-{taxonomy}-N.xml`, listed in `/wp-sitemap.xml`. With Yoast SEO or Rank Math (they switch core sitemaps off) the same URLs are served by the plugin and added to their index (`wpseo_sitemap_index`, `rank_math/sitemap/index`). No `xhtml:link` alternates anywhere (P96); `<head>` hreflang stays the baseline.
 
+**Phase 6 approved by the owner (2026-10-09).** Evidence limits (source builds, scripted data) are marked at the top of the 6b–6e acceptance sections.
+
+**Phase 7 — Hardening: in progress (2026-10-09).** Done in the keyless session: performance measurements, security review of every endpoint (live probe), uninstall and upgrade checks, i18n (POT, `Domain Path`, text-domain loading), `readme.txt` (with "External services"), `docs/STAGING-CHECKLIST.md` (15 steps for the owner's staging site), Gemini model name and request format re-verified against the current docs. **Waiting for the next session (owner sets `WST_AZURE_KEY`, `WST_AZURE_REGION`, `WST_GEMINI_KEY`):** Microsoft and Gemini live checks — procedure in "Phase 7 — live provider checks (next session)". Waiting for the owner: staging checklist results.
+
 ## Completed (Phase 0)
 
 - Plugin scaffold at repo root: `wp-site-translator.php`, `src/Autoloader.php` (PSR-4, no Composer at runtime), `src/Config.php` (all names), `.distignore`, `.gitignore`, `.editorconfig`.
@@ -324,6 +328,10 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P94 | Left out: mode "off" (page meta and path rules, via `Resolver`), drafts/private (core query), and noindex as decided by the active SEO plugin: Yoast SEO through its documented Surfaces API (`YoastSEO()->meta->for_post()` / `for_url()` → `robots`, `helpers->post_type/taxonomy->is_indexable()`) and the documented `wpseo_exclude_from_sitemap_by_post_ids`; Rank Math through its public `RankMath\Helper::is_post_indexable / is_term_indexable / is_post_type_indexable / is_taxonomy_indexable` (the checks its own sitemap uses; **not** in Rank Math's filter docs, verified in the 1.0.280 source). Without either plugin WordPress has no per-page noindex. If those APIs disappear the call throws (fails loudly). | Plan: honour noindex; VERIFY against official docs (Yoast docs fetched 2026-10-08; Rank Math filter KB fetched the same day). |
 | P95 | Yoast SEO and Rank Math disable core sitemaps (`wp_sitemaps_enabled`), but core keeps its rewrite rules; while one of them is active on a public site we serve `/wp-sitemap-wst-*.xml` ourselves at `template_redirect` priority 0 (HTTP 200, core's renderer, no core XSL because its URL then answers 404) and add those URLs to their index through the documented `wpseo_sitemap_index` and `rank_math/sitemap/index` filters. Sites that block search engines get no sitemap, as in core. Rank Math loads its sitemap module only after registration or the wizard's "skip"; before that core sitemaps stay on and ours is in the core index. | Plan §13A.8; both filters verified in the official docs. |
 | P96 | No `xhtml:link` alternates: core has no hook for them (plan), Yoast documents only a `urlset` namespace filter but no per-URL output filter, and Rank Math's documented `rank_math/sitemap/entry` gives URL parts that its renderer does not print as `xhtml:link`. Documented limitation; `<head>` hreflang tags (§5) remain the baseline. | Plan: "if none exists, document the limitation". |
+| P97 | Scan and preview responses send `Referrer-Policy: same-origin` (besides `no-store` and `noindex`): the token travels in the URL, so it must never reach other sites as a Referer. Same-origin requests keep the Referer (AJAX language detection uses it). | Security review; browsers' default policy already strips paths cross-origin, but a site could set `unsafe-url`. |
+| P98 | i18n: `Domain Path: /languages`, `languages/wp-site-translator.pot` generated with `wp i18n make-pot` (714 strings, PHP and built JS), `load_plugin_textdomain()` on `init` (not earlier: WP ≥ 6.7 warns about early loading), script translations looked up in `languages/` too. WordPress.org language packs load on their own. Regenerate the POT after string changes (command in "Phase 7 — hardening checks"). | Plan §16 Phase 7 "i18n strings"; translators need a template. |
+| P99 | `readme.txt` in the WordPress.org format with an **External services** section (what is sent to TranslateX, Microsoft and Gemini, when, and each service's terms and privacy links, checked reachable 2026-10-09) and the one cookie. The release zip now requires `readme.txt` and the POT. | Plugin directory guidelines; owner asked for a readme. |
+| P100 | `/lookup` abuse limits: ≤ 100 texts × 2,000 characters per request (rejected by REST validation before any work) and 60 requests per visitor IP per minute. **Changed in Phase 7:** the minute was a fixed clock minute, so a burst straddling hh:mm:59→00 got up to 120 requests through, and `test_lookup_rate_limit_per_visitor_ip_with_trusted_proxy` failed once in the full gate (reproduced: old code fails when the test starts 0.9 s before a minute; new code passes at 0.85–0.95 s). Now one window per IP that starts at its first request and lasts 60 s, stored in one transient per IP. Without a persistent object cache each active IP is one `wp_options` row for a minute; the lookup stays **off by default**. | Root cause of the gate failure; also closes the 2× burst. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -337,16 +345,60 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | Entry points | **PASS** | `EditorScreenTest::test_toolbar_entry_on_front_end_pages`, `test_editors_reach_the_editor_but_not_the_settings`; live toolbar link `…?page=wst-editor&post=1852`; Pages screen, post panels and Overview link to `?page=wst-editor`. |
 | RTL, mobile | **PASS** | Live: RTL editor mirrored (list and preview swap sides); 390 px: list only, no horizontal overflow. |
 
-## Phase 7 acceptance (planned) — moved here and added by the owner
+## Phase 7 acceptance (plan §16)
 
 | Item | Status |
 |---|---|
-| Microsoft: `wp wst provider test microsoft` and a live batch for `bn_BD` and `ar`; record `bin/capture-provider-fixtures.php microsoft all` | implemented, not yet verified live |
-| Microsoft `403001` quota behaviour with a real key (quota → `QuotaExceeded`, fallback, return next period) | implemented, not yet verified live |
-| Gemini: `wp wst provider test gemini` and a live batch; the model name (`gemini-3.5-flash-lite`) and the request format (`generationConfig.responseFormat`, structured JSON); record `bin/capture-provider-fixtures.php gemini all` | implemented, not yet verified live |
-| Gemini free-tier limits as shown in AI Studio (RPM, RPD, input TPM) against the defaults 5 / 100 / unlimited; 404 for an unknown model (P33) | implemented, not yet verified live |
-| Fallback switch and return with real keys (primary failure → fallback → primary again) | implemented, not yet verified live |
-| Compatibility matrix (§15) on a **real staging site with released WooCommerce and Elementor**: this environment only has source builds without their JavaScript builds (WooCommerce fatals in wp-admin, Elementor's JS 301s to HTML; see Known issues) | to do |
+| Microsoft: `wp wst provider test microsoft` and a live batch for `bn_BD` and `ar`; record `bin/capture-provider-fixtures.php microsoft all` | **next session** (keys) |
+| Microsoft `403001` quota behaviour with a real key | **next session**; see the note in the procedure (a real `403001` needs the F0 monthly quota used up) |
+| Gemini: `wp wst provider test gemini` and a live batch; model name and request format | docs re-verified 2026-10-09 (below); live **next session** |
+| Gemini free-tier limits (RPM, RPD, input TPM) against the defaults 5 / 100 / unlimited; 404 for an unknown model (P33) | **next session**; Google still publishes them only in AI Studio |
+| Fallback switch and return with real keys | **next session** |
+| Performance measurements | **PASS** (below) |
+| Security review of every endpoint, scan and preview, `/lookup` abuse limits | **PASS** (below; one hardening change, P97) |
+| Uninstall, upgrade routine | **PASS** (below) |
+| i18n strings, readme | **PASS** (P98, P99) |
+| Compatibility matrix (§15) incl. a run with TranslatePress active (guard) | Guard run done in 6b (dev site); Yoast SEO 28.6 and Rank Math 1.0.280 sitemaps done in 6f; **released WooCommerce and Elementor: owner, `docs/STAGING-CHECKLIST.md`** |
+| Full suite + PHPStan + PHPCS | **PASS** (see Validation status) |
+
+## Phase 7 — hardening checks (2026-10-09, keyless session)
+
+**Performance** (dev site, PHP 8.3 built-in server with opcache, MariaDB 10.11, Twenty Twenty-Five-era content, medians of 25–41 requests after warm-up; probe mu-plugin with `SAVEQUERIES` and a `pre_http_request` counter, scratchpad only):
+
+| Page | Plugin off | Plugin on | Notes |
+|---|---|---|---|
+| `/hello-world/` (default language, 63 KB) | 36 queries, 39.0 ms | 36 queries, 40.5–43.8 ms | **0 extra queries**; TTFB difference within run-to-run noise (±3 ms) |
+| `/` and `/sample-page/` (default) | 29 queries, 50.2 / 38.9 ms | 29 queries, 51.3 / 39.4 ms | 0 extra queries |
+| `/bn/hello-world/` (target, every string known) | — | 38 queries, 51.4–52.5 ms | **1 plugin query** (batched translation lookup, 1.0 ms), **0 external HTTP calls**; +1 core query (locale) |
+| `/bn/` home, `/bn/sample-page/` | — | 31 queries each, 69.9 / 45.3 ms | 1 plugin query (1.1–1.2 ms), 0 HTTP calls |
+
+A page cache (LiteSpeed / WP Rocket / Cloudflare) serves target pages without running the plugin at all.
+
+**Extraction on a 200 KB page** (`wp eval-file`, medians of 15): 225 KB document (Twenty Twenty-Five head + bodies of three real fixture pages), 614 segments / 279 unique: **extract 14.2 ms**, replace with every string translated 3.3 ms, digit conversion pass 18.0 ms (only when digits are on; it re-reads the document). 311 KB Twenty Twenty home (1,118 segments): extract 34.7 ms, replace 9.9 ms, digits 44.6 ms.
+
+**Security review** (code review of every route, plus a live probe of all 39 `wst/v1` routes as anonymous, subscriber, translator (`wst_translate` only) and administrator **without** the REST nonce; output in scratchpad `live/probe-rest.txt`):
+- Every route has a capability check: `manage_options` for settings, providers, queue, health/log/data tools, migration, CSV import, site translation; `wst_translate` for strings, pages, editor, scan/preview registration and dynamic scan; only `/lookup` is public. Live: anonymous → 401, subscriber → 403, translator → 403 on every admin route and allowed on translation routes, administrator without nonce → 401 (cookie auth needs the nonce, so no CSRF). Per-post writes also check `edit_post` (pages mode, post panel, "Translate now"). CSV export and "Translate now" (`admin-post.php`) check capability + `check_admin_referer`.
+- Scan/preview: tokens are random 128-bit, bound to one path, scan tokens single-use (second use 403), preview tokens readable until expiry and only on their path (other path 403), forged token 403; the request is rendered as a visitor (`wp_set_current_user(0)`), `no-store`, `noindex`, and now `Referrer-Policy: same-origin` (P97). Loopback scans fetch only the site's own origin + a validated path (`PageTarget::forPath` rejects `//`, `..`, queries, whitespace), with `redirection => 0`: no SSRF. Preview iframe is `sandbox="allow-scripts"` (opaque origin).
+- `/lookup` (live, before the P100 window change): 101 texts → 400, a 2,001-character text → 400, burst → 429 within the minute, string count unchanged (3,049 → 3,049); dynamic texts are written back with `nodeValue` / `setAttribute` of a fixed attribute list (no HTML injection). Residual: P100, known issue 19. After the P100 change: a burst of 70 → exactly 60 × 200, then 429 from the 61st.
+- Unchanged from earlier phases and re-read: secrets write-only (never in REST responses, logs or the page), `$wpdb->prepare` everywhere (36 `PreparedSQL` ignores, each with a reason: placeholder lists built in code or fixed fragments), TranslatePress table names only from the detected list, `wp_kses` on stored HTML, redirects through `wp_safe_redirect`, CSV-injection guard.
+
+**Uninstall and upgrade:** `UninstallerTest` (keeps everything unless "Delete all data on uninstall"; with it: tables, `wst_*` options and transients, page-mode meta, capability, cron). Every option and transient the plugin writes was checked to carry the `wst_` prefix, so the prefix sweep covers them. Upgrade live: with `wst_db_version = 0`, `wst_caps_version` deleted and the capability removed from editors, the next request re-ran `dbDelta` and the grant (version 1, editor has `wst_translate`), 3,049 strings intact; `SchemaTest::test_maybe_upgrade_runs_only_when_the_stored_version_is_older`.
+
+**i18n / readme:** P98, P99. POT command: `wp i18n make-pot . languages/wp-site-translator.pot --slug=wp-site-translator --domain=wp-site-translator --exclude=vendor,node_modules,reference,tests,assets-src,dist,bin,docs,.tools --headers='{"Report-Msgid-Bugs-To":"","Last-Translator":"","Language-Team":""}'` (no warnings: two translator comments fixed). Front-end scripts carry no hard-coded English (texts come from PHP).
+
+**Gemini docs re-check (2026-10-09, ai.google.dev):** `gemini-3.5-flash-lite` is listed on the models page, free of charge on the pricing page ("optimized for … translation", free-tier content used to improve Google's products) and recommended for new projects. The `generateContent` reference documents `generationConfig.responseFormat` → `ResponseFormatConfig.text` → `TextResponseFormat {mimeType: APPLICATION_JSON, schema}` — exactly what `Gemini::body()` sends; `responseSchema` / `_responseJsonSchema` are marked deprecated "use responseFormat instead". The structured-output guide now shows only the newer Interactions API (`/v1beta/interactions`, `response_format`); `generateContent` remains documented, so no change. Rate-limits page: limits per project, "view your active rate limits in AI Studio" — still no published numbers.
+
+## Phase 7 — live provider checks (next session)
+
+The owner sets `WST_AZURE_KEY`, `WST_AZURE_REGION` and `WST_GEMINI_KEY` in the environment. Never print, log or commit them; scan staged diffs for each value before committing (as for the TranslateX key). Send only harmless sample text.
+1. `bin/setup-env.sh`; start the dev site with the keys in the environment (`Secrets` reads `WST_*` variables; such keys cannot be overwritten from the UI); check `printenv | grep -c '^WST_'` only.
+2. `wp wst provider test microsoft` and `wp wst provider test gemini` → both "tested"; Translation screen cards show ready.
+3. Fixtures: `php bin/capture-provider-fixtures.php microsoft all`, `… gemini all`; check the files contain no key; replay tests green.
+4. Live batch per provider: provider = Microsoft, then Gemini; queue 5–10 harmless strings (with a printf placeholder, a URL, a never-translate term, one inline link) for `bn_BD` and `ar`; `wp wst queue run`; check `wst_translations` rows (provider, status machine, placeholders intact).
+5. Gemini limits: read RPM / RPD / input TPM for the key's project in AI Studio (owner) **or** let one burst of tiny requests reach `429 RESOURCE_EXHAUSTED` and record `quotaMetric` / `quotaValue` from the error details; compare with our defaults 5 / 100 / unlimited and adjust the defaults only if they are higher than the real limits. Unknown model → `404` → `AuthError` "Gemini does not know the model" (P33).
+6. Fallback live: primary Gemini, fallback Microsoft; set the Gemini model to an unknown name → `AuthError` → queue rows re-pointed to Microsoft and translated (Overview "Using fallback"); restore the model → next run uses Gemini again. Then the reverse with a deliberately wrong Microsoft region if needed.
+7. Microsoft `403001`: a real `403001` only comes once the F0 resource's 2M free characters of the month are used up (the hourly throttle answers `429001`, not `403001`); sending 2M characters is not worth it. Record what the key's resource tier is; if its quota is not exhausted, keep the recorded-response test (`MicrosoftTest`) as the evidence and say so to the owner.
+8. HANDOVER: fill the Phase 7 table, record facts in plan §7.1, commit and push.
 
 ## Phase 2 acceptance (plan §16) — one line per criterion
 
@@ -388,11 +440,17 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — Validated against the sitemap XML rules: `SitemapTest` validates the core index and every target sitemap against the official sitemaps.org 0.9 XSDs (`tests/fixtures/sitemaps/`); live XML from core, Yoast and Rank Math runs validates with `xmllint --schema` (`siteindex.xsd`, `sitemap.xsd`).
 - Screenshots (scratchpad `shots6f/`): `core-index.png`, `yoast-index.png`, `rankmath-index.png`, `rankmath-wst-page.png`, `advanced-toggle.png`. Yoast SEO and Rank Math are installed **inactive** on the dev site.
 
+## Files changed (Phase 7, keyless part)
+
+`src/Rest/DynamicController.php` (lookup window, P100), `src/Editor/EditorRequest.php` (`Referrer-Policy`, P97), `src/Plugin.php` + `src/Assets.php` + `wp-site-translator.php` (text domain, P98), `languages/wp-site-translator.pot`, `readme.txt`, `bin/build-zip.sh` (requires readme and POT), `assets-src/admin/{format.js,screens/ImportExport.js,screens/Migration.js}` + `build/admin.*` (translator comments), `docs/STAGING-CHECKLIST.md`, `HANDOVER.md`.
+
 ## Files changed (Phase 6f)
 
 `src/Sitemap/{TargetProvider,Sitemaps,SeoPlugins,PostQueries,TermQueries}.php`, `src/Settings.php` (`sitemap_alternates`), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `build/admin.*`, `phpstan.neon.dist` + `tests/phpstan/seo-plugin-stubs.php` (`YoastSEO()` signature), tests `tests/Integration/Sitemap/SitemapTest.php`, fixtures `tests/fixtures/sitemaps/` (sitemaps.org XSDs, CC BY-SA 2.5; Rank Math helper stand-in).
 
 ## Phase 6e acceptance (plan §16)
+
+> **Evidence limits:** none from source builds; checked in headless Chromium with a normal user agent and `navigator.webdriver=false`, and on a static file copy standing in for a page cache (no real LiteSpeed / WP Rocket / Cloudflare cache).
 
 - PASS — Suggestion bar works on a fully cached page: live, a Bengali browser on `/hello-world/` and on a **static HTML copy** of that page (served as a file) sees "এই পাতাটি বাংলায় পড়ুন" linking to `/bn/hello-world/` (`role=region`, `lang=bn-BD`); after dismissing, cookie `wst_lang_choice=en` (180 days) and no bar on reload; an English browser sees nothing on the English page and "Read this page in English" on the Bengali page. HTML for different browsers and cookies is identical apart from the theme's own category order. `SuggestionTest` (data per page, nothing when off / on "off" pages / 404 / feed, same data whatever the cookie or browser language, text sanitising).
 - PASS — Redirect never fires for bots or twice: live, a Bengali browser is sent from `/hello-world/` to `/bn/hello-world/` once; choosing English in the switcher stays on `/hello-world/`; Googlebot and `?wst_no_redirect=1` stay. `tests/js/suggest.test.mjs` decision table (16 cases incl. cookie, bot, no-redirect, off page).
@@ -403,6 +461,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 `assets/suggest.js`, `src/Switcher/Suggestion.php`, `src/Settings.php` (`lang_suggestion`, `suggestion_position`, `suggestion_text_default`, `suggestion_text_target`), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `build/admin.*`, tests `tests/Integration/Switcher/SuggestionTest.php`, `tests/js/suggest.test.mjs`.
 
 ## Phase 6d acceptance (plan §16)
+
+> **Evidence limits:** WooCommerce **source build** without its JS build, which renders no prices: price skipping is verified **only by integration-test markup**, not on a real shop page. Staging check: `docs/STAGING-CHECKLIST.md`.
 
 - PASS — Never touches URLs, attributes, prices when skipped: `DigitConverterTest::test_only_visible_text_outside_protected_areas_changes` (href/title/data attributes, URLs, e-mails, character references, input values, textarea, code/pre, no-translate, exclude selector, WooCommerce price markup skipped by default and converted when the toggle is off, never-translate term "iPhone 15", title/style/script). Live: `/bn/product/wordpress-pennant/` with Bengali digits → 120 converted digits in text (e.g. "অক্টোবর ২০২৬"), 0 in attributes (`/bn/2026/10/` links keep ASCII), 0 on the English page.
 - PASS — Round-trips: `test_each_set_round_trips` (Bengali, Arabic-Indic, Persian; whole test page and plain text restored to ASCII equal the input).
@@ -415,6 +475,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Phase 6c acceptance (plan §16)
 
+> **Evidence limits:** WooCommerce is a **source build** without its JavaScript build. Fragments were verified only by **direct `wc-ajax` POSTs** (empty mini-cart text) and by the test fixture JSON; the real browser flow — add to cart, mini-cart refresh, cart and checkout updates with products in the cart — has **not** run. `/lookup` and the dynamic scan were verified on a **synthetic test page** whose script inserts text, not on a real plugin's dynamic UI. Staging check: `docs/STAGING-CHECKLIST.md`.
+
 - PASS — WooCommerce fragments translated: live on the dev site (WooCommerce PHP from source), `POST /bn/?wc-ajax=get_refreshed_fragments` and `/?wc-ajax=…` with a `/bn/` referer return the mini-cart with "কার্টে কোনো পণ্য নেই।"; the same request from an English page is untouched. Add-to-cart uses the same response path; the browser flow could not run because this WooCommerce has no JavaScript build (known issue 9). `DynamicContentTest::test_woocommerce_fragments_json_is_translated_safely` (selectors, hash, nonce, numbers untouched; links prefixed; allowlisted keys), `test_unchanged_invalid_or_deep_bodies_come_back_byte_for_byte`, `test_html_bodies_and_rest_responses_are_translated_only_on_target_requests`.
 - PASS — `/lookup` cannot create strings and is rate-limited: `test_lookup_is_public_read_only_and_limited` (route absent when off, only existing translations, string count unchanged, 100/2,000 limits), `test_lookup_rate_limit_per_visitor_ip_with_trusted_proxy` (61st request 429, another visitor behind the proxy not limited), `test_client_ip_from_each_trusted_proxy_setting`. Live: a page whose script adds "View cart" and a placeholder after load shows "কার্ট দেখুন" / "পণ্য খুঁজুন", unknown text stays English, 2 lookup requests, string count unchanged (3,046).
 - PASS — Dynamic scan stores strings: `test_dynamic_scan_records_kind_dynamic_and_queues_by_mode` (kind `dynamic`, page occurrence, queued on auto pages only, token bound to its user, editors only). Live: editor → "Scan dynamic content" → new tab with the bar "3 texts found, 1 new"; the new text stored as `dynamic`, on the page, queued at priority 5; no link on the page carries the token.
@@ -425,6 +487,8 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 `src/Dynamic/{Fragments,Client}.php`, `src/Rest/DynamicController.php`, `assets/dynamic.js`, `src/Render/Pipeline.php` (`translateFragment`, `translateTexts`, extracted `neutralKinds`/`translationsFor`), `src/Routing/Router.php` (P81), `src/Settings.php` (`dynamic_fragments`, `dynamic_json_keys`, `dynamic_lookup`, `trusted_proxy`, `trusted_proxy_header`), `src/Html/Segment.php` (`DYNAMIC`), `src/Editor/Tokens.php` (`DYNAMIC`), `src/Transfer/Importer.php`, `src/Cli/StringCommand.php` (kinds), `src/Plugin.php`, `assets-src/admin/screens/Advanced.js`, `assets-src/editor/Editor.js`, `build/{admin,editor}.*`, tests `tests/Integration/Dynamic/DynamicContentTest.php`, `tests/Integration/Routing/RouterTest.php`.
 
 ## Phase 6b acceptance (plan §16)
+
+> **Evidence limits:** the real TranslatePress 3.3.7 plugin built its own dictionary on the dev site, but the **translations in it were filled in by script** (TranslatePress needs a keyed provider to translate), so statuses and texts are **fake data** shaped like its editor's output. The **owner's real export has not been imported**; nothing was tested with a dictionary translated by TranslatePress's own machine translation or reviewed by people, or with gettext tables (ignored by design). Staging check: `docs/STAGING-CHECKLIST.md`.
 
 - PASS — Imports a TranslatePress dataset read-only: dev site with TranslatePress 3.3.7 active (en_US → bn_BD, slugs en/bn) built its own dictionary (377 originals from 15 visited pages); sample translations were then filled in the way its editor stores them (227 machine, 76 reviewed, 74 untranslated, 1 old block). Wizard: dry run and import 236 new, 67 kept (already translated here), 74 + 1 skipped, 0 invalid; `CHECKSUM TABLE` of the dictionary identical before and after (520693744). `TranslatePressTest::test_dry_run_reads_only_and_writes_nothing`, `test_import_maps_statuses_normalises_and_is_idempotent` (checksum unchanged). **The owner's real table export is still to be tried** (not received).
 - PASS — Idempotent: re-run → 0 new, 236 unchanged (live); `test_import_maps_statuses_normalises_and_is_idempotent`, chunking `test_import_goes_in_chunks` (1,005 rows in 2 chunks).
@@ -493,7 +557,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 ## Validation status
 
 - `vendor/bin/phpunit` (unit): 128 tests green.
-- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,363 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 6f included.
+- `vendor/bin/phpunit -c phpunit-integration.xml.dist`: 7,363 tests green on WP 7.1.2 (MariaDB 10.11, PHP 8.3), Phase 7 keyless part included (2026-10-09; the first gate run had 1 failure, root-caused and fixed: P100).
 - `npm run test:js` (Node's built-in test runner, no extra dependency): 20 tests green (CSV reader, suggestion decision table).
 - Phase 0 suite on WP 6.7.9 / 6.8.10 / 6.9.9: green except the 3 core-warning inputs (G2). Later phases not re-run on those versions (CI matrix in Phase 7).
 - `vendor/bin/phpcs`: clean. PHPStan level 8: **no errors** (container: `php .tools/phpstan.phar analyse --memory-limit=1G`).
@@ -524,6 +588,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 16. The 6b dataset is TranslatePress-generated originals with translations filled in by script (TranslatePress needs a paid/keyed provider to translate itself); the owner's real export is the remaining check.
 17. Dynamic lookup does not see text that scripts insert while the page is still loading (P83); such text is not translated on the page (server-rendered HTML is).
 18. Sitemaps carry no `xhtml:link` alternates (P96); a sitemap page whose posts are all "off" or noindex answers 404 although the index lists it (pages follow the core page size).
+19. `/lookup` rate counters (P100): one transient per visitor IP for a minute; without a persistent object cache a flood from many IPs adds short-lived `wp_options` rows (removed by WordPress's expired-transient cleanup). The feature is off by default.
 
 ## Dev environment setup (scripted)
 
@@ -551,5 +616,6 @@ The fixture site (WordPress with theme unit test data, Elementor and WooCommerce
 
 ## Exact next step
 
-1. Owner: review "Translate entire site" (P67–P71), Phase 6b (P72–P78), 6c (P79–P85), 6d (P86–P88), 6e (P89–P92) and 6f (P93–P96); send the TranslatePress table export to test the importer on real data (put it in the session's uploads).
-2. Phase 6 is complete. Next: Phase 7 per plan §16 (Microsoft and Gemini live checks — ask for those keys only then — compatibility pass incl. known issue 10, CI matrix, hardening items in known issue 5).
+1. Next session (owner's keys in the environment): "Phase 7 — live provider checks (next session)", steps 1–8.
+2. Owner: run `docs/STAGING-CHECKLIST.md` on staging and send the results; send the TranslatePress table export (session uploads) for a real-data importer run; review P97–P100.
+3. Then close Phase 7: fill the compatibility matrix from the staging results, fix what it finds, full gate once, release zip.

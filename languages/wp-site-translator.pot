@@ -1,0 +1,3146 @@
+# Copyright (C) 2026 
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: WP Site Translator 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-10-09T09:05:17+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: wp-site-translator\n"
+
+#. Plugin Name of the plugin
+#: wp-site-translator.php:3
+msgid "WP Site Translator"
+msgstr ""
+
+#. Description of the plugin
+#: wp-site-translator.php:4
+msgid "Translate the whole site between two languages with queued machine translation and a conflict-proof editor."
+msgstr ""
+
+#: src/Admin/AdminPage.php:73
+#: src/Admin/AdminPage.php:74
+#: build/admin.js:74
+msgid "Translator"
+msgstr ""
+
+#: src/Admin/AdminPage.php:83
+#: src/Editor/AdminBar.php:116
+msgid "Translator settings"
+msgstr ""
+
+#: src/Admin/AdminPage.php:83
+msgid "Settings"
+msgstr ""
+
+#: src/Admin/AdminPage.php:90
+msgid "Loading…"
+msgstr ""
+
+#: src/Admin/AdminPage.php:91
+msgid "The Translator settings need JavaScript."
+msgstr ""
+
+#: src/Admin/EditorPage.php:98
+#: src/Editor/AdminBar.php:106
+#: build/editor.js:4
+msgid "Translation editor"
+msgstr ""
+
+#: src/Admin/EditorPage.php:99
+msgid "Editor"
+msgstr ""
+
+#: src/Admin/EditorPage.php:122
+msgid "Loading the translation editor…"
+msgstr ""
+
+#: src/Admin/EditorPage.php:123
+msgid "The translation editor needs JavaScript."
+msgstr ""
+
+#: src/Admin/Health.php:77
+msgid "Loopback request"
+msgstr ""
+
+#. translators: 1: URL, 2: error
+#: src/Admin/Health.php:87
+#, php-format
+msgid "The site could not load %1$s: %2$s. WP-Cron and scans may not work; use the server cron command and the admin queue runner."
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Admin/Health.php:92
+#, php-format
+msgid "The site answered its own request (HTTP %d)."
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Admin/Health.php:93
+#, php-format
+msgid "The site answered its own request with HTTP %d (basic auth, firewall or maintenance mode?)."
+msgstr ""
+
+#. translators: 1: current version, 2: minimum
+#: src/Admin/Health.php:112
+#, php-format
+msgid "PHP %1$s (needs %2$s or newer)."
+msgstr ""
+
+#. translators: 1: current version, 2: minimum
+#: src/Admin/Health.php:125
+#, php-format
+msgid "WordPress %1$s (needs %2$s or newer with the HTML API)."
+msgstr ""
+
+#: src/Admin/Health.php:143
+#: src/Admin/Health.php:144
+msgid "Database tables"
+msgstr ""
+
+#: src/Admin/Health.php:143
+msgid "All plugin tables exist."
+msgstr ""
+
+#: src/Admin/Health.php:144
+msgid "Missing tables (deactivate and activate the plugin): "
+msgstr ""
+
+#: src/Admin/Health.php:155
+msgid "Database locks"
+msgstr ""
+
+#: src/Admin/Health.php:158
+msgid "Named locks work (rate limiter and queue are safe across processes)."
+msgstr ""
+
+#: src/Admin/Health.php:159
+msgid "GET_LOCK() is not available on this database; the rate limiter cannot run safely."
+msgstr ""
+
+#: src/Admin/Health.php:169
+#: build/admin.js:47
+#: build/admin.js:49
+msgid "Languages"
+msgstr ""
+
+#: src/Admin/Health.php:172
+msgid "No target language is set: nothing is translated."
+msgstr ""
+
+#. translators: 1: default language, 2: target language, 3: URL prefix
+#: src/Admin/Health.php:174
+#, php-format
+msgid "%1$s → %2$s at /%3$s/."
+msgstr ""
+
+#: src/Admin/Health.php:183
+msgid "Translation provider"
+msgstr ""
+
+#: src/Admin/Health.php:186
+msgid "No provider is selected: only manual translations are used."
+msgstr ""
+
+#: src/Admin/Health.php:190
+msgid "No provider can translate now: "
+msgstr ""
+
+#. translators: %s: provider name
+#: src/Admin/Health.php:195
+#, php-format
+msgid "%s has not passed a connection test with its current key yet."
+msgstr ""
+
+#. translators: 1: provider id, 2: reason
+#: src/Admin/Health.php:199
+#: build/admin.js:14
+#, php-format,js-format
+msgid "Using the fallback provider %1$s: %2$s"
+msgstr ""
+
+#. translators: %s: provider id
+#: src/Admin/Health.php:203
+#, php-format
+msgid "%s is ready."
+msgstr ""
+
+#: src/Admin/Health.php:212
+msgid "Background processing"
+msgstr ""
+
+#: src/Admin/Health.php:215
+msgid "WP-Cron is disabled (DISABLE_WP_CRON). Run this every minute from the server cron: "
+msgstr ""
+
+#: src/Admin/Health.php:218
+msgid "Strings are queued but no queue run is scheduled. Open the Overview to process the queue, or save any setting to reschedule."
+msgstr ""
+
+#: src/Admin/Health.php:222
+msgid "Nothing queued; no run scheduled."
+msgstr ""
+
+#. translators: %s: date and time
+#: src/Admin/Health.php:224
+#, php-format
+msgid "Next queue run: %s."
+msgstr ""
+
+#: src/Admin/Health.php:234
+msgid "Page rendering"
+msgstr ""
+
+#: src/Admin/Health.php:237
+msgid "No rendering errors in the last 24 hours."
+msgstr ""
+
+#. translators: %d: number of failures
+#: src/Admin/Health.php:239
+#, php-format
+msgid "%d translated page was shown untranslated in the last 24 hours because rendering failed. See the log."
+msgid_plural "%d translated pages were shown untranslated in the last 24 hours because rendering failed. See the log."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/PostPanel.php:80
+#: build/admin.js:52
+msgid "Translation"
+msgstr ""
+
+#: src/Admin/PostPanel.php:99
+#: build/post-panel.js:2
+msgid "Translation mode"
+msgstr ""
+
+#: src/Admin/PostPanel.php:105
+#: build/post-panel.js:2
+msgid "The mode decides whether visits discover and queue new strings. Translations already made apply on every page."
+msgstr ""
+
+#: src/Admin/PostPanel.php:114
+#: build/post-panel.js:4
+msgid "Open in translation editor"
+msgstr ""
+
+#: src/Admin/PostPanel.php:115
+msgid "Publish the post to translate it in the translation editor."
+msgstr ""
+
+#: src/Admin/PostPanel.php:119
+#: build/post-panel.js:5
+msgid "Translate this page now"
+msgstr ""
+
+#: src/Admin/PostPanel.php:154
+msgid "You are not allowed to translate this page."
+msgstr ""
+
+#: src/Admin/PostPanel.php:159
+msgid "Nothing to translate: every string of this page has a translation."
+msgstr ""
+
+#. translators: %d: number of strings
+#: src/Admin/PostPanel.php:161
+#: build/post-panel.js:5
+#, php-format,js-format
+msgid "%d string queued for translation."
+msgid_plural "%d strings queued for translation."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/PostPanel.php:217
+msgid "Default (path rules, then site mode)"
+msgstr ""
+
+#: src/Admin/PostPanel.php:218
+#: build/admin.js:11
+msgid "Automatic"
+msgstr ""
+
+#: src/Admin/PostPanel.php:219
+#: build/admin.js:11
+#: build/admin.js:19
+#: build/editor.js:2
+msgid "Manual only"
+msgstr ""
+
+#: src/Admin/PostPanel.php:220
+#: build/admin.js:19
+#: build/editor.js:2
+msgid "Off (not translated)"
+msgstr ""
+
+#: src/Admin/PostPanel.php:231
+#: build/post-panel.js:1
+msgid "this page"
+msgstr ""
+
+#: src/Admin/PostPanel.php:232
+#: build/post-panel.js:1
+msgid "path rule"
+msgstr ""
+
+#: src/Admin/PostPanel.php:233
+#: build/admin.js:11
+#: build/post-panel.js:1
+msgid "site mode"
+msgstr ""
+
+#. translators: 1: mode label, 2: where it comes from
+#: src/Admin/PostPanel.php:237
+#: build/post-panel.js:3
+#, php-format,js-format
+msgid "Applies now: %1$s (%2$s)."
+msgstr ""
+
+#: src/Admin/PostPanel.php:248
+#: build/post-panel.js:4
+msgid "No strings recorded yet: the translated page has not been visited or scanned."
+msgstr ""
+
+#. translators: 1: translated strings, 2: all strings, 3: percent
+#: src/Admin/PostPanel.php:252
+#: build/post-panel.js:4
+#, php-format,js-format
+msgid "Translated: %1$d of %2$d strings (%3$d%%)."
+msgstr ""
+
+#. translators: %s: file name
+#: src/Assets.php:38
+#, php-format
+msgid "WP Site Translator: build/%s.js is missing. Run \"npm run build\"."
+msgstr ""
+
+#. translators: 1: strings found, 2: new strings
+#: src/Dynamic/Client.php:100
+#, php-format
+msgid "Dynamic scan: %1$d texts found, %2$d new. Open menus, the mini-cart, tabs and popups."
+msgstr ""
+
+#: src/Dynamic/Client.php:101
+msgid "Finish"
+msgstr ""
+
+#. translators: 1: strings found, 2: new strings
+#: src/Dynamic/Client.php:103
+#, php-format
+msgid "Dynamic scan finished: %1$d texts found, %2$d new. You can close this tab."
+msgstr ""
+
+#: src/Editor/AdminBar.php:75
+msgid "Translate"
+msgstr ""
+
+#: src/Editor/AdminBar.php:77
+msgid "Translate this site"
+msgstr ""
+
+#: src/Editor/AdminBar.php:85
+msgid "Translate this page"
+msgstr ""
+
+#: src/Editor/AdminBar.php:96
+msgid "Back to page"
+msgstr ""
+
+#: src/Editor/EditorRequest.php:74
+msgid "This scan or preview link is invalid or has expired. Start it again from the translation editor."
+msgstr ""
+
+#: src/Editor/PageTarget.php:53
+msgid "This post is not published yet. The editor scans pages as visitors see them, so publish it first, then translate it here."
+msgstr ""
+
+#: src/Editor/PageTarget.php:56
+msgid "Only published, public posts can be translated in the editor."
+msgstr ""
+
+#: src/Editor/PageTarget.php:61
+msgid "This post has no address on the site."
+msgstr ""
+
+#: src/Editor/PageTarget.php:76
+msgid "Give a path of this site starting with /, without query string."
+msgstr ""
+
+#: src/Editor/PageTarget.php:80
+#: src/Editor/PageTarget.php:106
+msgid "This address is not a translatable page of the site."
+msgstr ""
+
+#: src/Editor/PageTarget.php:91
+#: src/Site/SitePages.php:155
+msgid "Home page"
+msgstr ""
+
+#: src/Migration/Guard.php:46
+msgid "Open the migration steps"
+msgstr ""
+
+#: src/Migration/Guard.php:50
+msgid "WP Site Translator is paused on the front end while TranslatePress is active."
+msgstr ""
+
+#: src/Migration/Guard.php:51
+msgid "This keeps the two plugins from translating the same pages. Importing TranslatePress translations, the string list and the queue still work; deactivate TranslatePress to go live."
+msgstr ""
+
+#: src/Migration/MatchReport.php:166
+msgid "Give a path that starts with /."
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Migration/MatchReport.php:181
+#, php-format
+msgid "The page answered with HTTP %d."
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Render/Pipeline.php:140
+#, php-format
+msgid "The page answered with HTTP %d; only pages that load normally can be scanned."
+msgstr ""
+
+#: src/Render/Pipeline.php:152
+msgid "The scan failed; see the Translator log."
+msgstr ""
+
+#: src/Rest/DynamicController.php:155
+msgid "Too many requests; try again in a minute."
+msgstr ""
+
+#: src/Rest/DynamicController.php:195
+msgid "This dynamic scan has expired. Start it again from the translation editor."
+msgstr ""
+
+#. translators: %s: error message
+#: src/Rest/EditorController.php:168
+#, php-format
+msgid "The server could not load the page: %s"
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Rest/EditorController.php:174
+#, php-format
+msgid "This page sends visitors to another address (HTTP %d), so it cannot be scanned. Cart, checkout and account pages do this without a cart or a login. Their texts are translated wherever the same texts appear on other pages."
+msgstr ""
+
+#. translators: %d: HTTP status
+#: src/Rest/EditorController.php:178
+#, php-format
+msgid "The page answered with HTTP %d and no scan result (a redirect, a login wall or a cached copy?)."
+msgstr ""
+
+#: src/Rest/EditorController.php:184
+msgid "A cached copy of the page was returned instead of a scan. Exclude ?wst_scan= requests from the page cache."
+msgstr ""
+
+#: src/Rest/EditorController.php:221
+msgid "Send either post_id or path."
+msgstr ""
+
+#: src/Rest/HealthController.php:191
+msgid "No target language is set."
+msgstr ""
+
+#: src/Rest/MigrationController.php:180
+#: src/Rest/MigrationController.php:201
+msgid "This is not a TranslatePress dictionary table of the configured languages."
+msgstr ""
+
+#: src/Rest/MigrationController.php:205
+msgid "Copy the TranslatePress languages into the settings first (step 2): the target language must be the one of this table."
+msgstr ""
+
+#: src/Rest/MigrationController.php:223
+msgid "Choose the target language first."
+msgstr ""
+
+#: src/Rest/MigrationController.php:255
+msgid "TranslatePress settings were not found."
+msgstr ""
+
+#. translators: %s: locale code
+#: src/Rest/MigrationController.php:263
+#, php-format
+msgid "The language %s is not available in WP Site Translator."
+msgstr ""
+
+#: src/Rest/SettingsController.php:139
+msgid "Some values were not saved because they are not valid."
+msgstr ""
+
+#: src/Rest/SettingsController.php:240
+msgid "Unknown setting."
+msgstr ""
+
+#: src/Rest/SettingsController.php:250
+msgid "The default language needs a URL prefix different from the target language."
+msgstr ""
+
+#: src/Rest/SettingsController.php:283
+msgid "Choose a language different from the default language."
+msgstr ""
+
+#: src/Rest/SettingsController.php:286
+msgid "Use 1–20 lowercase letters, digits or hyphens, starting with a letter or digit."
+msgstr ""
+
+#: src/Rest/SettingsController.php:288
+msgid "The fallback must be a different provider from the main one."
+msgstr ""
+
+#. translators: %s: selectors
+#: src/Rest/SettingsController.php:294
+#, php-format
+msgid "Unsupported selectors: %s"
+msgstr ""
+
+#. translators: %d: maximum number of selectors
+#: src/Rest/SettingsController.php:298
+#, php-format
+msgid "At most %d selectors."
+msgstr ""
+
+#. translators: %d: maximum number of selectors
+#: src/Rest/SettingsController.php:298
+msgid "Send each selector trimmed, without empty lines."
+msgstr ""
+
+#: src/Rest/SettingsController.php:300
+msgid "Colours must be hex values such as #1e1e1e."
+msgstr ""
+
+#: src/Rest/SettingsController.php:302
+msgid "Each rule needs a path starting with / (or {{home}}) and a mode."
+msgstr ""
+
+#: src/Rest/SettingsController.php:304
+msgid "A provider limit is not a whole number in its allowed range, or a provider field is not valid."
+msgstr ""
+
+#: src/Rest/SettingsController.php:307
+msgid "This value is not valid."
+msgstr ""
+
+#: src/Rest/SettingsController.php:321
+msgid "Unknown credential."
+msgstr ""
+
+#: src/Rest/SettingsController.php:323
+msgid "Credentials must be text."
+msgstr ""
+
+#: src/Rest/SettingsController.php:325
+msgid "This credential is set in wp-config.php or the server environment; change it there."
+msgstr ""
+
+#: src/Rest/StringsController.php:186
+msgid "Send either ids or post_id."
+msgstr ""
+
+#: src/Rest/StringsController.php:253
+msgid "Type a translation, or use \"Remove translation\" to show the original."
+msgstr ""
+
+#: src/Rest/StringsController.php:277
+msgid "This string has no translation to remove."
+msgstr ""
+
+#: src/Rest/StringsController.php:296
+msgid "Only a translated string can be marked manual."
+msgstr ""
+
+#: src/Rest/StringsController.php:356
+msgid "Unknown string."
+msgstr ""
+
+#: src/Switcher/Suggestion.php:109
+msgid "Close"
+msgstr ""
+
+#: src/Switcher/Switcher.php:177
+msgid "Language"
+msgstr ""
+
+#: src/Switcher/Switcher.php:300
+#: src/Switcher/Switcher.php:307
+#: build/admin.js:52
+#: build/switcher-block.js:1
+msgid "Language switcher"
+msgstr ""
+
+#: src/Switcher/Switcher.php:323
+msgid "Shows one link per language. In block themes, use the Language switcher block instead."
+msgstr ""
+
+#: src/Switcher/Switcher.php:326
+msgid "Add to Menu"
+msgstr ""
+
+#: src/Transfer/Exporter.php:53
+msgid "You are not allowed to export translations."
+msgstr ""
+
+#: src/Transfer/Exporter.php:92
+msgid "Unknown export filter."
+msgstr ""
+
+#: src/Transfer/Exporter.php:98
+msgid "No strings are recorded for this page. Give its path (for example /about/) or scan it in the translation editor first."
+msgstr ""
+
+#: src/Transfer/Importer.php:95
+msgid "No translation in the file."
+msgstr ""
+
+#. translators: %d: line number
+#: src/Transfer/Importer.php:101
+#, php-format
+msgid "Same original as line %d."
+msgstr ""
+
+#: src/Transfer/Importer.php:165
+#: src/Transfer/Importer.php:171
+msgid "Malformed row."
+msgstr ""
+
+#. translators: 1: column name, 2: size in KB
+#: src/Transfer/Importer.php:175
+#, php-format
+msgid "The %1$s cell is longer than %2$d KB."
+msgstr ""
+
+#. translators: %s: column name
+#: src/Transfer/Importer.php:179
+#, php-format
+msgid "The %s cell is not valid UTF-8."
+msgstr ""
+
+#: src/Transfer/Importer.php:186
+msgid "The original is empty."
+msgstr ""
+
+#. translators: 1: language code in the file, 2: target locale
+#: src/Transfer/Importer.php:191
+#, php-format
+msgid "Language %1$s is not the target language (%2$s)."
+msgstr ""
+
+#. translators: %s: kind in the file
+#: src/Transfer/Importer.php:196
+#, php-format
+msgid "Unknown kind \"%s\"."
+msgstr ""
+
+#. translators: %s: status in the file
+#: src/Transfer/Importer.php:201
+#, php-format
+msgid "Unknown status \"%s\" (use machine or manual)."
+msgstr ""
+
+#: src/Transfer/Importer.php:238
+msgid "Kept: the string is already translated (add only)."
+msgstr ""
+
+#: src/Transfer/Importer.php:241
+msgid "Kept: the existing manual translation differs."
+msgstr ""
+
+#: build/admin.js:1
+#: build/editor.js:1
+msgid "The request failed. Check your connection and try again."
+msgstr ""
+
+#: build/admin.js:1
+msgid "unknown"
+msgstr ""
+
+#: build/admin.js:1
+msgid "less than a minute"
+msgstr ""
+
+#. translators: %d: minutes
+#: build/admin.js:2
+#, js-format
+msgid "about %d min"
+msgstr ""
+
+#. translators: %d: hours
+#: build/admin.js:3
+#, js-format
+msgid "about %d h"
+msgstr ""
+
+#: build/admin.js:3
+msgid "API key"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Subscription key"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Region (for example westeurope; empty for a global resource)"
+msgstr ""
+
+#: build/admin.js:3
+msgid "0 = no limit."
+msgstr ""
+
+#: build/admin.js:3
+msgid "0 = the provider maximum."
+msgstr ""
+
+#: build/admin.js:3
+msgid "Requests per minute"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Requests per day"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Characters per minute"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Strings per request"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Characters per request"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Parallel requests (1–5)"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Attempts before a string is marked failed (1–20)"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Monthly character budget"
+msgstr ""
+
+#: build/admin.js:3
+msgid "0 = no budget. A warning is logged at 80 percent of the budget; translation stops at 100 percent until next month."
+msgstr ""
+
+#: build/admin.js:3
+msgid "Request timeout in seconds (5–120)"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Free"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Startup"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Business"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Enterprise"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Set in wp-config.php"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Set in the server environment"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Saved (hidden)"
+msgstr ""
+
+#: build/admin.js:3
+msgid "Not set"
+msgstr ""
+
+#. translators: %s: constant name
+#: build/admin.js:4
+#, js-format
+msgid "Managed outside WordPress as %s; change it there."
+msgstr ""
+
+#: build/admin.js:4
+msgid "Write-only: the saved value is never shown. Type a new value to replace it."
+msgstr ""
+
+#: build/admin.js:4
+msgid "Will be removed when you save"
+msgstr ""
+
+#: build/admin.js:4
+msgid "Remove saved key"
+msgstr ""
+
+#: build/admin.js:4
+msgid "Undo"
+msgstr ""
+
+#: build/admin.js:4
+#: build/admin.js:18
+msgid "Paused"
+msgstr ""
+
+#: build/admin.js:4
+#: build/admin.js:18
+msgid "Not verified yet"
+msgstr ""
+
+#. translators: %s: date and time
+#: build/admin.js:5
+#, js-format
+msgid "Verified %s"
+msgstr ""
+
+#: build/admin.js:5
+#: build/admin.js:18
+msgid "Not configured"
+msgstr ""
+
+#. translators: 1: used characters, 2: budget, 3: percent
+#: build/admin.js:6
+#, js-format
+msgid "This month: %1$s of %2$s characters (%3$d %%)"
+msgstr ""
+
+#. translators: %s: characters
+#: build/admin.js:7
+#, js-format
+msgid "This month: %s characters (no budget set)."
+msgstr ""
+
+#: build/admin.js:7
+msgid "Translates any language pair the model knows."
+msgstr ""
+
+#: build/admin.js:7
+msgid "Language list not loaded yet: it loads on first use or with Test connection."
+msgstr ""
+
+#. translators: %s: number of languages
+#: build/admin.js:8
+#, js-format
+msgid "%s languages supported."
+msgstr ""
+
+#: build/admin.js:8
+#: build/admin.js:52
+msgid "Main provider"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Fallback"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Run Test connection once to confirm this key works. The check repeats whenever the key or connection settings change."
+msgstr ""
+
+#: build/admin.js:8
+#: build/admin.js:18
+msgid "Last error:"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Connection"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Plan (sets the default request rate)"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Endpoint"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Leave empty for the global endpoint. Use your resource endpoint for a custom domain."
+msgstr ""
+
+#: build/admin.js:8
+msgid "Model"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Leave empty for the default model."
+msgstr ""
+
+#: build/admin.js:8
+msgid "Test connection"
+msgstr ""
+
+#: build/admin.js:8
+msgid "Save your changes first: the test uses the saved key and settings."
+msgstr ""
+
+#: build/admin.js:8
+msgid "Add a key and save to test the connection."
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:9
+#, js-format
+msgid "%s string waiting for this provider."
+msgid_plural "%s strings waiting for this provider."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:9
+msgid "Limits"
+msgstr ""
+
+#. translators: %s: time zone
+#: build/admin.js:10
+#, js-format
+msgid "Leave a field empty to use the default shown. Daily limits reset at midnight %s."
+msgstr ""
+
+#. translators: 1: default value, 2: extra help
+#: build/admin.js:11
+#, js-format
+msgid "Default: %1$s. %2$s"
+msgstr ""
+
+#: build/admin.js:11
+msgid "Default"
+msgstr ""
+
+#: build/admin.js:11
+#: build/admin.js:58
+msgid "Off"
+msgstr ""
+
+#: build/admin.js:11
+msgid "set on the page"
+msgstr ""
+
+#: build/admin.js:11
+msgid "from a path rule"
+msgstr ""
+
+#. translators: 1: percent, 2: translated, 3: total
+#: build/admin.js:12
+#, js-format
+msgid "%1$d %% (%2$d of %3$d)"
+msgstr ""
+
+#: build/admin.js:12
+msgid "Not visited or scanned yet"
+msgstr ""
+
+#: build/admin.js:12
+msgid "Choose the target language"
+msgstr ""
+
+#: build/admin.js:12
+msgid "Connect a translation provider and pass Test connection"
+msgstr ""
+
+#: build/admin.js:12
+msgid "Translate the first page (visit or scan a translated page)"
+msgstr ""
+
+#: build/admin.js:12
+#: build/admin.js:39
+msgid "Done"
+msgstr ""
+
+#: build/admin.js:12
+#: build/admin.js:39
+msgid "To do"
+msgstr ""
+
+#: build/admin.js:12
+msgid "Choose a target language to see coverage."
+msgstr ""
+
+#: build/admin.js:12
+msgid "No strings recorded yet. Visit a translated page to start."
+msgstr ""
+
+#. translators: 1: percent, 2: translated, 3: total, 4: manual
+#: build/admin.js:13
+#, js-format
+msgid "%1$d %% translated: %2$s of %3$s strings (%4$s manual)."
+msgstr ""
+
+#: build/admin.js:13
+msgid "Waiting"
+msgstr ""
+
+#: build/admin.js:13
+msgid "Failed"
+msgstr ""
+
+#: build/admin.js:13
+msgid "Characters waiting"
+msgstr ""
+
+#: build/admin.js:13
+msgid "Estimated time"
+msgstr ""
+
+#: build/admin.js:14
+msgid "No provider can translate now:"
+msgstr ""
+
+#. translators: %s: date and time
+#: build/admin.js:15
+#, js-format
+msgid "Next background run: %s. Processing here works even when WP-Cron does not run."
+msgstr ""
+
+#: build/admin.js:15
+msgid "No background run scheduled."
+msgstr ""
+
+#: build/admin.js:15
+msgid "Stop"
+msgstr ""
+
+#: build/admin.js:15
+msgid "The queue is empty."
+msgstr ""
+
+#: build/admin.js:15
+msgid "Nothing could be processed right now (rows are waiting for a retry or locked by another run)."
+msgstr ""
+
+#: build/admin.js:15
+msgid "Process queue now"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:16
+#, js-format
+msgid "%s failed strings queued again."
+msgstr ""
+
+#: build/admin.js:16
+msgid "Retry failed"
+msgstr ""
+
+#. translators: %d: seconds
+#: build/admin.js:17
+#, js-format
+msgid "Waiting %d s for the provider rate limit…"
+msgstr ""
+
+#. translators: 1: translated strings, 2: failed strings, 3: batches
+#: build/admin.js:18
+#, js-format
+msgid "This run: %1$s translated, %2$s failed, %3$s batch."
+msgid_plural "This run: %1$s translated, %2$s failed, %3$s batches."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:18
+msgid "Verified"
+msgstr ""
+
+#: build/admin.js:18
+msgid "main"
+msgstr ""
+
+#: build/admin.js:18
+msgid "fallback"
+msgstr ""
+
+#. translators: 1: language name, 2: direction
+#: build/admin.js:19
+#, js-format
+msgid "%1$s is written %2$s (detected automatically)."
+msgstr ""
+
+#: build/admin.js:19
+msgid "right to left"
+msgstr ""
+
+#: build/admin.js:19
+msgid "left to right"
+msgstr ""
+
+#: build/admin.js:19
+msgid "Translate automatically"
+msgstr ""
+
+#: build/admin.js:19
+msgid "Path rules"
+msgstr ""
+
+#: build/admin.js:19
+msgid "Set the mode of whole sections. \"/shop/*\" matches /shop/ and everything below it, \"/about/\" matches that page only and {{home}} is the front page. Rules are checked in order and the first match applies; a mode set on a page itself wins over rules."
+msgstr ""
+
+#: build/admin.js:19
+msgid "No path rules yet: every page uses the site mode."
+msgstr ""
+
+#. translators: %d: rule number
+#: build/admin.js:20
+#, js-format
+msgid "Path of rule %d"
+msgstr ""
+
+#. translators: %d: rule number
+#: build/admin.js:21
+#, js-format
+msgid "Mode of rule %d"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Remove"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Add rule"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Text"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Background"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Accent (current language and focus)"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Language (preview)"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Show"
+msgstr ""
+
+#: build/admin.js:21
+#: build/admin.js:60
+msgid "Errors and warnings"
+msgstr ""
+
+#: build/admin.js:21
+#: build/admin.js:60
+msgid "Errors only"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Warnings only"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Refresh"
+msgstr ""
+
+#: build/admin.js:21
+msgid "The log is empty."
+msgstr ""
+
+#: build/admin.js:21
+msgid "Time (UTC)"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Level"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Source"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Message"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Details"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Yes, delete"
+msgstr ""
+
+#: build/admin.js:21
+#: build/admin.js:63
+#: build/admin.js:67
+#: build/editor.js:8
+msgid "Cancel"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Unused strings"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Strings no longer found on any page, not shared site-wide and without a manual translation. Check first, then delete."
+msgstr ""
+
+#: build/admin.js:21
+msgid "Recorded more than this many days ago"
+msgstr ""
+
+#: build/admin.js:21
+msgid "Check (dry run)"
+msgstr ""
+
+#. translators: 1: number of strings, 2: characters
+#: build/admin.js:22
+#, js-format
+msgid "%1$s unused strings (%2$s characters) would be deleted with their machine translations."
+msgstr ""
+
+#: build/admin.js:22
+msgid "Delete unused strings"
+msgstr ""
+
+#: build/admin.js:22
+msgid "Delete these strings and their machine translations? This cannot be undone."
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:23
+#, js-format
+msgid "%s strings deleted."
+msgstr ""
+
+#: build/admin.js:23
+msgid "Suggested for Bengali: Bengali digits."
+msgstr ""
+
+#: build/admin.js:23
+msgid "Suggested for Urdu and Persian: Persian digits."
+msgstr ""
+
+#: build/admin.js:23
+msgid "OK"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Warning"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Problem"
+msgstr ""
+
+#: build/admin.js:23
+msgid "All strings"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Untranslated only"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:61
+msgid "Machine translations"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Manual translations"
+msgstr ""
+
+#: build/admin.js:23
+msgid "One page"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "Overwrite machine translations, keep manual ones"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Add only: keep every existing translation"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Overwrite all, including manual translations"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Manual (protected from machine translation)"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:62
+#: build/editor.js:1
+#: build/editor.js:2
+msgid "Machine"
+msgstr ""
+
+#: build/admin.js:23
+msgid "As in the file’s status column (empty = manual)"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "New translations"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "Updates"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "Unchanged"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "Kept by the conflict policy"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Skipped (no translation)"
+msgstr ""
+
+#: build/admin.js:23
+#: build/admin.js:39
+msgid "Invalid"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Kept"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Skipped"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Export"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Download strings and their translations as a CSV file (UTF-8). Columns: original, translated, status, kind, lang, pages. Cells that a spreadsheet would run as a formula start with an apostrophe; the import removes it."
+msgstr ""
+
+#: build/admin.js:23
+#: build/editor.js:8
+msgid "Strings"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Page path"
+msgstr ""
+
+#: build/admin.js:23
+msgid "Path without the language prefix, for example /about/. The page must have been visited or scanned."
+msgstr ""
+
+#: build/admin.js:23
+msgid "Download CSV"
+msgstr ""
+
+#. translators: 1: rows processed so far, 2: all rows
+#: build/admin.js:24
+#: build/admin.js:41
+#, js-format
+msgid "%1$s of %2$s rows"
+msgstr ""
+
+#: build/admin.js:24
+#: build/admin.js:41
+msgid "Import finished"
+msgstr ""
+
+#: build/admin.js:24
+#: build/admin.js:41
+msgid "Dry run: nothing was changed"
+msgstr ""
+
+#: build/admin.js:24
+msgid "Rows"
+msgstr ""
+
+#: build/admin.js:24
+msgid "Line"
+msgstr ""
+
+#: build/admin.js:24
+msgid "Result"
+msgstr ""
+
+#: build/admin.js:24
+msgid "Reason"
+msgstr ""
+
+#. translators: %s: number of rows not listed
+#: build/admin.js:25
+#, js-format
+msgid "… and %s more row."
+msgid_plural "… and %s more rows."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: cells found, 2: cells expected
+#: build/admin.js:26
+#, js-format
+msgid "Found %1$d cells, the header has %2$d."
+msgstr ""
+
+#: build/admin.js:26
+#: build/admin.js:40
+msgid "Importing…"
+msgstr ""
+
+#: build/admin.js:26
+#: build/admin.js:40
+msgid "Checking…"
+msgstr ""
+
+#. translators: 1: error message, 2: rows imported
+#: build/admin.js:27
+#, js-format
+msgid "%1$s The first %2$s rows were imported. Importing the same file again is safe: rows already imported come out unchanged."
+msgstr ""
+
+#: build/admin.js:27
+#: build/admin.js:34
+#: build/admin.js:40
+msgid "Import"
+msgstr ""
+
+#: build/admin.js:27
+msgid "Import a CSV file with at least the columns original and translated (status, kind and lang are optional; lang must be the target language). Check the file first: the dry run changes nothing. Inline translations must keep the original’s tags and attributes."
+msgstr ""
+
+#: build/admin.js:27
+msgid "CSV file"
+msgstr ""
+
+#. translators: %s: size in MB
+#: build/admin.js:28
+#, js-format
+msgid "The file is larger than %s MB. Split it into smaller files."
+msgstr ""
+
+#. translators: %d: line number
+#: build/admin.js:29
+#, js-format
+msgid "The file is not valid CSV: a quoted cell that starts on line %d is never closed."
+msgstr ""
+
+#. translators: %d: line number
+#: build/admin.js:30
+#, js-format
+msgid "The file is not valid CSV: unexpected text after a closing quote on line %d."
+msgstr ""
+
+#. translators: %s: column names
+#: build/admin.js:31
+#, js-format
+msgid "The first line must name the columns; missing: %s."
+msgstr ""
+
+#. translators: %s: row limit
+#: build/admin.js:32
+#, js-format
+msgid "The file has more than %s rows. Split it into smaller files."
+msgstr ""
+
+#: build/admin.js:32
+msgid "The file has no rows."
+msgstr ""
+
+#. translators: 1: size in MB, 2: row limit
+#: build/admin.js:33
+#, js-format
+msgid "Up to %1$s MB and %2$s rows."
+msgstr ""
+
+#. translators: 1: file name, 2: number of rows
+#: build/admin.js:34
+#, js-format
+msgid "%1$s: %2$s row read."
+msgid_plural "%1$s: %2$s rows read."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:34
+msgid "Import as"
+msgstr ""
+
+#: build/admin.js:34
+msgid "When a string is already translated"
+msgstr ""
+
+#: build/admin.js:34
+msgid "Check file (dry run)"
+msgstr ""
+
+#: build/admin.js:34
+#: build/editor.js:2
+msgid "The page did not answer with a scan result."
+msgstr ""
+
+#: build/admin.js:34
+#: build/editor.js:2
+msgid "A cached copy of the page came back instead of a scan."
+msgstr ""
+
+#: build/admin.js:34
+msgid "Set to \"off\""
+msgstr ""
+
+#: build/admin.js:34
+msgid "Manual pages (machine translation is turned off for them)"
+msgstr ""
+
+#: build/admin.js:34
+msgid "Cart, checkout and account pages (may show personal data)"
+msgstr ""
+
+#: build/admin.js:34
+msgid "Password-protected"
+msgstr ""
+
+#: build/admin.js:34
+msgid "Matches a \"never discover\" path"
+msgstr ""
+
+#: build/admin.js:34
+msgid "Not an address of this site"
+msgstr ""
+
+#. translators: 1: pages done, 2: all pages
+#: build/admin.js:35
+#, js-format
+msgid "%1$s of %2$s"
+msgstr ""
+
+#. translators: %s: number of pages
+#: build/admin.js:36
+#, js-format
+msgid "%s page is left out"
+msgid_plural "%s pages are left out"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: provider name, 2: characters used this month
+#: build/admin.js:37
+#, js-format
+msgid "%1$s has no monthly character limit set here; %2$s characters used this month."
+msgstr ""
+
+#. translators: 1: provider, 2: used, 3: monthly limit, 4: characters already queued, 5: remaining
+#: build/admin.js:38
+#, js-format
+msgid "%1$s: %2$s of %3$s characters used this month, %4$s already queued; %5$s left."
+msgstr ""
+
+#. translators: 1: characters left, 2: date
+#: build/admin.js:39
+#, js-format
+msgid "This is more than the %1$s characters left this month. Translation stops at the limit; the rest stays queued and continues after the limit resets on %2$s (or with the fallback provider, if one is set)."
+msgstr ""
+
+#: build/admin.js:39
+msgid "Keep existing translations (add only)"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Overwrite all"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Default language"
+msgstr ""
+
+#: build/admin.js:39
+#: build/admin.js:49
+msgid "Target language"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Target URL slug"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Default-language URL slug"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Prefix the default language"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Yes"
+msgstr ""
+
+#: build/admin.js:39
+msgid "No"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Setting"
+msgstr ""
+
+#: build/admin.js:39
+msgid "Use the TranslatePress languages and URL slugs"
+msgstr ""
+
+#. translators: 1: error message, 2: rows handled
+#: build/admin.js:40
+#, js-format
+msgid "%1$s The first %2$s TranslatePress rows were handled; importing again is safe."
+msgstr ""
+
+#: build/admin.js:40
+msgid "Use the TranslatePress languages first: the target language must be the one of this table."
+msgstr ""
+
+#: build/admin.js:40
+msgid "When a string is already translated here"
+msgstr ""
+
+#: build/admin.js:40
+msgid "Dry run"
+msgstr ""
+
+#: build/admin.js:41
+msgid "TranslatePress rows"
+msgstr ""
+
+#: build/admin.js:41
+msgid "Skipped: not translated"
+msgstr ""
+
+#: build/admin.js:41
+msgid "Skipped: old translation blocks"
+msgstr ""
+
+#. translators: %s: number of rows
+#: build/admin.js:42
+#, js-format
+msgid "%s row needs attention"
+msgid_plural "%s rows need attention"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: 1: TranslatePress row id, 2: reason
+#: build/admin.js:43
+#, js-format
+msgid "TranslatePress row %1$d: %2$s"
+msgstr ""
+
+#: build/admin.js:43
+msgid "Pages to check (one path per line, up to 20)"
+msgstr ""
+
+#: build/admin.js:43
+msgid "Check pages"
+msgstr ""
+
+#: build/admin.js:43
+msgid "No strings found on these pages."
+msgstr ""
+
+#. translators: 1: percentage, 2: matched strings, 3: all strings
+#: build/admin.js:44
+#, js-format
+msgid "%1$s%% of the strings already have a translation (%2$s of %3$s)."
+msgstr ""
+
+#. translators: 1: matched, 2: strings
+#: build/admin.js:45
+#, js-format
+msgid "%1$s of %2$s strings translated"
+msgstr ""
+
+#: build/admin.js:45
+msgid "Most frequent strings without a translation"
+msgstr ""
+
+#. translators: %d: number of pages
+#: build/admin.js:46
+#, js-format
+msgid "(%d page)"
+msgid_plural "(%d pages)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:46
+msgid "TranslatePress and WP Site Translator split pages into strings differently, so some longer blocks do not match. Scan those pages after going live and translate what is missing."
+msgstr ""
+
+#: build/admin.js:46
+msgid "No TranslatePress shortcodes or menu switchers were found in posts, widgets or menus."
+msgstr ""
+
+#: build/admin.js:46
+msgid "Widgets"
+msgstr ""
+
+#. translators: %d: number of menu items
+#: build/admin.js:47
+#, js-format
+msgid "%d TranslatePress language switcher menu item: replace it with the \"Language switcher\" item of WP Site Translator."
+msgid_plural "%d TranslatePress language switcher menu items: replace them with the \"Language switcher\" item of WP Site Translator."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:47
+msgid "Show our language switcher where content uses [language-switcher]"
+msgstr ""
+
+#: build/admin.js:47
+msgid "Works once TranslatePress is deactivated. [trp_language], [language-include] and [language-exclude] are not replaced; edit the places listed above."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Deactivate TranslatePress."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Plugins"
+msgstr ""
+
+#: build/admin.js:47
+msgid "Its data stays in the database untouched; you can switch back at any time."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Flush permalinks, so the old language rules are gone."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Flush now"
+msgstr ""
+
+#: build/admin.js:47
+msgid "Confirm the URL slugs are the same as in TranslatePress."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Scan the key pages (or the whole site)."
+msgstr ""
+
+#: build/admin.js:47
+#: build/admin.js:49
+#: build/admin.js:62
+msgid "Translate entire site"
+msgstr ""
+
+#: build/admin.js:47
+msgid "Possible after deactivating TranslatePress."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Compare a few translated URLs: they should stay the same."
+msgstr ""
+
+#: build/admin.js:47
+msgid "Same"
+msgstr ""
+
+#: build/admin.js:47
+msgid "Different"
+msgstr ""
+
+#. translators: %s: URL under TranslatePress
+#: build/admin.js:48
+#, js-format
+msgid "was %s"
+msgstr ""
+
+#: build/admin.js:48
+msgid "Overview"
+msgstr ""
+
+#: build/admin.js:48
+#: build/admin.js:52
+#: build/admin.js:53
+#: build/admin.js:62
+#: build/admin.js:74
+#: build/editor.js:2
+#: build/editor.js:4
+#: build/editor.js:8
+msgid "Try again"
+msgstr ""
+
+#: build/admin.js:48
+msgid "TranslatePress is active, so the translated front end of WP Site Translator is paused."
+msgstr ""
+
+#: build/admin.js:48
+msgid "Import and go live"
+msgstr ""
+
+#. translators: %d: number of failures
+#: build/admin.js:49
+#, js-format
+msgid "%d translated page was shown untranslated in the last 24 hours because rendering failed."
+msgid_plural "%d translated pages were shown untranslated in the last 24 hours because rendering failed."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:49
+msgid "See the log"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Getting started"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Open the translation editor"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Coverage"
+msgstr ""
+
+#: build/admin.js:49
+#: build/admin.js:60
+msgid "Translation queue"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Providers"
+msgstr ""
+
+#: build/admin.js:49
+msgid "No provider is set up yet."
+msgstr ""
+
+#: build/admin.js:49
+msgid "Set one up"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Recent log entries"
+msgstr ""
+
+#: build/admin.js:49
+msgid "Nothing logged."
+msgstr ""
+
+#: build/admin.js:49
+msgid "Open the full log"
+msgstr ""
+
+#: build/admin.js:49
+msgid "The site is translated between exactly two languages. Visitors reach the target language under its URL prefix, for example /bn/about/."
+msgstr ""
+
+#: build/admin.js:49
+msgid "Default language (the language your content is written in)"
+msgstr ""
+
+#: build/admin.js:49
+msgid "— Choose a language —"
+msgstr ""
+
+#: build/admin.js:49
+msgid "URL prefix of the target language"
+msgstr ""
+
+#. translators: %s: default prefix
+#: build/admin.js:50
+#, js-format
+msgid "Leave empty to use \"%s\". Lowercase letters, digits and hyphens."
+msgstr ""
+
+#: build/admin.js:50
+msgid "Choose a target language first."
+msgstr ""
+
+#: build/admin.js:50
+msgid "Default language URLs"
+msgstr ""
+
+#: build/admin.js:50
+msgid "By default the original pages keep their URLs. With a prefix, they move under it (for example /en/about/) and the old URLs redirect permanently."
+msgstr ""
+
+#: build/admin.js:50
+msgid "Add a language prefix to the default language"
+msgstr ""
+
+#: build/admin.js:50
+msgid "URL prefix of the default language"
+msgstr ""
+
+#: build/admin.js:50
+msgid "Leave empty to use the language code. It must differ from the target prefix."
+msgstr ""
+
+#: build/admin.js:50
+#: build/admin.js:52
+msgid "Language names"
+msgstr ""
+
+#: build/admin.js:50
+msgid "Show language names"
+msgstr ""
+
+#. translators: %s: example
+#: build/admin.js:51
+#, js-format
+msgid "In their own language (%s)"
+msgstr ""
+
+#: build/admin.js:51
+msgid "In their own language"
+msgstr ""
+
+#. translators: %s: example
+#: build/admin.js:52
+#, js-format
+msgid "In English (%s)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "In English"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Site mode"
+msgstr ""
+
+#: build/admin.js:52
+msgid "How new strings are translated"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Automatically: new strings are queued for machine translation"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Manually: only translations you enter are shown; nothing is sent to a provider unless you ask"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Allow machine translation in the editor on manual pages"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Manual pages never send strings automatically. With this on, editors can still ask the provider for a translation."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Translation providers"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Strings are translated in the background through a rate-limited queue; pages never wait for a provider. The fallback takes over while the main provider is paused, out of budget or cannot translate the language pair."
+msgstr ""
+
+#: build/admin.js:52
+msgid "None (manual translations only)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Fallback provider"
+msgstr ""
+
+#: build/admin.js:52
+msgid "None"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Finding strings"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Strings are recorded when a translated page is visited or scanned."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Record new strings when visitors open translated pages"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Off: only scans record strings."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Ignore visits from search engines and other bots"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Bots still see existing translations but never add strings to the queue."
+msgstr ""
+
+#: build/admin.js:52
+msgid "New strings per page per hour"
+msgstr ""
+
+#: build/admin.js:52
+msgid "New strings per site per hour"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Longest string recorded (characters)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Query arguments that make a page distinct (one per line)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Other query strings are ignored when recording where a string appears."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Paths never recorded (one per line, * at the end matches a section)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Pages not translated automatically"
+msgstr ""
+
+#: build/admin.js:52
+msgid "When a visitor opens the translated address of a page that is off"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Redirect to the original page"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Show the original text at the translated address"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Set the mode of single pages on the Pages screen or in the editor sidebar."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Copying is not available here: select the shortcode and copy it."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Appearance"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Labels"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Short codes (EN, BN)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Codes and names"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Names follow the language name style on the Languages screen."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Colours"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Follow the theme"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Light"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Dark"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Custom"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Custom colours"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Live preview"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Choose a target language to see the preview."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Floating switcher"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Show a floating switcher on every page"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Position"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Left and right swap on right-to-left pages."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Bottom right"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Bottom left"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Top right"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Top left"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Distance from the top or bottom edge (pixels)"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Raise it when the theme has a fixed bar at that edge, for example a bottom navigation bar on phones. 0–400; default 16."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Placing the switcher"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Shortcode"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Copied."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Copy shortcode"
+msgstr ""
+
+#: build/admin.js:52
+msgid "Block"
+msgstr ""
+
+#: build/admin.js:52
+msgid "In the block editor or the site editor, add the \"Language switcher\" block (for example to the header template)."
+msgstr ""
+
+#: build/admin.js:52
+msgid "Menu"
+msgstr ""
+
+#. translators: %s: screen name
+#: build/admin.js:53
+#, js-format
+msgid "In classic themes, open %s, find the \"Language switcher\" box and add it to a menu. It shows one link per language."
+msgstr ""
+
+#: build/admin.js:53
+msgid "Appearance → Menus"
+msgstr ""
+
+#: build/admin.js:53
+msgid "Open Menus"
+msgstr ""
+
+#: build/admin.js:53
+msgid "Pages"
+msgstr ""
+
+#: build/admin.js:53
+msgid "Choose and save a target language on the Languages screen first."
+msgstr ""
+
+#: build/admin.js:53
+msgid "Go to Languages"
+msgstr ""
+
+#: build/admin.js:53
+msgid "Each page follows the site mode and path rules unless you set a mode for it here or in the editor sidebar."
+msgstr ""
+
+#: build/admin.js:53
+msgid "Search pages"
+msgstr ""
+
+#: build/admin.js:53
+#: build/admin.js:56
+#: build/admin.js:57
+msgid "Page setting"
+msgstr ""
+
+#: build/admin.js:53
+#: build/editor.js:2
+msgid "All"
+msgstr ""
+
+#: build/admin.js:53
+#: build/editor.js:1
+msgid "Search"
+msgstr ""
+
+#: build/admin.js:53
+msgid "No pages found."
+msgstr ""
+
+#: build/admin.js:53
+msgid "Select all on this page"
+msgstr ""
+
+#: build/admin.js:53
+msgid "Set mode of selected pages"
+msgstr ""
+
+#: build/admin.js:53
+msgid "— Choose —"
+msgstr ""
+
+#. translators: %d: number of pages
+#: build/admin.js:54
+#, js-format
+msgid "%d page updated."
+msgid_plural "%d pages updated."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of pages
+#: build/admin.js:55
+#, js-format
+msgid "%d page skipped (not found or not allowed)."
+msgid_plural "%d pages skipped (not found or not allowed)."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of selected pages
+#: build/admin.js:56
+#, js-format
+msgid "Apply to %d selected"
+msgstr ""
+
+#: build/admin.js:56
+msgid "Select"
+msgstr ""
+
+#: build/admin.js:56
+msgid "Title"
+msgstr ""
+
+#: build/admin.js:56
+#: build/admin.js:57
+msgid "Type"
+msgstr ""
+
+#: build/admin.js:56
+#: build/admin.js:57
+msgid "Applies"
+msgstr ""
+
+#: build/admin.js:56
+#: build/admin.js:57
+msgid "Translated"
+msgstr ""
+
+#: build/admin.js:56
+#: build/editor.js:1
+msgid "(no title)"
+msgstr ""
+
+#. translators: %s: post title
+#: build/admin.js:57
+#, js-format
+msgid "Select %s"
+msgstr ""
+
+#: build/admin.js:57
+msgid "Edit translations"
+msgstr ""
+
+#: build/admin.js:57
+#: build/editor.js:8
+msgid "Previous"
+msgstr ""
+
+#. translators: 1: page, 2: pages, 3: total items
+#: build/admin.js:58
+#, js-format
+msgid "Page %1$d of %2$d (%3$d items)"
+msgstr ""
+
+#: build/admin.js:58
+#: build/editor.js:9
+msgid "Next"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Advanced"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Excluded areas"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Never translate elements matching these CSS selectors (one per line)"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Supported: tag (div), .class, #id, [attr], [attr=value], several combined (div.note[data-x]), descendants separated by spaces (.footer .legal) and comma lists. Not supported: *, >, +, ~ and pseudo-classes. Elements with data-wst-no-translate or data-no-translation are always skipped."
+msgstr ""
+
+#: build/admin.js:58
+msgid "Never-translate terms"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Brand and product names that must stay as written. Changes apply to new translations only."
+msgstr ""
+
+#: build/admin.js:58
+msgid "Terms (one per line, up to 500)"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Match regardless of upper and lower case"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Match whole words only"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Links and search engines"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Keep visitors in their language on internal links written into content"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Add an x-default hreflang link pointing to the default language"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Use language codes without region (bn instead of bn-BD) in hreflang and the lang attribute"
+msgstr ""
+
+#: build/admin.js:58
+msgid "List translated pages in the XML sitemap"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Adds a sitemap of the translated URLs to the WordPress, Yoast SEO or Rank Math sitemap index. Pages set to Off and pages marked noindex are left out."
+msgstr ""
+
+#: build/admin.js:58
+msgid "Language suggestion"
+msgstr ""
+
+#: build/admin.js:58
+msgid "When a visitor’s browser prefers the other language, suggest the same page in that language. The page is the same for everyone (works with page caches); the choice is made in the browser."
+msgstr ""
+
+#: build/admin.js:58
+msgid "Suggestion"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Bar: asks the visitor with a link to the other language"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Redirect: sends the visitor there automatically on the first visit"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Redirects never apply to search engines and other bots, never go to a page set to \"off\", happen once (the choice is remembered) and are skipped with ?wst_no_redirect=1. Automatic redirects can surprise visitors who opened a link on purpose; the bar is the gentler choice."
+msgstr ""
+
+#: build/admin.js:58
+msgid "The visitor’s choice (dismissing the bar, following it or using the language switcher) is remembered for 180 days in the first-party cookie wst_lang_choice; mention it in your cookie policy."
+msgstr ""
+
+#: build/admin.js:58
+msgid "Bar position"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Bottom"
+msgstr ""
+
+#: build/admin.js:58
+msgid "Top"
+msgstr ""
+
+#. translators: %s: language name
+#: build/admin.js:59
+#, js-format
+msgid "Bar text in %s (shown on default-language pages)"
+msgstr ""
+
+#: build/admin.js:59
+msgid "the target language"
+msgstr ""
+
+#: build/admin.js:59
+msgid "Write it in that language; it links to the translated page. Empty: the language name."
+msgstr ""
+
+#. translators: %s: language name
+#: build/admin.js:60
+#, js-format
+msgid "Bar text in %s (shown on translated pages)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Digits"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Write numbers with the digits of the target language on translated pages. Only visible text changes: links, attributes, e-mail addresses, form values, code and never-translate terms keep their digits."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Digits on translated pages"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Automatic: Arabic-Indic digits for Arabic, unchanged for other languages"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Unchanged (0123456789)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Bengali (০১২৩৪৫৬৭৮৯)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Arabic-Indic (٠١٢٣٤٥٦٧٨٩)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Persian, also used for Urdu (۰۱۲۳۴۵۶۷۸۹)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Keep WooCommerce prices as they are"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Dynamic content"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Text that arrives after the page loads: cart fragments, AJAX responses and text that scripts add. Only existing translations are used; nothing here creates strings or calls a provider."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Translate AJAX and REST responses on translated pages (WooCommerce cart fragments, add to cart, order review, checkout messages)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "JSON keys whose plain-text values are translated"
+msgstr ""
+
+#: build/admin.js:60
+msgid "One per line. Values that contain HTML are translated under any key; keys, numbers, IDs, URLs and nonces never change."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Translate dynamic content: text that scripts add to the page"
+msgstr ""
+
+#: build/admin.js:60
+msgid "A small script asks for existing translations of new text (public, read-only, limited to 60 requests a minute per visitor). Text assembled by scripts, such as \"Items: \" plus a number, cannot be matched. Use \"Scan dynamic content\" in the editor to collect such texts."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Visitor address for the rate limit"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Behind Cloudflare or another proxy every visitor arrives from the proxy address; choose the header the proxy sets, or all visitors share one limit. Only choose a header your proxy always sets: visitors can send any header themselves."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Direct connection (no proxy)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Cloudflare (CF-Connecting-IP)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Proxy or load balancer (X-Forwarded-For, last address)"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Custom header"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Header name"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Log"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Record"
+msgstr ""
+
+#: build/admin.js:60
+msgid "The latest 1,000 entries are kept."
+msgstr ""
+
+#: build/admin.js:60
+msgid "Data"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Clear the queue"
+msgstr ""
+
+#: build/admin.js:60
+msgid "Remove all waiting and failed strings from the queue? Strings being translated right now finish. Visits and scans add strings again."
+msgstr ""
+
+#. translators: %s: number of rows
+#: build/admin.js:61
+#, js-format
+msgid "%s queued strings removed."
+msgstr ""
+
+#: build/admin.js:61
+msgid "Deletes every machine translation of the target language. Manual translations are kept. Pages show the original text until strings are translated again."
+msgstr ""
+
+#: build/admin.js:61
+msgid "Delete machine translations"
+msgstr ""
+
+#: build/admin.js:61
+msgid "Delete all machine translations? Manual translations are kept. This cannot be undone."
+msgstr ""
+
+#. translators: %s: number of translations
+#: build/admin.js:62
+#, js-format
+msgid "%s machine translations deleted."
+msgstr ""
+
+#: build/admin.js:62
+msgid "Delete all translator data when the plugin is deleted"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Off: deleting the plugin keeps every translation and setting, so reinstalling restores them. On: tables, settings, keys and page modes are removed for good."
+msgstr ""
+
+#: build/admin.js:62
+msgid "Import / Export"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Health"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Run loopback test"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Loads your home page from the server, as WP-Cron does."
+msgstr ""
+
+#: build/admin.js:62
+msgid "Server cron command"
+msgstr ""
+
+#: build/admin.js:62
+msgid "WP-Cron is disabled on this site. Add this line to the server crontab so the queue keeps running:"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Migration"
+msgstr ""
+
+#: build/admin.js:62
+msgid "TranslatePress"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Active: our front end is paused"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Installed, not active"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Plugin removed, data still in the database"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Everything here only reads TranslatePress data; nothing of TranslatePress is changed or deleted."
+msgstr ""
+
+#: build/admin.js:62
+msgid "No TranslatePress translation tables were found for the configured languages."
+msgstr ""
+
+#: build/admin.js:62
+msgid "Language to import (WP Site Translator translates into one language)"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Language pair"
+msgstr ""
+
+#: build/admin.js:62
+#: build/editor.js:1
+#: build/editor.js:2
+msgid "Manual"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Not translated"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Old translation blocks"
+msgstr ""
+
+#: build/admin.js:62
+msgid "1. Languages and URL slugs"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Use the same languages and URL slugs, so translated pages keep their addresses and search rankings."
+msgstr ""
+
+#: build/admin.js:62
+msgid "2. Import translations"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Machine translations stay machine translations; manual (reviewed) ones are protected from machine translation. Rows without a translation and old translation blocks are skipped. Importing again is safe."
+msgstr ""
+
+#: build/admin.js:62
+msgid "3. Match report"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Loads pages in the default language and checks how many of their strings already have a translation. Nothing is recorded or sent to a provider."
+msgstr ""
+
+#: build/admin.js:62
+msgid "Switchers and shortcodes in your content"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Go live"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Lists the home page, archives, every published post, page and product, and every category or tag page; scans them as a visitor sees them; then shows how many characters would be sent to the provider. Nothing is queued until you confirm. Queued strings are translated after visitor and editor requests (lowest priority)."
+msgstr ""
+
+#: build/admin.js:62
+msgid "TranslatePress is active, so the translated front end is paused and pages cannot be scanned. Deactivate TranslatePress first (Translator → Migration)."
+msgstr ""
+
+#: build/admin.js:62
+msgid "List the site’s pages"
+msgstr ""
+
+#: build/admin.js:62
+msgid "Listing pages…"
+msgstr ""
+
+#. translators: %s: number of pages
+#: build/admin.js:63
+#, js-format
+msgid "%s page to scan."
+msgid_plural "%s pages to scan."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:63
+msgid "May show personal data; scan it in the editor if needed."
+msgstr ""
+
+#: build/admin.js:63
+msgid "Scan pages"
+msgstr ""
+
+#: build/admin.js:63
+msgid "Scanning pages…"
+msgstr ""
+
+#: build/admin.js:63
+msgid "Stop and estimate what was scanned"
+msgstr ""
+
+#. translators: %s: number of pages
+#: build/admin.js:64
+#, js-format
+msgid "%s page could not be scanned"
+msgid_plural "%s pages could not be scanned"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:64
+msgid "No page could be scanned, so there is nothing to estimate."
+msgstr ""
+
+#: build/admin.js:64
+msgid "Estimating…"
+msgstr ""
+
+#: build/admin.js:64
+msgid "Pages scanned"
+msgstr ""
+
+#: build/admin.js:64
+msgid "Strings to translate"
+msgstr ""
+
+#: build/admin.js:64
+msgid "Estimated characters"
+msgstr ""
+
+#: build/admin.js:64
+msgid "Every string on the scanned pages is already translated or queued."
+msgstr ""
+
+#. translators: 1: characters, 2: provider
+#: build/admin.js:65
+#, js-format
+msgid "Send about %1$s characters to %2$s for translation."
+msgstr ""
+
+#. translators: 1: error message, 2: number of strings queued
+#: build/admin.js:66
+#, js-format
+msgid "%1$s %2$s strings were queued before the error; queueing again adds only the rest."
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:67
+#, js-format
+msgid "Queue %s string"
+msgid_plural "Queue %s strings"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:67
+msgid "Queueing…"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:68
+#, js-format
+msgid "%s string queued. Translation runs in the background; follow it in the queue on the Overview."
+msgid_plural "%s strings queued. Translation runs in the background; follow it in the queue on the Overview."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:68
+msgid "Back to the Overview"
+msgstr ""
+
+#. translators: %s: provider name
+#: build/admin.js:69
+#, js-format
+msgid "%s paused"
+msgstr ""
+
+#. translators: %s: provider name
+#: build/admin.js:70
+#, js-format
+msgid "%s: not verified yet"
+msgstr ""
+
+#. translators: %s: provider name
+#: build/admin.js:71
+#, js-format
+msgid "%s ready"
+msgstr ""
+
+#. translators: %s: provider name
+#: build/admin.js:72
+#, js-format
+msgid "%s: no key"
+msgstr ""
+
+#: build/admin.js:72
+msgid "No provider selected"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:73
+#, js-format
+msgid "%s string queued"
+msgid_plural "%s strings queued"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:73
+msgid "Queue empty"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/admin.js:74
+#, js-format
+msgid "%s failed"
+msgid_plural "%s failed"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/admin.js:74
+msgid "Loading settings…"
+msgstr ""
+
+#: build/admin.js:74
+msgid "Translator screens"
+msgstr ""
+
+#: build/admin.js:74
+msgid "Unsaved changes"
+msgstr ""
+
+#: build/admin.js:74
+msgid "You have unsaved changes."
+msgstr ""
+
+#: build/admin.js:74
+msgid "Discard"
+msgstr ""
+
+#: build/admin.js:74
+msgid "Settings saved."
+msgstr ""
+
+#: build/admin.js:74
+msgid "Save changes"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Choose a page to translate"
+msgstr ""
+
+#: build/editor.js:1
+msgid "You can also open the editor from the Pages screen, the post editor sidebar, or “Translate this page” in the toolbar while viewing the site."
+msgstr ""
+
+#: build/editor.js:1
+msgid "Search posts and pages"
+msgstr ""
+
+#: build/editor.js:1
+msgid "No posts or pages found."
+msgstr ""
+
+#: build/editor.js:1
+msgid "Or an address of this site (home page, archive, shop…)"
+msgstr ""
+
+#: build/editor.js:1
+msgid "For example / for the home page or /shop/."
+msgstr ""
+
+#: build/editor.js:1
+msgid "Open"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Preview"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Run page scripts"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Off: other plugins’ scripts are removed from the preview so they cannot interfere."
+msgstr ""
+
+#: build/editor.js:1
+msgid "The preview did not load (the page may refuse to be framed, or it failed). The string list works without it."
+msgstr ""
+
+#: build/editor.js:1
+msgid "Try the preview again"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Translated page preview"
+msgstr ""
+
+#: build/editor.js:1
+#: build/editor.js:2
+msgid "Untranslated"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Translated piece by piece (a plain-text provider could not keep the tags in one sentence): word order may be off."
+msgstr ""
+
+#: build/editor.js:1
+msgid "The provider changed the tag syntax; it was repaired. Check the result."
+msgstr ""
+
+#: build/editor.js:1
+msgid "Machine translation failed:"
+msgstr ""
+
+#: build/editor.js:1
+msgid "Site-wide"
+msgstr ""
+
+#. translators: %s: original text
+#: build/editor.js:2
+#, js-format
+msgid "Translation of: %s"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Type the translation…"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Keep every tag exactly as in the original; you may move tags with their words."
+msgstr ""
+
+#: build/editor.js:2
+msgid "Waiting for machine translation"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Saving…"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Saved"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Translate with provider"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Keep as manual"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Revert to machine translation"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Remove translation"
+msgstr ""
+
+#: build/editor.js:2
+msgid "This address shows the site’s “not found” page (HTTP 404), so there is nothing to scan here. Texts of the not-found template are translated wherever they also appear; choose a page below."
+msgstr ""
+
+#: build/editor.js:2
+msgid "Search results are built from your other pages, so they cannot be scanned as one page. Translate the pages they show; choose one below."
+msgstr ""
+
+#: build/editor.js:2
+msgid "Has warning"
+msgstr ""
+
+#: build/editor.js:2
+msgid "Automatic translation"
+msgstr ""
+
+#: build/editor.js:2
+msgid "This page is set to “off”: it is not translated, so nothing was recorded."
+msgstr ""
+
+#. translators: 1: strings found, 2: new strings, 3: queued strings
+#: build/editor.js:3
+#, js-format
+msgid "Scan finished: %1$s strings on the page, %2$s new, %3$s queued for machine translation."
+msgstr ""
+
+#. translators: %s: error
+#: build/editor.js:4
+#, js-format
+msgid "The scan failed: %s"
+msgstr ""
+
+#: build/editor.js:4
+msgid "Empty translations are not saved. Use “Remove translation” to show the original."
+msgstr ""
+
+#: build/editor.js:4
+msgid "Loading the page…"
+msgstr ""
+
+#. translators: %s: language name
+#: build/editor.js:5
+#, js-format
+msgid "View in %s"
+msgstr ""
+
+#. translators: %s: date and time
+#: build/editor.js:6
+#, js-format
+msgid "Last scanned %s"
+msgstr ""
+
+#: build/editor.js:6
+msgid "Not scanned yet"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/editor.js:7
+#, js-format
+msgid "%s string waiting for machine translation"
+msgid_plural "%s strings waiting for machine translation"
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/editor.js:7
+msgid "Scan page"
+msgstr ""
+
+#: build/editor.js:7
+msgid "Opens the page in a new tab; texts that its scripts add (menus, mini-cart, tabs, popups) are collected while you use it."
+msgstr ""
+
+#: build/editor.js:7
+msgid "Scan dynamic content"
+msgstr ""
+
+#. translators: %s: number of strings
+#: build/editor.js:8
+#, js-format
+msgid "%s string queued for machine translation."
+msgid_plural "%s strings queued for machine translation."
+msgstr[0] ""
+msgstr[1] ""
+
+#: build/editor.js:8
+msgid "Translate untranslated with provider"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Show preview"
+msgstr ""
+
+#: build/editor.js:8
+msgid "TranslatePress is active, so the translated front end is paused: scanning and the preview are unavailable. The string list and your edits work; they show on the site once TranslatePress is deactivated."
+msgstr ""
+
+#: build/editor.js:8
+msgid "This page is set to “off”: visitors see it untranslated, so it is not scanned. Strings listed here come from earlier scans; translations you make apply wherever the text appears."
+msgstr ""
+
+#: build/editor.js:8
+msgid "No translation provider is ready, so machine translation is unavailable here. Manual translation works."
+msgstr ""
+
+#: build/editor.js:8
+msgid "Set up a provider"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Machine translation is turned off for manual pages."
+msgstr ""
+
+#: build/editor.js:8
+msgid "Scanning the translated page…"
+msgstr ""
+
+#: build/editor.js:8
+msgid "This page may show personal data (search results, cart, checkout or account). Its strings will be recorded but never sent for machine translation automatically. Scan it anyway?"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Scan anyway"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Filter"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Search strings"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Include site-wide strings (menus, footer)"
+msgstr ""
+
+#: build/editor.js:8
+msgid "Changes save when you leave a field. Ctrl+Enter saves and moves on, Esc undoes, Alt+↑/↓ moves between strings. A translation applies everywhere the text appears."
+msgstr ""
+
+#: build/editor.js:8
+msgid "No strings match."
+msgstr ""
+
+#: build/editor.js:8
+msgid "No strings yet: scan the page to find them."
+msgstr ""
+
+#. translators: 1: page, 2: pages
+#: build/editor.js:9
+#, js-format
+msgid "Page %1$d of %2$d"
+msgstr ""
+
+#. translators: %s: target language name
+#: build/post-panel.js:2
+#, js-format
+msgid "Translation (%s)"
+msgstr ""
+
+#: build/post-panel.js:2
+msgid "Save the post to apply the new mode."
+msgstr ""
+
+#: build/switcher-block.js:1
+msgid "Links to this page in each language."
+msgstr ""
+
+#: blocks/switcher/block.json
+msgctxt "block title"
+msgid "Language switcher"
+msgstr ""
+
+#: blocks/switcher/block.json
+msgctxt "block description"
+msgid "Links to this page in each language."
+msgstr ""

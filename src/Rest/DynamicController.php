@@ -262,12 +262,21 @@ final class DynamicController {
 	 * @param string $ip Visitor IP.
 	 */
 	private function allowRequest( string $ip ): bool {
-		$key   = Config::PREFIX . 'lk_' . substr( hash( 'sha256', $ip . '|' . gmdate( 'YmdHi' ) ), 0, 32 );
-		$count = (int) get_transient( $key );
+		// One window per visitor that starts with its first request and lasts a
+		// minute, so requests on both sides of a clock minute share one limit.
+		$key    = Config::PREFIX . 'lk_' . substr( hash( 'sha256', $ip ), 0, 32 );
+		$now    = time();
+		$stored = get_transient( $key );
+		$start  = is_array( $stored ) && isset( $stored[0] ) ? (int) $stored[0] : 0;
+		$count  = is_array( $stored ) && isset( $stored[1] ) ? (int) $stored[1] : 0;
+		if ( $now - $start >= MINUTE_IN_SECONDS ) {
+			$start = $now;
+			$count = 0;
+		}
 		if ( $count >= self::RATE_PER_MINUTE ) {
 			return false;
 		}
-		set_transient( $key, $count + 1, 2 * MINUTE_IN_SECONDS );
+		set_transient( $key, array( $start, $count + 1 ), MINUTE_IN_SECONDS );
 
 		return true;
 	}

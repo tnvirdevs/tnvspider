@@ -22,8 +22,11 @@ export function duration( seconds ) {
 	}
 	const minutes = Math.ceil( seconds / 60 );
 	if ( minutes < 120 ) {
-		/* translators: %d: minutes */
-		return sprintf( __( 'about %d min', 'wp-site-translator' ), minutes );
+		return sprintf(
+			/* translators: %d: minutes */
+			__( 'about %d min', 'wp-site-translator' ),
+			minutes
+		);
 	}
 	return sprintf(
 		/* translators: %d: hours */

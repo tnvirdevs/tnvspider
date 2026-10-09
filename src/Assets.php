@@ -53,7 +53,7 @@ final class Assets {
 			isset( $meta['version'] ) ? (string) $meta['version'] : Config::VERSION,
 			true
 		);
-		wp_set_script_translations( $handle, 'wp-site-translator' );
+		wp_set_script_translations( $handle, Config::TEXT_DOMAIN, dirname( $pluginFile ) . '/languages' );
 
 		return true;
 	}

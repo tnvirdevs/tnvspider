@@ -69,6 +69,8 @@ final class EditorRequest {
 		$record           = Tokens::SCAN === $type ? Tokens::consume( $token, $type ) : Tokens::read( $token, $type );
 		nocache_headers();
 		self::header( 'X-Robots-Tag: noindex, nofollow' );
+		// The token is in the URL: never send it to other sites as a Referer.
+		self::header( 'Referrer-Policy: same-origin' );
 		if ( null === $record || null === $path || $record['path'] !== $path || ! $this->urls->hasPrefix( (string) $this->urls->relativePath( $uri ), $this->target->slug() ) ) {
 			// The editor's scan fetch sends Accept: application/json, so wp_die() answers in JSON.
 			wp_die( esc_html__( 'This scan or preview link is invalid or has expired. Start it again from the translation editor.', 'wp-site-translator' ), '', array( 'response' => 403 ) );

@@ -8,6 +8,7 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       wp-site-translator
+ * Domain Path:       /languages
  *
  * The header above cannot read PHP constants; keep its name, version and text
  * domain in sync with WST\Config.

@@ -43,7 +43,7 @@ git archive HEAD | tar -x -C "$work/export"
 rsync -a --exclude-from=.distignore "$work/export/" "$work/$slug/"
 
 # Contents checks.
-for required in "$slug.php" uninstall.php src/Plugin.php build/admin.js build/admin.css build/admin.asset.php build/post-panel.js build/switcher-block.js assets/switcher.css blocks/switcher/block.json; do
+for required in "$slug.php" uninstall.php readme.txt languages/$slug.pot src/Plugin.php build/admin.js build/admin.css build/admin.asset.php build/post-panel.js build/switcher-block.js assets/switcher.css blocks/switcher/block.json; do
 	[ -f "$work/$slug/$required" ] || fail "missing from the package: $required"
 done
 forbidden="$(cd "$work/$slug" && find . \( -path ./tests -o -path ./bin -o -path ./docs -o -path ./assets-src -o -path ./node_modules -o -path ./vendor -o -path ./.tools -o -name '*.md' -o -name 'phpunit*.xml*' -o -name 'phpcs.xml*' -o -name 'phpstan.neon*' -o -name 'composer.*' -o -name 'package*.json' -o -name '.*' -o -name '*fixture*' -o -name '*-rtl.css' \) -print | grep -v '^\.$' || true)"

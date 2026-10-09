@@ -182,7 +182,7 @@ function Progress( { label, done, total } ) {
 			<p id="wst-import-progress">
 				{ label }{ ' ' }
 				{ sprintf(
-					/* translators: 1: rows done, 2: all rows */
+					/* translators: 1: rows processed so far, 2: all rows */
 					__( '%1$s of %2$s rows', 'wp-site-translator' ),
 					number( done ),
 					number( total )

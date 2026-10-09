@@ -82,6 +82,13 @@ final class Plugin {
 	 * @param string $file Absolute path of the main plugin file.
 	 */
 	public static function boot( string $file ): void {
+		// Translations shipped in languages/ (WordPress.org language packs load on their own).
+		add_action(
+			'init',
+			static function () use ( $file ): void {
+				load_plugin_textdomain( Config::TEXT_DOMAIN, false, dirname( plugin_basename( $file ) ) . '/languages' );
+			}
+		);
 		register_activation_hook(
 			$file,
 			static function (): void {
