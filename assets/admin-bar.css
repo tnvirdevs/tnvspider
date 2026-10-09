@@ -1,0 +1,38 @@
+/* WP Site Translator: "Translate" toolbar item. Core hides toolbar items it
+   does not know below 782px, so this one opts back in, as an icon. */
+#wpadminbar #wp-admin-bar-wst-translate > .ab-item .ab-icon::before {
+	content: "\f326";
+	content: "\f326" / "";
+	top: 2px;
+}
+
+@media screen and (max-width: 782px) {
+
+	#wpadminbar li#wp-admin-bar-wst-translate {
+		display: block;
+		position: static;
+	}
+
+	#wpadminbar #wp-admin-bar-wst-translate > .ab-item {
+		width: 52px;
+		padding: 0;
+		text-align: center;
+	}
+
+	#wpadminbar #wp-admin-bar-wst-translate > .ab-item .ab-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	#wpadminbar #wp-admin-bar-wst-translate > .ab-item .ab-icon::before {
+		display: block;
+		top: 0;
+		height: 46px;
+		font-size: 32px;
+		line-height: 1.4375;
+	}
+}

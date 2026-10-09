@@ -1,0 +1,586 @@
+<?php
+/**
+ * Front-end render pipeline (plan §6, §6A).
+ *
+ * @package WST
+ */
+
+declare(strict_types=1);
+
+namespace WST\Render;
+
+use WST\Editor\EditorRequest;
+use WST\Editor\Preview;
+use WST\Editor\Tokens;
+use WST\Html\Extractor;
+use WST\Html\InlineMarkup;
+use WST\Html\Replacer;
+use WST\Html\Segment;
+use WST\Html\Text;
+use WST\Html\Selectors;
+use WST\Languages\Current;
+use WST\Languages\Language;
+use WST\Log\Logger;
+use WST\Modes\Resolver;
+use WST\Queue\AutoQueue;
+use WST\Routing\Urls;
+use WST\Settings;
+use WST\Storage\StringStore;
+
+/**
+ * Buffers target-language HTML responses and replaces translatable strings
+ * with stored translations. On discoverable pages, untranslated strings are
+ * queued for the active provider. Never calls a provider; on any error the
+ * original HTML is returned untouched.
+ */
+final class Pipeline {
+
+	/** Pending strings older than this no longer make a page uncacheable. */
+	public const PENDING_MAX_AGE = DAY_IN_SECONDS;
+
+	/**
+	 * Context captured when buffering started.
+	 *
+	 * @var PageContext|null
+	 */
+	private ?PageContext $context = null;
+
+	/**
+	 * Strings of the last processed page still queued for automatic translation.
+	 *
+	 * @var int
+	 */
+	private int $pending = 0;
+
+	/**
+	 * Digit converter, built on first use.
+	 *
+	 * @var DigitConverter|null
+	 */
+	private ?DigitConverter $digitConverter = null;
+
+	/**
+	 * Create the pipeline.
+	 *
+	 * @param Settings      $settings Plugin settings.
+	 * @param Language      $target   Target language.
+	 * @param StringStore   $store    String storage.
+	 * @param DiscoveryGate $gate     Discovery rules.
+	 * @param Logger        $logger   Plugin log.
+	 * @param Urls          $urls     URL helper.
+	 * @param AutoQueue     $auto     Queues untranslated strings.
+	 * @param Resolver      $modes    Page modes.
+	 * @param Preview|null  $preview  Safe preview filter for the editor frame.
+	 */
+	public function __construct(
+		private Settings $settings,
+		private Language $target,
+		private StringStore $store,
+		private DiscoveryGate $gate,
+		private Logger $logger,
+		private Urls $urls,
+		private AutoQueue $auto,
+		private Resolver $modes,
+		private ?Preview $preview = null
+	) {
+	}
+
+	/**
+	 * Register the hooks.
+	 */
+	public function boot(): void {
+		add_action( 'template_redirect', array( $this, 'start' ), 1 );
+	}
+
+	/**
+	 * Start buffering when this is a target-language front-end HTML page.
+	 */
+	public function start(): void {
+		if ( ! Current::isTarget() || is_feed() || is_robots() || is_trackback() || '' !== (string) get_query_var( 'sitemap' ) ) {
+			return;
+		}
+		$uri  = isset( $_SERVER['REQUEST_URI'] ) && is_string( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only parsed.
+		$path = $this->urls->unprefixedPath( $uri, $this->target->slug() ) ?? '/';
+
+		$mode          = $this->modes->current()['mode'];
+		$editor        = EditorRequest::current();
+		$this->context = new PageContext(
+			$path,
+			is_singular() ? (int) get_queried_object_id() : null,
+			null === $editor && Settings::MODE_OFF !== $mode && $this->gate->allowsRequest( $path, $mode ),
+			$mode,
+			null === $editor ? '' : $editor['type'],
+			DiscoveryGate::isPersonalPage()
+		);
+		ob_start( array( $this, 'finish' ) );
+	}
+
+	/**
+	 * Output buffer callback: translate the page, send cache headers.
+	 *
+	 * @param string $html  Buffered output.
+	 * @param int    $phase PHP output buffer phase flags.
+	 * @return string
+	 * @throws \Throwable Re-thrown under WP_DEBUG after logging.
+	 */
+	public function finish( $html, $phase = PHP_OUTPUT_HANDLER_FINAL ) {
+		unset( $phase );
+		if ( ! is_string( $html ) || '' === $html || null === $this->context || ! $this->isHtmlResponse() ) {
+			return $html;
+		}
+		$status = http_response_code();
+		if ( 200 !== $status ) {
+			$this->context->discoverable = false;
+		}
+		$scan = Tokens::SCAN === $this->context->editor;
+		if ( $scan ) {
+			EditorRequest::header( 'Content-Type: application/json; charset=utf-8' );
+			if ( 200 !== $status ) {
+				/* translators: %d: HTTP status */
+				return (string) wp_json_encode( array( 'error' => sprintf( __( 'The page answered with HTTP %d; only pages that load normally can be scanned.', 'wp-site-translator' ), (int) $status ) ) );
+			}
+		}
+
+		try {
+			$translated = $this->process( $html, $this->context );
+		} catch ( \Throwable $e ) {
+			$this->logFailure( $e );
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				throw $e;
+			}
+
+			return $scan ? (string) wp_json_encode( array( 'error' => __( 'The scan failed; see the Translator log.', 'wp-site-translator' ) ) ) : $html;
+		}
+
+		if ( $this->pending > 0 && '' === $this->context->editor ) {
+			$this->markUncacheable();
+		}
+
+		return $translated;
+	}
+
+	/**
+	 * Translate one document.
+	 *
+	 * @param string      $html    Document.
+	 * @param PageContext $context Page context.
+	 */
+	public function process( string $html, PageContext $context ): string {
+		$this->pending = 0;
+		$extractor     = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
+		$segments      = $extractor->extract( $html );
+		if ( Tokens::SCAN === $context->editor && Settings::MODE_OFF === $context->mode ) {
+			return (string) wp_json_encode( $this->summary( $context, array( 'strings' => 0 ) ) );
+		}
+		if ( Settings::MODE_OFF === $context->mode ) {
+			// "Off" page shown with its original text: links stay in the
+			// language, nothing is translated, discovered or queued.
+			$html = ( new Replacer() )->apply( $html, $segments, array(), $this->linkEdits( $extractor->links() ) );
+
+			return $this->forPreview( $this->setDocumentLanguage( $html, $this->settings->defaultLanguage() ), $context );
+		}
+
+		[ $kinds, $neutral ] = $this->neutralKinds( $segments );
+		$lang                = $this->target->locale();
+		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $lang );
+		if ( Tokens::SCAN === $context->editor ) {
+			return (string) wp_json_encode( $this->scan( $kinds, $found, $context ) );
+		}
+		[ $translations, $untranslated ] = $this->translationsFor( $kinds, $neutral, $found );
+
+		if ( $context->discoverable ) {
+			$untranslated = array_merge( $untranslated, array_values( $this->discover( array_diff_key( $kinds, $found ), $context ) ) );
+			$this->auto->queue( $untranslated, $this->target );
+		}
+		// Rows waiting for a provider that cannot run now (none selected,
+		// paused, out of budget) must not keep the page out of caches.
+		$this->pending = array() === $untranslated || '' === $this->auto->provider( $this->target ) ? 0 : $this->store->pendingCount( $untranslated, $lang, self::PENDING_MAX_AGE );
+
+		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+		$html = $this->digits()?->html( $html ) ?? $html;
+
+		return $this->forPreview( $this->setDocumentLanguage( $html, $this->target ), $context );
+	}
+
+	/**
+	 * Translate an HTML fragment of an AJAX or REST response (plan §13A.5a)
+	 * with existing translations only: no discovery, no queueing, no
+	 * document language, head or cache work. Internal links get the prefix.
+	 *
+	 * @param string $html Fragment.
+	 */
+	public function translateFragment( string $html ): string {
+		$extractor           = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
+		$segments            = $extractor->extract( $html );
+		[ $kinds, $neutral ] = $this->neutralKinds( $segments );
+		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $this->target->locale() );
+		[ $translations ]    = $this->translationsFor( $kinds, $neutral, $found );
+
+		$html = ( new Replacer() )->apply( $html, $segments, $translations, $this->linkEdits( $extractor->links() ) );
+
+		return $this->digits()?->html( $html ) ?? $html;
+	}
+
+	/**
+	 * Existing translations of plain texts (JSON values, text added by
+	 * scripts), keeping each text's leading and trailing whitespace.
+	 *
+	 * @param string[] $texts Texts as they appear.
+	 * @phpstan-param list<string> $texts
+	 * @return array<string, string> Text => translation, only for translated texts.
+	 */
+	public function translateTexts( array $texts ): array {
+		$normalized = array();
+		foreach ( $texts as $text ) {
+			$core = Text::normalize( $text );
+			if ( Text::isTranslatable( $core ) ) {
+				$normalized[ $text ] = $core;
+			}
+		}
+		if ( array() === $normalized ) {
+			return array();
+		}
+		$found = $this->store->lookup( array_values( array_unique( $normalized ) ), $this->target->locale() );
+		$out   = array();
+		foreach ( $normalized as $text => $core ) {
+			$translation = $found[ $core ]['translated'] ?? null;
+			if ( null !== $translation ) {
+				[ $lead, , $trail ]    = Text::splitEdges( (string) $text );
+				$out[ (string) $text ] = $lead . ( $this->digits()?->text( $translation ) ?? $translation ) . $trail;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Digit conversion for target output, or null when it is off.
+	 */
+	private function digits(): ?DigitConverter {
+		$mode = $this->settings->digitsMode();
+		if ( 'off' === $mode ) {
+			return null;
+		}
+		if ( null === $this->digitConverter ) {
+			$selectors            = $this->settings->excludeSelectors();
+			$this->digitConverter = new DigitConverter(
+				$mode,
+				$this->settings->flag( 'digits_skip_prices' ) ? array_values( array_merge( $selectors, DigitConverter::PRICE_SELECTORS ) ) : $selectors,
+				$this->settings->neverTranslateTerms(),
+				$this->settings->flag( 'terms_case_insensitive' )
+			);
+		}
+
+		return $this->digitConverter;
+	}
+
+	/**
+	 * Kind of each language-neutral original and the neutral form of each
+	 * segment text. Inline originals are stored language-neutral: internal
+	 * links in them lose the language prefix, so the slug never changes a hash.
+	 *
+	 * @param Segment[] $segments Segments.
+	 * @phpstan-param list<Segment> $segments
+	 * @return array{0: array<string, string>, 1: array<string, string>} Neutral original => kind; segment text => neutral original.
+	 */
+	private function neutralKinds( array $segments ): array {
+		$kinds   = array();
+		$neutral = array();
+		foreach ( $segments as $segment ) {
+			if ( ! isset( $neutral[ $segment->text ] ) ) {
+				$neutral[ $segment->text ] = Segment::INLINE === $segment->kind ? $this->withLinks( $segment->text, false ) : $segment->text;
+			}
+			$kinds[ $neutral[ $segment->text ] ] = $kinds[ $neutral[ $segment->text ] ] ?? $segment->kind;
+		}
+
+		return array( $kinds, $neutral );
+	}
+
+	/**
+	 * Usable translations by segment text, and the ids of known strings
+	 * without a translation.
+	 *
+	 * @param array<string, string>                                                    $kinds   Neutral original => kind.
+	 * @param array<string, string>                                                    $neutral Segment text => neutral original.
+	 * @param array<string, array{id: int, translated: string|null, status: int|null}> $found   Known strings.
+	 * @return array{0: array<string, string>, 1: list<int>}
+	 */
+	private function translationsFor( array $kinds, array $neutral, array $found ): array {
+		$byNeutral    = array();
+		$untranslated = array();
+		foreach ( $found as $text => $entry ) {
+			if ( null === $entry['translated'] ) {
+				$untranslated[] = $entry['id'];
+				continue;
+			}
+			$translation = $this->checkedTranslation( (string) $text, $kinds[ $text ], $entry['translated'] );
+			if ( null !== $translation ) {
+				$byNeutral[ $text ] = $translation;
+			}
+		}
+		$translations = array();
+		foreach ( $neutral as $actual => $key ) {
+			if ( isset( $byNeutral[ $key ] ) ) {
+				$translations[ $actual ] = $byNeutral[ $key ];
+			}
+		}
+
+		return array( $translations, $untranslated );
+	}
+
+	/**
+	 * The editor frame's version of the page (plan §11 safe preview).
+	 *
+	 * @param string      $html    Translated document.
+	 * @param PageContext $context Page context.
+	 * @throws \LogicException When a preview request arrives without the filter.
+	 */
+	private function forPreview( string $html, PageContext $context ): string {
+		if ( Tokens::PREVIEW !== $context->editor ) {
+			return $html;
+		}
+		if ( null === $this->preview ) {
+			throw new \LogicException( 'Preview request without a preview filter.' );
+		}
+
+		return $this->preview->prepare( $html, ( EditorRequest::current()['data']['scripts'] ?? false ) === true );
+	}
+
+	/**
+	 * The request snapshot taken by start(), or null when not buffering.
+	 */
+	public function context(): ?PageContext {
+		return $this->context;
+	}
+
+	/**
+	 * Strings of the last processed page still queued for automatic translation.
+	 */
+	public function pending(): int {
+		return $this->pending;
+	}
+
+	/**
+	 * Record every string of the page for the editor and queue what the
+	 * page's mode allows (plan §11, §6A: no caps; personal pages only after
+	 * confirmation and never auto-queued). A record-only scan ("Translate
+	 * entire site") queues nothing.
+	 *
+	 * @param array<string, string>                                                    $kinds   Normalised original => kind.
+	 * @param array<string, array{id: int, translated: string|null, status: int|null}> $found Known strings.
+	 * @param PageContext                                                              $context Page context.
+	 * @return array<string, mixed> Summary.
+	 */
+	private function scan( array $kinds, array $found, PageContext $context ): array {
+		$allowPersonal = true === ( EditorRequest::current()['data']['allow_personal'] ?? false );
+		if ( $context->personal && ! $allowPersonal ) {
+			return $this->summary(
+				$context,
+				array(
+					'needs_confirmation' => true,
+					'strings'            => count( $kinds ),
+				)
+			);
+		}
+		$maxLength = $this->settings->number( 'max_string_length' );
+		$keep      = array_filter( $kinds, static fn( $kind, $text ): bool => mb_strlen( (string) $text ) <= $maxLength, ARRAY_FILTER_USE_BOTH );
+		$ids       = $this->store->recordScan( $keep, $context->path, $context->postId );
+
+		$untranslated = array();
+		$translated   = 0;
+		foreach ( $ids as $text => $id ) {
+			if ( null === ( $found[ $text ]['translated'] ?? null ) ) {
+				$untranslated[] = $id;
+			} else {
+				++$translated;
+			}
+		}
+		$recordOnly = true === ( EditorRequest::current()['data']['record_only'] ?? false );
+		$queued     = ! $recordOnly && Settings::MODE_AUTO === $context->mode && ! $context->personal && array() !== $untranslated && $this->auto->queue( $untranslated, $this->target );
+
+		return $this->summary(
+			$context,
+			array(
+				'strings'      => count( $ids ),
+				'new'          => count( array_diff_key( $ids, $found ) ),
+				'translated'   => $translated,
+				'untranslated' => count( $untranslated ),
+				'queued'       => $queued ? count( $untranslated ) : 0,
+				'too_long'     => count( $kinds ) - count( $keep ),
+			)
+		);
+	}
+
+	/**
+	 * Scan summary with the page facts.
+	 *
+	 * @param PageContext          $context Page context.
+	 * @param array<string, mixed> $counts  Counts.
+	 * @return array<string, mixed>
+	 */
+	private function summary( PageContext $context, array $counts ): array {
+		return array(
+			'scan_id'  => EditorRequest::current()['token'] ?? '',
+			'path'     => $context->path,
+			'page_key' => StringStore::pageKey( $context->path ),
+			'post_id'  => $context->postId,
+			'mode'     => $context->mode,
+			'personal' => $context->personal,
+		) + $counts;
+	}
+
+	/**
+	 * Record unknown strings within the caps.
+	 *
+	 * @param array<string, string> $unknown Normalised original => kind.
+	 * @param PageContext           $context Page context.
+	 * @return array<string, int> Original => string id.
+	 */
+	private function discover( array $unknown, PageContext $context ): array {
+		$maxLength = $this->settings->number( 'max_string_length' );
+		$unknown   = array_filter( $unknown, static fn( $kind, $text ): bool => mb_strlen( (string) $text ) <= $maxLength, ARRAY_FILTER_USE_BOTH );
+		if ( array() === $unknown ) {
+			return array();
+		}
+		$allowed = $this->gate->take( $context->path, count( $unknown ) );
+
+		return $this->store->recordOnPage( array_slice( $unknown, 0, $allowed, true ), $context->path, $context->postId );
+	}
+
+	/**
+	 * A stored translation ready for the page, or null when it must not be used.
+	 * Inline translations must keep the original markup; their links are
+	 * prefixed here because the Replacer skips link edits inside them.
+	 *
+	 * @param string $original    Normalised original.
+	 * @param string $kind        Segment kind on this page.
+	 * @param string $translation Stored translation.
+	 */
+	private function checkedTranslation( string $original, string $kind, string $translation ): ?string {
+		if ( Segment::INLINE !== $kind ) {
+			return $translation;
+		}
+		if ( ! InlineMarkup::sameStructure( $original, $translation ) ) {
+			$this->logger->warning( 'render', 'Inline translation does not match the original markup; original shown.', array( 'original' => $original ) );
+
+			return null;
+		}
+
+		return $this->settings->flag( 'force_language_links' ) ? $this->withLinks( $translation, true ) : $translation;
+	}
+
+	/**
+	 * Add or remove the language prefix on internal links of an HTML fragment.
+	 *
+	 * @param string $html   Fragment.
+	 * @param bool   $prefix True to add the prefix, false to remove it.
+	 */
+	private function withLinks( string $html, bool $prefix ): string {
+		if ( ! str_contains( $html, 'href' ) ) {
+			return $html;
+		}
+		$processor = new \WP_HTML_Tag_Processor( $html );
+		while ( $processor->next_tag( array( 'tag_name' => 'A' ) ) ) {
+			$href = $processor->get_attribute( 'href' );
+			if ( ! is_string( $href ) || null !== $processor->get_attribute( 'hreflang' ) ) {
+				continue;
+			}
+			$changed = $prefix ? $this->urls->addPrefix( $href, $this->target->slug() ) : $this->urls->removePrefix( $href, $this->target->slug() );
+			if ( $changed !== $href ) {
+				$processor->set_attribute( 'href', $changed );
+			}
+		}
+
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Attribute edits that keep internal links in the target language.
+	 *
+	 * @param list<array{0: int, 1: int, 2: string, 3: string}> $links Links from the Extractor.
+	 * @return list<array{0: int, 1: int, 2: string, 3: string}>
+	 */
+	private function linkEdits( array $links ): array {
+		if ( ! $this->settings->flag( 'force_language_links' ) ) {
+			return array();
+		}
+		$edits = array();
+		foreach ( $links as [ $start, $length, $attribute, $value ] ) {
+			$prefixed = $this->urls->addPrefix( $value, $this->target->slug() );
+			if ( $prefixed !== $value ) {
+				$edits[] = array( $start, $length, $attribute, $prefixed );
+			}
+		}
+
+		return $edits;
+	}
+
+	/**
+	 * Make the html element's lang and dir match the page's language: the
+	 * target, or the default language for an "off" page shown untranslated.
+	 *
+	 * @param string   $html     Document.
+	 * @param Language $language Language of the content.
+	 */
+	private function setDocumentLanguage( string $html, Language $language ): string {
+		$processor = new \WP_HTML_Tag_Processor( $html );
+		if ( ! $processor->next_tag( array( 'tag_name' => 'HTML' ) ) ) {
+			return $html;
+		}
+		$lang = $language->tag( $this->settings->flag( 'hreflang_drop_region' ) );
+		if ( $lang === $processor->get_attribute( 'lang' ) && $language->dir() === $processor->get_attribute( 'dir' ) ) {
+			return $html;
+		}
+		$processor->set_attribute( 'lang', $lang );
+		$processor->set_attribute( 'dir', $language->dir() );
+
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Whether the response being sent is HTML (or has no content type yet).
+	 */
+	private function isHtmlResponse(): bool {
+		foreach ( headers_list() as $header ) {
+			if ( 0 === stripos( $header, 'content-type:' ) ) {
+				return false !== stripos( $header, 'text/html' );
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Keep page caches from storing a page that is still being translated.
+	 */
+	private function markUncacheable(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Page-cache plugins' shared contract.
+		}
+		if ( headers_sent() ) {
+			$this->logger->warning( 'render', 'Headers already sent; could not mark a page with pending translations as uncacheable.' );
+
+			return;
+		}
+		header( 'Cache-Control: no-cache, must-revalidate, max-age=0' );
+		header( 'X-WST-Pending: ' . $this->pending );
+	}
+
+	/**
+	 * Log a pipeline failure; if the log itself fails, use the PHP error log.
+	 *
+	 * @param \Throwable $e Failure.
+	 */
+	private function logFailure( \Throwable $e ): void {
+		$context = array(
+			'exception' => get_class( $e ),
+			'file'      => $e->getFile() . ':' . $e->getLine(),
+		);
+		try {
+			$this->logger->error( 'render', $e->getMessage(), $context );
+		} catch ( \Throwable $logError ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Last resort when the plugin log is unavailable.
+			error_log( 'WP Site Translator render failure: ' . $e->getMessage() . ' (log unavailable: ' . $logError->getMessage() . ')' );
+		}
+	}
+}
