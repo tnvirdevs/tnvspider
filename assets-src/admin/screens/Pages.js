@@ -1,0 +1,503 @@
+/**
+ * Pages: mode and coverage of every page, post and product; bulk mode change.
+ */
+import {
+	Button,
+	CheckboxControl,
+	Notice,
+	SelectControl,
+	Spinner,
+	TextControl,
+} from '@wordpress/components';
+import { useCallback, useEffect, useState } from '@wordpress/element';
+import { __, _n, sprintf } from '@wordpress/i18n';
+import { addQueryArgs } from '@wordpress/url';
+import { errorText, getWithTotal, post } from '../api';
+import { Section } from '../fields';
+
+const PER_PAGE = 20;
+
+/**
+ * Translation editor URL for a post.
+ *
+ * @param {number} postId Post id.
+ * @return {string} URL.
+ */
+export const editorUrl = ( postId ) =>
+	addQueryArgs( window.location.pathname, {
+		page: 'wst-editor',
+		...( postId ? { post: postId } : {} ),
+	} );
+
+const MODE_LABELS = {
+	inherit: __( 'Default', 'wp-site-translator' ),
+	auto: __( 'Automatic', 'wp-site-translator' ),
+	manual: __( 'Manual only', 'wp-site-translator' ),
+	off: __( 'Off', 'wp-site-translator' ),
+};
+
+const SOURCE_LABELS = {
+	page: __( 'set on the page', 'wp-site-translator' ),
+	path: __( 'from a path rule', 'wp-site-translator' ),
+	site: __( 'site mode', 'wp-site-translator' ),
+};
+
+const modeOptions = ( first ) => [
+	first,
+	...Object.entries( MODE_LABELS ).map( ( [ value, label ] ) => ( {
+		value,
+		label,
+	} ) ),
+];
+
+function Coverage( { coverage, lastScan } ) {
+	if ( ! coverage.total ) {
+		return (
+			<span className="wst-muted">
+				{ __( 'Not visited or scanned yet', 'wp-site-translator' ) }
+			</span>
+		);
+	}
+	return (
+		<span>
+			{ sprintf(
+				/* translators: 1: percent, 2: translated, 3: total */
+				__( '%1$d %% (%2$d of %3$d)', 'wp-site-translator' ),
+				coverage.percent,
+				coverage.translated,
+				coverage.total
+			) }
+			{ lastScan && <span className="wst-muted"> · { lastScan }</span> }
+		</span>
+	);
+}
+
+export default function Pages( { data } ) {
+	const [ query, setQuery ] = useState( { page: 1, search: '', mode: '' } );
+	const [ search, setSearch ] = useState( '' );
+	const [ result, setResult ] = useState( null );
+	const [ error, setError ] = useState( null );
+	const [ selected, setSelected ] = useState( [] );
+	const [ bulkMode, setBulkMode ] = useState( '' );
+	const [ busy, setBusy ] = useState( false );
+	const [ notice, setNotice ] = useState( null );
+	const hasTarget = !! data.languages.target;
+
+	const load = useCallback( () => {
+		setError( null );
+		const args = {
+			page: query.page,
+			per_page: PER_PAGE,
+			search: query.search,
+		};
+		if ( query.mode ) {
+			args.mode = query.mode;
+		}
+		return getWithTotal( '/pages', args )
+			.then( setResult )
+			.catch( ( e ) => setError( errorText( e ) ) );
+	}, [ query ] );
+
+	useEffect( () => {
+		if ( hasTarget ) {
+			load();
+		}
+	}, [ hasTarget, load ] );
+
+	if ( ! hasTarget ) {
+		return (
+			<Section title={ __( 'Pages', 'wp-site-translator' ) }>
+				<p className="wst-empty">
+					{ __(
+						'Choose and save a target language on the Languages screen first.',
+						'wp-site-translator'
+					) }{ ' ' }
+					<a href="#/languages">
+						{ __( 'Go to Languages', 'wp-site-translator' ) }
+					</a>
+				</p>
+			</Section>
+		);
+	}
+
+	const items = result ? result.items : [];
+	const editable = items.filter( ( item ) => item.can_edit );
+	const allSelected =
+		editable.length > 0 &&
+		editable.every( ( item ) => selected.includes( item.id ) );
+
+	const apply = () => {
+		setBusy( true );
+		setNotice( null );
+		post( '/pages/mode', { ids: selected, mode: bulkMode } )
+			.then( ( response ) => {
+				const skipped = Object.keys( response.skipped || {} ).length;
+				setNotice( {
+					status: skipped ? 'warning' : 'success',
+					text:
+						sprintf(
+							/* translators: %d: number of pages */
+							_n(
+								'%d page updated.',
+								'%d pages updated.',
+								response.updated.length,
+								'wp-site-translator'
+							),
+							response.updated.length
+						) +
+						( skipped
+							? ' ' +
+								sprintf(
+									/* translators: %d: number of pages */
+									_n(
+										'%d page skipped (not found or not allowed).',
+										'%d pages skipped (not found or not allowed).',
+										skipped,
+										'wp-site-translator'
+									),
+									skipped
+								)
+							: '' ),
+				} );
+				setSelected( [] );
+				return load();
+			} )
+			.catch( ( e ) =>
+				setNotice( { status: 'error', text: errorText( e ) } )
+			)
+			.finally( () => setBusy( false ) );
+	};
+
+	return (
+		<Section
+			title={ __( 'Pages', 'wp-site-translator' ) }
+			description={ __(
+				'Each page follows the site mode and path rules unless you set a mode for it here or in the editor sidebar.',
+				'wp-site-translator'
+			) }
+		>
+			<form
+				className="wst-toolbar"
+				role="search"
+				onSubmit={ ( event ) => {
+					event.preventDefault();
+					setQuery( { ...query, page: 1, search } );
+				} }
+			>
+				<TextControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Search pages', 'wp-site-translator' ) }
+					value={ search }
+					onChange={ setSearch }
+				/>
+				<SelectControl
+					__nextHasNoMarginBottom
+					__next40pxDefaultSize
+					label={ __( 'Page setting', 'wp-site-translator' ) }
+					value={ query.mode }
+					options={ modeOptions( {
+						value: '',
+						label: __( 'All', 'wp-site-translator' ),
+					} ) }
+					onChange={ ( mode ) =>
+						setQuery( { ...query, page: 1, mode } )
+					}
+				/>
+				<Button variant="secondary" type="submit">
+					{ __( 'Search', 'wp-site-translator' ) }
+				</Button>
+			</form>
+			{ notice && (
+				<Notice
+					status={ notice.status }
+					onRemove={ () => setNotice( null ) }
+				>
+					{ notice.text }
+				</Notice>
+			) }
+			{ error && (
+				<Notice status="error" isDismissible={ false }>
+					<p>{ error }</p>
+					<Button variant="secondary" onClick={ load }>
+						{ __( 'Try again', 'wp-site-translator' ) }
+					</Button>
+				</Notice>
+			) }
+			{ ! result && ! error && <Spinner /> }
+			{ result && items.length === 0 && (
+				<p className="wst-empty">
+					{ __( 'No pages found.', 'wp-site-translator' ) }
+				</p>
+			) }
+			{ items.length > 0 && (
+				<>
+					<div className="wst-toolbar">
+						<CheckboxControl
+							__nextHasNoMarginBottom
+							label={ __(
+								'Select all on this page',
+								'wp-site-translator'
+							) }
+							checked={ allSelected }
+							onChange={ ( on ) =>
+								setSelected(
+									on
+										? editable.map( ( item ) => item.id )
+										: []
+								)
+							}
+						/>
+						<SelectControl
+							__nextHasNoMarginBottom
+							__next40pxDefaultSize
+							label={ __(
+								'Set mode of selected pages',
+								'wp-site-translator'
+							) }
+							value={ bulkMode }
+							options={ modeOptions( {
+								value: '',
+								label: __( '— Choose —', 'wp-site-translator' ),
+							} ) }
+							onChange={ setBulkMode }
+						/>
+						<Button
+							variant="primary"
+							onClick={ apply }
+							isBusy={ busy }
+							disabled={ busy || ! bulkMode || ! selected.length }
+						>
+							{ sprintf(
+								/* translators: %d: number of selected pages */
+								__(
+									'Apply to %d selected',
+									'wp-site-translator'
+								),
+								selected.length
+							) }
+						</Button>
+					</div>
+					<div className="wst-table-wrap">
+						<table className="wst-table wst-table--cards">
+							<thead>
+								<tr>
+									<td className="wst-table__check">
+										<span className="screen-reader-text">
+											{ __(
+												'Select',
+												'wp-site-translator'
+											) }
+										</span>
+									</td>
+									<th scope="col">
+										{ __( 'Title', 'wp-site-translator' ) }
+									</th>
+									<th scope="col">
+										{ __( 'Type', 'wp-site-translator' ) }
+									</th>
+									<th scope="col">
+										{ __(
+											'Page setting',
+											'wp-site-translator'
+										) }
+									</th>
+									<th scope="col">
+										{ __(
+											'Applies',
+											'wp-site-translator'
+										) }
+									</th>
+									<th scope="col">
+										{ __(
+											'Translated',
+											'wp-site-translator'
+										) }
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{ items.map( ( item ) => {
+									const title =
+										item.title ||
+										__(
+											'(no title)',
+											'wp-site-translator'
+										);
+									const checkId = `wst-page-select-${ item.id }`;
+									return (
+										<tr key={ item.id }>
+											<td className="wst-table__check">
+												<input
+													id={ checkId }
+													type="checkbox"
+													disabled={ ! item.can_edit }
+													checked={ selected.includes(
+														item.id
+													) }
+													onChange={ ( event ) =>
+														setSelected(
+															event.target.checked
+																? [
+																		...selected,
+																		item.id,
+																	]
+																: selected.filter(
+																		(
+																			id
+																		) =>
+																			id !==
+																			item.id
+																	)
+														)
+													}
+												/>
+												<label
+													className="screen-reader-text"
+													htmlFor={ checkId }
+												>
+													{ sprintf(
+														/* translators: %s: post title */
+														__(
+															'Select %s',
+															'wp-site-translator'
+														),
+														title
+													) }
+												</label>
+											</td>
+											<th
+												scope="row"
+												className="wst-table__primary"
+											>
+												<a href={ item.link }>
+													{ title }
+												</a>
+												{ item.status !== 'publish' && (
+													<span className="wst-muted">
+														{ ' ' }
+														· { item.status }
+													</span>
+												) }
+												{ item.status === 'publish' &&
+													item.effective.mode !==
+														'off' && (
+														<a
+															className="wst-table__action"
+															href={ editorUrl(
+																item.id
+															) }
+														>
+															{ __(
+																'Edit translations',
+																'wp-site-translator'
+															) }
+														</a>
+													) }
+											</th>
+											<td
+												data-label={ __(
+													'Type',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													{ item.type }
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Page setting',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													{ MODE_LABELS[
+														item.mode
+													] || item.mode }
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Applies',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													{ MODE_LABELS[
+														item.effective.mode
+													] ||
+														item.effective
+															.mode }{ ' ' }
+													<span className="wst-muted">
+														(
+														{ SOURCE_LABELS[
+															item.effective
+																.source
+														] ||
+															item.effective
+																.source }
+														)
+													</span>
+												</span>
+											</td>
+											<td
+												data-label={ __(
+													'Translated',
+													'wp-site-translator'
+												) }
+											>
+												<span className="wst-table__value">
+													<Coverage
+														coverage={
+															item.coverage
+														}
+														lastScan={
+															item.last_scan
+														}
+													/>
+												</span>
+											</td>
+										</tr>
+									);
+								} ) }
+							</tbody>
+						</table>
+					</div>
+					<div className="wst-pagination">
+						<Button
+							variant="secondary"
+							disabled={ query.page <= 1 }
+							onClick={ () =>
+								setQuery( { ...query, page: query.page - 1 } )
+							}
+						>
+							{ __( 'Previous', 'wp-site-translator' ) }
+						</Button>
+						<span>
+							{ sprintf(
+								/* translators: 1: page, 2: pages, 3: total items */
+								__(
+									'Page %1$d of %2$d (%3$d items)',
+									'wp-site-translator'
+								),
+								query.page,
+								Math.max( 1, result.pages ),
+								result.total
+							) }
+						</span>
+						<Button
+							variant="secondary"
+							disabled={ query.page >= result.pages }
+							onClick={ () =>
+								setQuery( { ...query, page: query.page + 1 } )
+							}
+						>
+							{ __( 'Next', 'wp-site-translator' ) }
+						</Button>
+					</div>
+				</>
+			) }
+		</Section>
+	);
+}

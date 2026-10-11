@@ -1,0 +1,48 @@
+{
+    "case": "mixed-empty-text",
+    "captured_at": "2026-10-06T16:26:17+00:00",
+    "request": {
+        "method": "POST",
+        "path": "/translate",
+        "query": {
+            "sl": "en",
+            "tl": "bn"
+        },
+        "key": "valid",
+        "fields": [
+            "text"
+        ],
+        "items": 3,
+        "chars": 19,
+        "body": [
+            [
+                "text",
+                "Shop now"
+            ],
+            [
+                "text",
+                ""
+            ],
+            [
+                "text",
+                "Add to cart"
+            ]
+        ]
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "content-type": "application/json",
+            "x-tx-ratelimit-remaining": "42"
+        },
+        "body_json": {
+            "translation": [
+                "এখনই কেনাকাটা করুন",
+                "",
+                "কার্ট যোগ করুন"
+            ]
+        },
+        "body_raw": null,
+        "ms": 331
+    }
+}

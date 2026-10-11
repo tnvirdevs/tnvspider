@@ -1,0 +1,58 @@
+{
+    "case": "tokens-format-ar",
+    "captured_at": "2026-10-06T16:28:18+00:00",
+    "request": {
+        "method": "POST",
+        "path": "/translate",
+        "query": {
+            "sl": "en",
+            "tl": "ar"
+        },
+        "key": "valid",
+        "fields": [
+            "text"
+        ],
+        "items": 5,
+        "chars": 138,
+        "body": [
+            [
+                "text",
+                "Buy [[1]] today"
+            ],
+            [
+                "text",
+                "Visit [[1]] and [[2]] now"
+            ],
+            [
+                "text",
+                "[[1]] is our best seller"
+            ],
+            [
+                "text",
+                "Price: [[1]] per item, shipping [[2]], total [[3]]."
+            ],
+            [
+                "text",
+                "Contact [[12]] for help"
+            ]
+        ]
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "content-type": "application/json",
+            "x-tx-ratelimit-remaining": "48"
+        },
+        "body_json": {
+            "translation": [
+                "اشترى [ [ 1]] اليوم",
+                "زار [ [ 1]] و [ [ 2]] الآن",
+                "[ [ 1]] هو أفضل بائع لدينا",
+                "السعر: [ [ 1]] لكل عنصر ، الشحن [ [ 2]] ، المجموع [ [ 3]].",
+                "اتصال [ [ 12]] للمساعدة"
+            ]
+        },
+        "body_raw": null,
+        "ms": 619
+    }
+}
