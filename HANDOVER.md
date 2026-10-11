@@ -356,6 +356,7 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P102 | `bin/dev-site.sh [--serve]`: reproducible dev site for live checks (WordPress core from Composer, WP-CLI 2.12.0 release phar checked by SHA-512, `.dev/` gitignored and distignored, `home`/`siteurl` set explicitly). Replaces the scratchpad-only site of earlier sessions for provider checks. | A fresh container could not otherwise run `wp wst provider test`. |
 | P103 | TranslateX card shows a non-dismissible warning while the free plan is selected (the default): non-commercial use only, texts may be stored and used for training, choose a paid plan or another provider for business sites. No provider is chosen by default and no key ships (regression test `SettingsTest::test_no_provider_is_chosen_by_default`; the zip build fails on key-like strings). | Owner request: commercial-use safety; provider terms in "Provider facts". |
 | P104 | `readme.txt` licence note (GPL-2.0-or-later, no bundled third-party libraries, what to decide before selling, not legal advice); `docs/USER-GUIDE.md` for site owners; `docs/STAGING-CHECKLIST.md` gets a "Results to paste back" block. | Owner request. |
+| P105 | Rate limiter reads the clock **inside** the database lock (`acquire()` and `block()`). It used to read it before `GET_LOCK`, so a worker that waited for the lock granted against a stale time and two real requests could be closer than 60/rpm by up to the lock wait. First CI run: `RateLimiterTest::test_concurrent_workers_never_exceed_the_rate` failed once (0.481 s gap for a 0.5 s rate; the parallel run on the same commit passed). Reproduced locally under CPU load: old code 2/15 failures at one busy loop per core (9/12 at two), new code 0/15. The test is unchanged. Under heavy CPU oversubscription (two busy loops per core) the test can still see 1–8 ms of jitter between the limiter's decision and the moment the test records it (lock release and file write), which no limiter controls (known issue 20). | Root cause of the CI failure; a real over-rate bug under lock contention. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -458,7 +459,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 
 ## Files changed (owner batch 2026-10-11)
 
-`.github/workflows/ci.yml`, `bin/dev-site.sh`, `.gitignore`, `.distignore`, `eslint.config.cjs` (ignore `.dev/`), `assets-src/admin/screens/ProviderCard.js` + `build/admin.*` (TranslateX warning), `languages/wp-site-translator.pot`, `tests/Integration/SettingsTest.php`, `readme.txt`, `docs/STAGING-CHECKLIST.md`, `docs/USER-GUIDE.md`, `CLAUDE.md` (commands), `HANDOVER.md`.
+`src/Queue/RateLimiter.php` (P105), `.github/workflows/ci.yml`, `bin/dev-site.sh`, `.gitignore`, `.distignore`, `eslint.config.cjs` (ignore `.dev/`), `assets-src/admin/screens/ProviderCard.js` + `build/admin.*` (TranslateX warning), `languages/wp-site-translator.pot`, `tests/Integration/SettingsTest.php`, `readme.txt`, `docs/STAGING-CHECKLIST.md`, `docs/USER-GUIDE.md`, `CLAUDE.md` (commands), `HANDOVER.md`.
 
 ## Files changed (Phase 7, keyless part)
 
@@ -609,6 +610,7 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 17. Dynamic lookup does not see text that scripts insert while the page is still loading (P83); such text is not translated on the page (server-rendered HTML is).
 18. Sitemaps carry no `xhtml:link` alternates (P96); a sitemap page whose posts are all "off" or noindex answers 404 although the index lists it (pages follow the core page size).
 19. `/lookup` rate counters (P100): one transient per visitor IP for a minute; without a persistent object cache a flood from many IPs adds short-lived `wp_options` rows (removed by WordPress's expired-transient cleanup). The feature is off by default.
+20. `RateLimiterTest::test_concurrent_workers_never_exceed_the_rate` measures grant spacing after `acquire()` returns, so on a heavily oversubscribed machine scheduling jitter of a few milliseconds can still appear (P105). Seen only with more busy processes than CPU cores; re-check if CI ever shows it after P105.
 
 ## Dev environment setup (scripted)
 

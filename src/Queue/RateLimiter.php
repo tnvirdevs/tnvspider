@@ -51,11 +51,13 @@ final class RateLimiter {
 	 * @return float 0 when granted (and counted), else seconds to wait.
 	 */
 	public function acquire( string $provider, Limits $limits, int $chars, ?float $now = null ): float {
-		$now = $now ?? microtime( true );
-
 		return $this->locked(
 			$provider,
 			function ( array $state ) use ( $limits, $chars, $now ): array {
+				// Read the clock only once the lock is held: a time taken before
+				// waiting for the lock is stale and would let two grants come
+				// closer together than the rate allows.
+				$now  = $now ?? microtime( true );
 				$day  = $this->day( $now, $limits->dayTimezone );
 				$wait = max( 0.0, $state['blocked_until'] - $now );
 				if ( $limits->rpm > 0 ) {
@@ -95,10 +97,10 @@ final class RateLimiter {
 	 * @param float|null $now      Unix time.
 	 */
 	public function block( string $provider, int $seconds, ?float $now = null ): void {
-		$until = ( $now ?? microtime( true ) ) + max( 1, $seconds );
 		$this->locked(
 			$provider,
-			static function ( array $state ) use ( $until ): array {
+			static function ( array $state ) use ( $now, $seconds ): array {
+				$until                  = ( $now ?? microtime( true ) ) + max( 1, $seconds );
 				$state['blocked_until'] = max( $state['blocked_until'], $until );
 
 				return array( 0.0, $state );
