@@ -8,7 +8,7 @@ module.exports = [
 	...defaults,
 	{
 		// Third-party reference source (gitignored), never linted.
-		ignores: [ 'reference/**' ],
+		ignores: [ 'reference/**', '.dev/**' ],
 	},
 	{
 		settings: {

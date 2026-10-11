@@ -21,6 +21,19 @@ WP Site Translator serves your site in two languages: the default language and o
 
 Not included: more than two languages, translated URL slugs, media replacement, `.po` / gettext translation, e-mails and multisite.
 
+= Licence =
+
+GPL-2.0-or-later, the same as WordPress. The plugin bundles no third-party libraries: its scripts use the copies of React and the WordPress packages that WordPress itself provides (the built files contain only webpack's small, MIT-licensed module loader). It ships with no API key and selects no translation provider; each site owner signs up with a provider and enters their own key.
+
+Before selling it, decide:
+
+* **Licence of what you sell.** A WordPress plugin is normally sold under the GPL. You may charge for it, but every buyer may then copy, change and redistribute the code. What customers usually pay for is updates, support and convenience.
+* **Name and trademarks.** Check that the product name and branding do not conflict with existing marks; WordPress's own trademark policy limits how "WordPress" may be used in names and domains.
+* **Provider terms for your customers.** The TranslateX free plan is non-commercial and may keep the texts sent to it; Gemini's free tier uses submitted content to improve Google's products. Customers running a business site need a paid plan or another provider; the plugin warns about TranslateX's free plan on its card.
+* **Updates, support and privacy.** How paid updates are delivered, what support you promise, and the privacy notice for any licence or update server you run.
+
+This is not legal advice; have a lawyer check the terms before selling.
+
 == External services ==
 
 The plugin sends text to a translation service only when you configure one and enter its key (Translator → Translation). It sends the texts to translate (strings from your pages, protected terms and tags replaced by placeholders), the language pair and your key; nothing about your visitors. Requests run in the background queue or when you press a translate or test button; viewing a page never calls a service.
@@ -49,7 +62,7 @@ Yes. The language is in the URL and the server never varies a page by cookie. Pa
 
 = What happens to my translations if I uninstall? =
 
-They stay, unless you turn on Advanced → Data → "Delete all data on uninstall" first. With it on, uninstalling removes the plugin's tables, options, page settings and capability.
+They stay, unless you turn on Advanced → Data → "Delete all translator data when the plugin is deleted" first. With it on, uninstalling removes the plugin's tables, options, page settings and capability.
 
 = Where do I see the provider's free-tier limits? =
 

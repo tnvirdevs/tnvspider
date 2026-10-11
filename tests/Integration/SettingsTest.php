@@ -30,6 +30,14 @@ final class SettingsTest extends WP_UnitTestCase {
 		$this->assertSame( 2000, $settings->number( 'max_string_length' ) );
 	}
 
+	public function test_no_provider_is_chosen_by_default(): void {
+		$settings = new Settings( array(), 'en_US', new Registry() );
+
+		$this->assertSame( '', $settings->provider(), 'Nothing is translated until the owner picks a provider and enters their own key.' );
+		$this->assertSame( '', $settings->fallbackProvider() );
+		$this->assertSame( '', $settings->providerSettings( 'translatex' )['plan'] ?? '', 'TranslateX defaults to the free plan, which the card marks as non-commercial.' );
+	}
+
 	public function test_target_language_and_custom_slug(): void {
 		$settings = new Settings(
 			array(

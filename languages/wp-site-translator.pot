@@ -9,18 +9,18 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-09T09:05:17+00:00\n"
+"POT-Creation-Date: 2026-10-11T09:43:47+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: wp-site-translator\n"
 
 #. Plugin Name of the plugin
-#: wp-site-translator.php:3
+#: wp-site-translator.php
 msgid "WP Site Translator"
 msgstr ""
 
 #. Description of the plugin
-#: wp-site-translator.php:4
+#: wp-site-translator.php
 msgid "Translate the whole site between two languages with queued machine translation and a conflict-proof editor."
 msgstr ""
 
@@ -350,7 +350,7 @@ msgstr ""
 msgid "Back to page"
 msgstr ""
 
-#: src/Editor/EditorRequest.php:74
+#: src/Editor/EditorRequest.php:76
 msgid "This scan or preview link is invalid or has expired. Start it again from the translation editor."
 msgstr ""
 
@@ -847,6 +847,10 @@ msgstr ""
 
 #: build/admin.js:8
 msgid "Fallback"
+msgstr ""
+
+#: build/admin.js:8
+msgid "The TranslateX free plan is for non-commercial use only, and TranslateX may store the texts you send and use them for training. For a business, shop or client site, choose a paid TranslateX plan or another provider."
 msgstr ""
 
 #: build/admin.js:8

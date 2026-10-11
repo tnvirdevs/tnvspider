@@ -28,7 +28,8 @@ WPCS (`phpcs.xml.dist`) with project exceptions: PSR-4 file names, camelCase met
 
 ## Commands
 ```
-bin/setup-env.sh                     # database + dev tools; idempotent (see HANDOVER "Dev environment setup")
+bin/setup-env.sh                     # database + dev tools; idempotent (see HANDOVER "Start here")
+bin/dev-site.sh --serve              # dev WordPress site in .dev/ for live checks; WP-CLI as .dev/wp
 composer install                     # dev tools (PHPUnit, PHPCS, PHPStan, WP core for tests)
 composer lint                        # PHPCS
 composer analyse                     # PHPStan level 8 (cloud container: php .tools/phpstan.phar analyse --memory-limit=1G)
@@ -38,5 +39,6 @@ bin/fetch-html5lib-tests.sh          # html5lib inputs for RoundTripTest (gitign
 npm install && npm run build         # assets-src/ -> build/ (commit build/); npm run lint:js; Node >= 22.22.2
 npm run test:js                      # JS unit tests (Node's built-in runner)
 npx wp-env start                     # Docker dev site with WooCommerce + Elementor
+# CI: .github/workflows/ci.yml runs PHPCS, PHPStan, unit + integration, JS lint/tests and the build check on every push/PR
 bin/build-zip.sh                     # release zip from HEAD (.distignore, checks contents and secrets) -> dist/
 ```

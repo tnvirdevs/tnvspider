@@ -13,3 +13,6 @@
 
 # TranslatePress source (behavioural reference only, owner-supplied; never committed)
 /reference/
+
+# Development site built by bin/dev-site.sh
+/.dev/

@@ -2,6 +2,26 @@
 
 Spec: `docs/WST-V1-PLAN.md` (owner-approved, includes decision log D1–D9). Working rules: `CLAUDE.md`.
 
+## Start here (fresh session)
+
+Everything a new session needs is in the repository; nothing from earlier sessions' scratchpads is required.
+
+1. **Environment** (each new container): `bin/setup-env.sh` — MariaDB, `wst_tests` database, Composer tools (PHPStan phar fallback in the cloud container), html5lib inputs. Add `--node` for JS work (`npm install`, Node ≥ 22.22.2). Then the gate commands in `CLAUDE.md` work. CI (`.github/workflows/ci.yml`) runs the same checks on GitHub for every push and PR.
+2. **Dev site** for live checks: `bin/dev-site.sh --serve` — WordPress from Composer in `.dev/site` (gitignored), database `wst_site`, WP-CLI as `.dev/wp`, `http://127.0.0.1:8899/` (admin / `wst-dev-only-pass`), target `bn_BD`, no provider, `DISABLE_WP_CRON` (the queue runs only with `.dev/wp wst queue run`). Idempotent; verified from zero on 2026-10-11. WooCommerce, Elementor and TranslatePress are **not** installed there (staging covers them, `docs/STAGING-CHECKLIST.md`).
+3. **Keys**: the owner puts `WST_AZURE_KEY`, `WST_AZURE_REGION`, `WST_GEMINI_KEY` (and `WST_TRANSLATEX_KEY` if needed) in the environment. Check presence only (`printenv | grep -c '^WST_'`); never print, log or commit a value; before every commit run `git diff --cached | grep -cF "$WST_AZURE_KEY"` (and the same for each key) and expect 0. Keys from the environment reach the plugin directly (`Secrets` reads `WST_*`; the UI cannot overwrite them). Start the dev server from a shell where they are exported. Send only harmless sample text.
+
+### Next: Microsoft and Gemini live checks (Phase 7)
+
+Settings from the shell (merges into `wst_settings`; the plugin validates on load): `.dev/wp eval 'update_option( "wst_settings", array_replace_recursive( (array) get_option( "wst_settings", array() ), array( "provider" => "microsoft" ) ) );'` — the same pattern sets `target_language`, `fallback_provider` or `providers.gemini.model`. The Translation screen does the same.
+
+1. `.dev/wp wst provider test microsoft` and `.dev/wp wst provider test gemini` → both report the connection works; `.dev/wp wst queue status` shows them `tested`.
+2. Fixtures: `php bin/capture-provider-fixtures.php microsoft all` and `… gemini all`; check the files contain no key; `composer test:unit` and the provider integration tests (`--filter 'MicrosoftTest|GeminiTest'`) green.
+3. Live batch per provider: set `provider` to `microsoft`; create a page with harmless text including a printf placeholder (`%s`), a URL, a never-translate term and one inline link (`.dev/wp post create --post_type=page --post_status=publish --post_title='Live check' --post_content='…'`); request `/bn/live-check/` once (discovery queues its strings); `.dev/wp wst queue run`; check `wp_wst_translations` rows (provider, status machine, placeholders and the link intact) and the page. Repeat with `target_language` `ar` and with `provider` `gemini`.
+4. **Gemini free-tier limits**: read RPM / RPD / input TPM for the key's project in AI Studio (owner) **or** let one burst of tiny requests reach `429 RESOURCE_EXHAUSTED` and record `quotaMetric` / `quotaValue` from its details; compare with the defaults 5 / 100 / unlimited and lower the defaults only if the real limits are lower. Model name and request format were re-verified against the docs on 2026-10-09 (`gemini-3.5-flash-lite`, `generationConfig.responseFormat`); confirm live. Unknown model → `404` → `AuthError` "Gemini does not know the model" (P33).
+5. **Fallback switch and return**: `provider` `gemini`, `fallback_provider` `microsoft`; set `providers.gemini.model` to an unknown name → `AuthError` → queue rows re-pointed to Microsoft and translated (Overview "Using fallback"); restore the model → the next run uses Gemini again.
+6. **Microsoft `403001`**: a real `403001` only comes once the F0 resource's 2 M free characters of the month are used up (the hourly throttle answers `429001`); do not burn the owner's quota for it. Record the resource tier; unless the quota is already exhausted, the recorded-response test (`MicrosoftTest`) stays the evidence — tell the owner.
+7. Fill the "Phase 7 acceptance" table below, record facts in plan §7.1, full gate once, commit (key scan first) and push. Then wait for the owner's staging results (`docs/STAGING-CHECKLIST.md`, "Results to paste back") and the TranslatePress export.
+
 ## Status
 
 **Phase 0 — Setup & spikes: done.** PHPStan level 8 is clean and provider facts are recorded from official sources (Gemini per-model free-tier limits are unpublished and stay unconfirmed). `wp-env` is configured but not run here (no Docker daemon); the container uses MariaDB + `php -S`.
@@ -332,6 +352,10 @@ The lexer alone takes ~13 ms on 311 KB (~17 ms with span reads); the rest is our
 | P98 | i18n: `Domain Path: /languages`, `languages/wp-site-translator.pot` generated with `wp i18n make-pot` (714 strings, PHP and built JS), `load_plugin_textdomain()` on `init` (not earlier: WP ≥ 6.7 warns about early loading), script translations looked up in `languages/` too. WordPress.org language packs load on their own. Regenerate the POT after string changes (command in "Phase 7 — hardening checks"). | Plan §16 Phase 7 "i18n strings"; translators need a template. |
 | P99 | `readme.txt` in the WordPress.org format with an **External services** section (what is sent to TranslateX, Microsoft and Gemini, when, and each service's terms and privacy links, checked reachable 2026-10-09) and the one cookie. The release zip now requires `readme.txt` and the POT. | Plugin directory guidelines; owner asked for a readme. |
 | P100 | `/lookup` abuse limits: ≤ 100 texts × 2,000 characters per request (rejected by REST validation before any work) and 60 requests per visitor IP per minute. **Changed in Phase 7:** the minute was a fixed clock minute, so a burst straddling hh:mm:59→00 got up to 120 requests through, and `test_lookup_rate_limit_per_visitor_ip_with_trusted_proxy` failed once in the full gate (reproduced: old code fails when the test starts 0.9 s before a minute; new code passes at 0.85–0.95 s). Now one window per IP that starts at its first request and lasts 60 s, stored in one transient per IP. Without a persistent object cache each active IP is one `wp_options` row for a minute; the lookup stays **off by default**. | Root cause of the gate failure; also closes the 2× burst. |
+| P101 | CI: `.github/workflows/ci.yml` on every push and pull request — job **PHP** (PHP 8.3, MariaDB 10.11 service, `composer install`, PHPCS incl. PHPCompatibility 8.0+, PHPStan level 8, unit suite, html5lib fetch, integration suite) and job **JS** (Node 22, `npm ci`, ESLint, Stylelint, `node --test`, rebuild and `git diff --exit-code build`). `permissions: contents: read`, no secrets, no provider calls (tests replay recorded responses). Validated with actionlint 1.7.7. | Owner request; same commands as the local gate. |
+| P102 | `bin/dev-site.sh [--serve]`: reproducible dev site for live checks (WordPress core from Composer, WP-CLI 2.12.0 release phar checked by SHA-512, `.dev/` gitignored and distignored, `home`/`siteurl` set explicitly). Replaces the scratchpad-only site of earlier sessions for provider checks. | A fresh container could not otherwise run `wp wst provider test`. |
+| P103 | TranslateX card shows a non-dismissible warning while the free plan is selected (the default): non-commercial use only, texts may be stored and used for training, choose a paid plan or another provider for business sites. No provider is chosen by default and no key ships (regression test `SettingsTest::test_no_provider_is_chosen_by_default`; the zip build fails on key-like strings). | Owner request: commercial-use safety; provider terms in "Provider facts". |
+| P104 | `readme.txt` licence note (GPL-2.0-or-later, no bundled third-party libraries, what to decide before selling, not legal advice); `docs/USER-GUIDE.md` for site owners; `docs/STAGING-CHECKLIST.md` gets a "Results to paste back" block. | Owner request. |
 | P53 | "Translate entire site" (plan §8) was **not** in Phase 5. **Closed 2026-10-08: owner decided yes; built before 6b (P67–P71).** | Owner decision. |
 
 ## Phase 5 acceptance (plan §16) — one line per criterion
@@ -384,21 +408,13 @@ A page cache (LiteSpeed / WP Rocket / Cloudflare) serves target pages without ru
 
 **Uninstall and upgrade:** `UninstallerTest` (keeps everything unless "Delete all data on uninstall"; with it: tables, `wst_*` options and transients, page-mode meta, capability, cron). Every option and transient the plugin writes was checked to carry the `wst_` prefix, so the prefix sweep covers them. Upgrade live: with `wst_db_version = 0`, `wst_caps_version` deleted and the capability removed from editors, the next request re-ran `dbDelta` and the grant (version 1, editor has `wst_translate`), 3,049 strings intact; `SchemaTest::test_maybe_upgrade_runs_only_when_the_stored_version_is_older`.
 
-**i18n / readme:** P98, P99. POT command: `wp i18n make-pot . languages/wp-site-translator.pot --slug=wp-site-translator --domain=wp-site-translator --exclude=vendor,node_modules,reference,tests,assets-src,dist,bin,docs,.tools --headers='{"Report-Msgid-Bugs-To":"","Last-Translator":"","Language-Team":""}'` (no warnings: two translator comments fixed). Front-end scripts carry no hard-coded English (texts come from PHP).
+**i18n / readme:** P98, P99. POT command: `wp i18n make-pot . languages/wp-site-translator.pot --slug=wp-site-translator --domain=wp-site-translator --exclude=vendor,node_modules,reference,tests,assets-src,dist,bin,docs,.tools,.dev --headers='{"Report-Msgid-Bugs-To":"","Last-Translator":"","Language-Team":""}'` (no warnings: two translator comments fixed). Front-end scripts carry no hard-coded English (texts come from PHP).
 
 **Gemini docs re-check (2026-10-09, ai.google.dev):** `gemini-3.5-flash-lite` is listed on the models page, free of charge on the pricing page ("optimized for … translation", free-tier content used to improve Google's products) and recommended for new projects. The `generateContent` reference documents `generationConfig.responseFormat` → `ResponseFormatConfig.text` → `TextResponseFormat {mimeType: APPLICATION_JSON, schema}` — exactly what `Gemini::body()` sends; `responseSchema` / `_responseJsonSchema` are marked deprecated "use responseFormat instead". The structured-output guide now shows only the newer Interactions API (`/v1beta/interactions`, `response_format`); `generateContent` remains documented, so no change. Rate-limits page: limits per project, "view your active rate limits in AI Studio" — still no published numbers.
 
-## Phase 7 — live provider checks (next session)
+## Phase 7 — live provider checks
 
-The owner sets `WST_AZURE_KEY`, `WST_AZURE_REGION` and `WST_GEMINI_KEY` in the environment. Never print, log or commit them; scan staged diffs for each value before committing (as for the TranslateX key). Send only harmless sample text.
-1. `bin/setup-env.sh`; start the dev site with the keys in the environment (`Secrets` reads `WST_*` variables; such keys cannot be overwritten from the UI); check `printenv | grep -c '^WST_'` only.
-2. `wp wst provider test microsoft` and `wp wst provider test gemini` → both "tested"; Translation screen cards show ready.
-3. Fixtures: `php bin/capture-provider-fixtures.php microsoft all`, `… gemini all`; check the files contain no key; replay tests green.
-4. Live batch per provider: provider = Microsoft, then Gemini; queue 5–10 harmless strings (with a printf placeholder, a URL, a never-translate term, one inline link) for `bn_BD` and `ar`; `wp wst queue run`; check `wst_translations` rows (provider, status machine, placeholders intact).
-5. Gemini limits: read RPM / RPD / input TPM for the key's project in AI Studio (owner) **or** let one burst of tiny requests reach `429 RESOURCE_EXHAUSTED` and record `quotaMetric` / `quotaValue` from the error details; compare with our defaults 5 / 100 / unlimited and adjust the defaults only if they are higher than the real limits. Unknown model → `404` → `AuthError` "Gemini does not know the model" (P33).
-6. Fallback live: primary Gemini, fallback Microsoft; set the Gemini model to an unknown name → `AuthError` → queue rows re-pointed to Microsoft and translated (Overview "Using fallback"); restore the model → next run uses Gemini again. Then the reverse with a deliberately wrong Microsoft region if needed.
-7. Microsoft `403001`: a real `403001` only comes once the F0 resource's 2M free characters of the month are used up (the hourly throttle answers `429001`, not `403001`); sending 2M characters is not worth it. Record what the key's resource tier is; if its quota is not exhausted, keep the recorded-response test (`MicrosoftTest`) as the evidence and say so to the owner.
-8. HANDOVER: fill the Phase 7 table, record facts in plan §7.1, commit and push.
+Procedure moved to the top of this file ("Start here").
 
 ## Phase 2 acceptance (plan §16) — one line per criterion
 
@@ -439,6 +455,10 @@ D10–D14 approved by the owner and applied to `docs/WST-V1-PLAN.md` (§0, §7, 
 - PASS — The sitemap lists target URLs, omitting "off" and noindex pages: `SitemapTest` (home first with latest posts on front, page "off" by meta and by path rule left out, drafts left out, `lastmod` from the post, categories, unknown subtype empty, Rank Math noindex post/term/taxonomy left out through a stand-in helper). Live, core: `/wp-sitemap.xml` lists 5 `wst` sitemaps; counts equal the core ones (posts 119, pages 33, categories 71, tags 68, formats 9); a post set to "off" → 118 while core keeps 119. Live, **Yoast SEO 28.6**: `/wp-sitemap.xml` → 301 to `/sitemap_index.xml`, which lists our 4 sitemaps (post formats not indexable in Yoast); each answers 200 with the same count as Yoast's own sitemap; `sample-page` set noindex in Yoast (`<meta name='robots' content='noindex, follow'>`) → 32 vs 33. Live, **Rank Math 1.0.280** (after the wizard's skip): its index lists our 3 sitemaps (tags and formats noindex by Rank Math default); counts equal Rank Math's own; `rank_math_robots = noindex` on `sample-page` → 32. Toggle off → no `wst` entries, 404.
 - PASS — Validated against the sitemap XML rules: `SitemapTest` validates the core index and every target sitemap against the official sitemaps.org 0.9 XSDs (`tests/fixtures/sitemaps/`); live XML from core, Yoast and Rank Math runs validates with `xmllint --schema` (`siteindex.xsd`, `sitemap.xsd`).
 - Screenshots (scratchpad `shots6f/`): `core-index.png`, `yoast-index.png`, `rankmath-index.png`, `rankmath-wst-page.png`, `advanced-toggle.png`. Yoast SEO and Rank Math are installed **inactive** on the dev site.
+
+## Files changed (owner batch 2026-10-11)
+
+`.github/workflows/ci.yml`, `bin/dev-site.sh`, `.gitignore`, `.distignore`, `eslint.config.cjs` (ignore `.dev/`), `assets-src/admin/screens/ProviderCard.js` + `build/admin.*` (TranslateX warning), `languages/wp-site-translator.pot`, `tests/Integration/SettingsTest.php`, `readme.txt`, `docs/STAGING-CHECKLIST.md`, `docs/USER-GUIDE.md`, `CLAUDE.md` (commands), `HANDOVER.md`.
 
 ## Files changed (Phase 7, keyless part)
 
@@ -612,10 +632,10 @@ fi
 ```
 The repo script also starts MariaDB, which does not survive a container restart; run `bin/setup-env.sh` again at the start of a resumed session.
 
-The fixture site (WordPress with theme unit test data, Elementor and WooCommerce from GitHub source, wp-cli via Composer, `php -S` with a router) is only needed to re-capture page fixtures; `bin/capture-fixtures.sh` lists the URLs.
+`bin/dev-site.sh [--serve]` builds the dev site for live checks (see "Start here"). The older fixture site (WordPress with theme unit test data, Elementor and WooCommerce from GitHub source, wp-cli via Composer, `php -S` with a router) is only needed to re-capture page fixtures; `bin/capture-fixtures.sh` lists the URLs.
 
 ## Exact next step
 
-1. Next session (owner's keys in the environment): "Phase 7 — live provider checks (next session)", steps 1–8.
-2. Owner: run `docs/STAGING-CHECKLIST.md` on staging and send the results; send the TranslatePress table export (session uploads) for a real-data importer run; review P97–P100.
-3. Then close Phase 7: fill the compatibility matrix from the staging results, fix what it finds, full gate once, release zip.
+1. Next session with the owner's keys: "Start here" at the top, then "Next: Microsoft and Gemini live checks".
+2. Owner: staging run (`docs/STAGING-CHECKLIST.md`, paste the "Results to paste back" block), the TranslatePress table export, review P97–P104. First CI run on GitHub: check it is green and fix anything environment-specific.
+3. Then close Phase 7: fill the compatibility matrix from the staging results, fix what they find, full gate once, release zip.

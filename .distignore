@@ -30,3 +30,4 @@
 /composer.local.lock
 /build/*-rtl.css
 /reference
+/.dev

@@ -339,6 +339,15 @@ export default function ProviderCard( {
 				<VerifiedState row={ row } />
 			</CardHeader>
 			<CardBody>
+				{ row.id === 'translatex' &&
+					( ! own.plan || own.plan === 'free' ) && (
+						<Notice status="warning" isDismissible={ false }>
+							{ __(
+								'The TranslateX free plan is for non-commercial use only, and TranslateX may store the texts you send and use them for training. For a business, shop or client site, choose a paid TranslateX plan or another provider.',
+								'wp-site-translator'
+							) }
+						</Notice>
+					) }
 				{ row.configured &&
 					null === row.verified_at &&
 					! row.unavailable && (
