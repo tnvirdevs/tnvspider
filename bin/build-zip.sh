@@ -40,7 +40,14 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/export" "$work/$slug"
 git archive HEAD | tar -x -C "$work/export"
-rsync -a --exclude-from=.distignore "$work/export/" "$work/$slug/"
+if command -v rsync > /dev/null 2>&1; then
+	rsync -a --exclude-from=.distignore "$work/export/" "$work/$slug/"
+else
+	# Same rules without rsync: every .distignore entry is an anchored path ("/dir", "/build/*-rtl.css").
+	grep -v '^/' .distignore | grep -q . && fail ".distignore has an entry that is not an anchored path; install rsync."
+	sed -n 's#^/#./#p' .distignore > "$work/excludes"
+	tar -C "$work/export" --anchored --exclude-from="$work/excludes" -cf - . | tar -x -C "$work/$slug"
+fi
 
 # Contents checks.
 for required in "$slug.php" uninstall.php readme.txt languages/$slug.pot src/Plugin.php build/admin.js build/admin.css build/admin.asset.php build/post-panel.js build/switcher-block.js assets/switcher.css blocks/switcher/block.json; do
