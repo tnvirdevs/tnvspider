@@ -17,14 +17,27 @@ namespace WST\Html;
 final class Extractor {
 
 	/**
+	 * Primary language subtags (lowercase) of the site's two languages.
+	 *
+	 * @var array<string, true>
+	 */
+	private array $languages;
+
+	/**
 	 * Create an extractor.
 	 *
-	 * @param Selectors|null $exclude User exclude selectors (plan §13), or null.
+	 * @param Selectors|null $exclude   User exclude selectors (plan §13), or null.
+	 * @param string[]       $languages Primary subtags of the default and target
+	 *                                  language. Elements whose lang attribute
+	 *                                  names any other language (an Arabic
+	 *                                  quotation on a Bengali site) are left
+	 *                                  untranslated. Empty: lang is not read.
 	 */
-	public function __construct( private ?Selectors $exclude = null ) {
+	public function __construct( private ?Selectors $exclude = null, array $languages = array() ) {
 		if ( null !== $this->exclude && $this->exclude->isEmpty() ) {
 			$this->exclude = null;
 		}
+		$this->languages = array_fill_keys( array_map( 'strtolower', $languages ), true );
 	}
 
 	/** Tags whose content may be merged into one inline segment. */
@@ -278,7 +291,7 @@ final class Extractor {
 
 		$parent         = $this->current();
 		$parentExcluded = null !== $parent && $parent->excluded;
-		$excluded       = $parentExcluded || isset( self::EXCLUDED_TAGS[ $tag ] ) || $this->hasNoTranslateMarker();
+		$excluded       = $parentExcluded || isset( self::EXCLUDED_TAGS[ $tag ] ) || $this->hasNoTranslateMarker() || $this->isOtherLanguage();
 		$info           = null === $this->exclude ? null : $this->elementInfo( $tag );
 		if ( ! $excluded && null !== $info && null !== $this->exclude ) {
 			$ancestors = array();
@@ -539,6 +552,20 @@ final class Extractor {
 		}
 
 		return isset( $this->attributes['class'] ) && true === $this->lexer->has_class( 'notranslate' );
+	}
+
+	/**
+	 * Whether the current start tag marks its content as a third language,
+	 * neither the default nor the target (lang="ar" on a Bengali site).
+	 */
+	private function isOtherLanguage(): bool {
+		if ( array() === $this->languages || ! isset( $this->attributes['lang'] ) ) {
+			return false;
+		}
+		$lang    = $this->lexer->get_attribute( 'lang' );
+		$primary = is_string( $lang ) ? strtolower( (string) strtok( trim( $lang ), '-_' ) ) : '';
+
+		return '' !== $primary && ! isset( $this->languages[ $primary ] );
 	}
 
 	/**

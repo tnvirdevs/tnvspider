@@ -15,6 +15,7 @@ use WST\Config;
 use WST\Log\Logger;
 use WST\Providers\StatusReport;
 use WST\Settings;
+use WST\Site\BackgroundScan;
 use WST\Storage\StringStore;
 
 /**
@@ -29,18 +30,20 @@ final class HealthController {
 	/**
 	 * Create the controller.
 	 *
-	 * @param Settings     $settings Settings.
-	 * @param Health       $health   Checks.
-	 * @param Logger       $logger   Plugin log.
-	 * @param StringStore  $store    Strings and translations.
-	 * @param StatusReport $status   Provider status.
+	 * @param Settings            $settings Settings.
+	 * @param Health              $health   Checks.
+	 * @param Logger              $logger   Plugin log.
+	 * @param StringStore         $store    Strings and translations.
+	 * @param StatusReport        $status   Provider status.
+	 * @param BackgroundScan|null $siteScan Automatic site translation, when a target exists.
 	 */
 	public function __construct(
 		private Settings $settings,
 		private Health $health,
 		private Logger $logger,
 		private StringStore $store,
-		private StatusReport $status
+		private StatusReport $status,
+		private ?BackgroundScan $siteScan = null
 	) {
 	}
 
@@ -141,6 +144,8 @@ final class HealthController {
 				'page'     => null !== $coverage && $coverage['machine'] + $coverage['manual'] > 0,
 			),
 			'coverage'       => $coverage,
+			'pages_known'    => null === $target ? 0 : $this->store->pageCount(),
+			'site_scan'      => null === $this->siteScan ? null : $this->siteScan->status(),
 			'render_errors'  => $this->logger->countSince( 'error', 'render', DAY_IN_SECONDS ),
 			'recent_entries' => $this->logger->recent( 5 ),
 		);

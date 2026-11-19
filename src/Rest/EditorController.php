@@ -12,6 +12,7 @@ namespace WST\Rest;
 use WST\Access;
 use WST\Config;
 use WST\Editor\EditorRequest;
+use WST\Editor\LoopbackScan;
 use WST\Editor\PageTarget;
 use WST\Editor\Tokens;
 
@@ -22,9 +23,6 @@ use WST\Editor\Tokens;
  * built from the home URL.
  */
 final class EditorController {
-
-	/** Seconds the server-side loopback scan may take. */
-	private const LOOPBACK_TIMEOUT = 30;
 
 	/**
 	 * Create the controller.
@@ -151,40 +149,18 @@ final class EditorController {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function loopback( \WP_REST_Request $request ) {
-		$scan = $this->registerScan( $request );
-		if ( $scan instanceof \WP_Error ) {
-			return $scan;
-		}
-		$response = wp_remote_get(
-			(string) $scan['url'],
-			array(
-				'timeout'     => self::LOOPBACK_TIMEOUT,
-				'redirection' => 0,
-				'headers'     => array( 'Accept' => 'application/json' ),
-			)
-		);
-		if ( is_wp_error( $response ) ) {
-			/* translators: %s: error message */
-			return new \WP_Error( 'wst_loopback_failed', sprintf( __( 'The server could not load the page: %s', 'wp-site-translator' ), $response->get_error_message() ), array( 'status' => 502 ) );
-		}
-		$code    = (int) wp_remote_retrieve_response_code( $response );
-		$summary = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( ! is_array( $summary ) && $code >= 300 && $code < 400 ) {
-			/* translators: %d: HTTP status */
-			return new \WP_Error( 'wst_scan_redirected', sprintf( __( 'This page sends visitors to another address (HTTP %d), so it cannot be scanned. Cart, checkout and account pages do this without a cart or a login. Their texts are translated wherever the same texts appear on other pages.', 'wp-site-translator' ), $code ), array( 'status' => 422 ) );
-		}
-		if ( ! is_array( $summary ) ) {
-			/* translators: %d: HTTP status */
-			return new \WP_Error( 'wst_loopback_failed', sprintf( __( 'The page answered with HTTP %d and no scan result (a redirect, a login wall or a cached copy?).', 'wp-site-translator' ), $code ), array( 'status' => 502 ) );
-		}
-		if ( isset( $summary['error'] ) ) {
-			return new \WP_Error( 'wst_scan_failed', (string) $summary['error'], array( 'status' => 502 ) );
-		}
-		if ( ( $summary['scan_id'] ?? '' ) !== $scan['token'] ) {
-			return new \WP_Error( 'wst_scan_cached', __( 'A cached copy of the page was returned instead of a scan. Exclude ?wst_scan= requests from the page cache.', 'wp-site-translator' ), array( 'status' => 502 ) );
+		$page = $this->resolve( $request );
+		if ( $page instanceof \WP_Error ) {
+			return $page;
 		}
 
-		return $summary + array( 'via' => 'server' );
+		return ( new LoopbackScan() )->run(
+			$page,
+			array(
+				'allow_personal' => true === $request->get_param( 'allow_personal' ),
+				'record_only'    => true === $request->get_param( 'record_only' ),
+			)
+		);
 	}
 
 	/**

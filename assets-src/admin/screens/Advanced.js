@@ -564,7 +564,7 @@ export default function Advanced( {
 			<Section
 				title={ __( 'Digits', 'wp-site-translator' ) }
 				description={ __(
-					'Write numbers with the digits of the target language on translated pages. Only visible text changes: links, attributes, e-mail addresses, form values, code and never-translate terms keep their digits.',
+					'Write numbers with the digits of the target language on translated pages, in either direction (0–9 to Bengali, or Bengali to 0–9). Only visible text changes: links, attributes, e-mail addresses, form values, code and never-translate terms keep their digits.',
 					'wp-site-translator'
 				) }
 			>
@@ -581,14 +581,14 @@ export default function Advanced( {
 						{
 							value: 'auto',
 							label: __(
-								'Automatic: Arabic-Indic digits for Arabic, unchanged for other languages',
+								'Automatic: Arabic-Indic digits for an Arabic target; 0–9 when the default language writes Bengali, Arabic or Persian digits and the target does not; otherwise unchanged',
 								'wp-site-translator'
 							),
 						},
 						{
 							value: 'off',
 							label: __(
-								'Unchanged (0123456789)',
+								'Unchanged (as on the original page)',
 								'wp-site-translator'
 							),
 						},
@@ -610,6 +610,13 @@ export default function Advanced( {
 							value: 'persian',
 							label: __(
 								'Persian, also used for Urdu (۰۱۲۳۴۵۶۷۸۹)',
+								'wp-site-translator'
+							),
+						},
+						{
+							value: 'latin',
+							label: __(
+								'0–9, from Bengali, Arabic-Indic or Persian digits (for English and other Latin-script targets)',
 								'wp-site-translator'
 							),
 						},

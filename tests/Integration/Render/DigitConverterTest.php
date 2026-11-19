@@ -95,6 +95,18 @@ final class DigitConverterTest extends WP_UnitTestCase {
 		$this->assertSame( '<p>No digits here</p>', $converter->html( '<p>No digits here</p>' ) );
 	}
 
+	public function test_latin_mode_writes_native_digits_as_0_to_9_in_visible_text_only(): void {
+		$latin = new DigitConverter( DigitConverter::LATIN, DigitConverter::PRICE_SELECTORS, array(), true, array( 'bn', 'en' ) );
+
+		$this->assertSame(
+			'<p>7 Sunnahs of the Prophet</p><p>March 2, 2024 and 3 and 4</p><a href="/p/৭/" title="৭">link 7</a><p lang="ar">سورة ١٣</p><p>https://x.com/৭ and 5</p>',
+			$latin->html( '<p>৭ Sunnahs of the Prophet</p><p>March ২, ২০২৪ and ٣ and ۴</p><a href="/p/৭/" title="৭">link ৭</a><p lang="ar">سورة ١٣</p><p>https://x.com/৭ and 5</p>' ),
+			'Bengali, Arabic-Indic and Persian digits become 0–9; attributes, URLs and text marked as another language (Arabic) keep theirs.'
+		);
+		$this->assertSame( 'Verse 13, page 7', $latin->text( 'Verse ১৩, page ৭' ) );
+		$this->assertSame( '<p>No digits</p>', $latin->html( '<p>No digits</p>' ) );
+	}
+
 	public function test_unknown_mode_fails_loudly(): void {
 		$this->expectException( \InvalidArgumentException::class );
 		new DigitConverter( 'roman', array(), array(), true );
@@ -106,6 +118,9 @@ final class DigitConverterTest extends WP_UnitTestCase {
 
 		$this->assertSame( 'arabic_indic', $mode( array( 'target_language' => 'ar' ) ), 'Owner decision: Arabic gets Arabic-Indic digits by default.' );
 		$this->assertSame( 'off', $mode( array( 'target_language' => 'bn_BD' ) ), 'Bengali is only suggested, never enabled silently.' );
+		$this->assertSame( 'latin', ( new Settings( array( 'target_language' => 'en_GB' ), 'bn_BD', $registry ) )->digitsMode(), 'Bengali site translated to English: 0–9.' );
+		$this->assertSame( 'latin', ( new Settings( array( 'target_language' => 'en_US' ), 'ar', $registry ) )->digitsMode() );
+		$this->assertSame( 'off', ( new Settings( array( 'target_language' => 'fa_IR' ), 'bn_BD', $registry ) )->digitsMode(), 'Both languages write their own digits: unchanged.' );
 		$this->assertSame(
 			'off',
 			$mode(

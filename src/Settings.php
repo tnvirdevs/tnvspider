@@ -65,7 +65,10 @@ final class Settings {
 	 * Digit conversion on target pages (plan §13A.6). "auto" = Arabic-Indic
 	 * digits for an Arabic target (owner decision), off for any other.
 	 */
-	public const DIGITS_MODES = array( 'auto', 'off', 'bengali', 'arabic_indic', 'persian' );
+	public const DIGITS_MODES = array( 'auto', 'off', 'bengali', 'arabic_indic', 'persian', 'latin' );
+
+	/** Languages written with their own digits (Bengali, Arabic, Persian, Urdu). */
+	private const NATIVE_DIGIT_LANGUAGES = array( 'bn', 'ar', 'fa', 'ur' );
 
 	/** Browser-language suggestion (plan §13A.7): off, a bar that asks, or an automatic first-visit redirect. */
 	public const SUGGESTION_MODES = array( 'off', 'bar', 'redirect' );
@@ -159,7 +162,8 @@ final class Settings {
 	 *     suggestion_position: string,
 	 *     suggestion_text_default: string,
 	 *     suggestion_text_target: string,
-	 *     sitemap_alternates: bool
+	 *     sitemap_alternates: bool,
+	 *     auto_site_scan: bool
 	 * }
 	 */
 	private array $values;
@@ -261,7 +265,7 @@ final class Settings {
 	 *
 	 * @param string $key One of discover_on_visit, block_crawlers, force_language_links,
 	 *                    hreflang_x_default, hreflang_drop_region, editor_mt_on_manual,
-	 *                    trp_switcher_alias, sitemap_alternates.
+	 *                    trp_switcher_alias, sitemap_alternates, auto_site_scan.
 	 */
 	public function flag( string $key ): bool {
 		return (bool) ( $this->values[ $key ] ?? false );
@@ -337,16 +341,23 @@ final class Settings {
 	}
 
 	/**
-	 * Effective digit conversion: off, bengali, arabic_indic or persian.
-	 * "auto" means Arabic-Indic digits for an Arabic target language, off otherwise.
+	 * Effective digit conversion: off, bengali, arabic_indic, persian or latin.
+	 * "auto" means Arabic-Indic digits for an Arabic target language; 0–9 when
+	 * the default language writes its own digits (Bengali, Arabic, Persian,
+	 * Urdu) and the target does not; off otherwise.
 	 */
 	public function digitsMode(): string {
 		$mode = $this->values['digits_mode'];
 		if ( 'auto' !== $mode ) {
 			return $mode;
 		}
+		$target = strtolower( (string) strtok( $this->values['target_language'], '_' ) );
+		if ( 'ar' === $target ) {
+			return 'arabic_indic';
+		}
+		$default = strtolower( (string) strtok( $this->values['default_language'], '_' ) );
 
-		return str_starts_with( $this->values['target_language'], 'ar' ) ? 'arabic_indic' : 'off';
+		return '' !== $target && in_array( $default, self::NATIVE_DIGIT_LANGUAGES, true ) && ! in_array( $target, self::NATIVE_DIGIT_LANGUAGES, true ) ? 'latin' : 'off';
 	}
 
 	/**
@@ -466,7 +477,8 @@ final class Settings {
 	 *     suggestion_position: string,
 	 *     suggestion_text_default: string,
 	 *     suggestion_text_target: string,
-	 *     sitemap_alternates: bool
+	 *     sitemap_alternates: bool,
+	 *     auto_site_scan: bool
 	 * }
 	 */
 	private static function sanitize( array $raw, string $siteLocale ): array {
@@ -525,6 +537,7 @@ final class Settings {
 			'suggestion_text_default' => self::readShortText( $raw, 'suggestion_text_default' ),
 			'suggestion_text_target'  => self::readShortText( $raw, 'suggestion_text_target' ),
 			'sitemap_alternates'      => self::readBool( $raw, 'sitemap_alternates', true ),
+			'auto_site_scan'          => self::readBool( $raw, 'auto_site_scan', true ),
 			'trusted_proxy_header'    => isset( $raw['trusted_proxy_header'] ) && is_string( $raw['trusted_proxy_header'] ) && 1 === preg_match( self::KEY_PATTERN, trim( $raw['trusted_proxy_header'] ) ) ? trim( $raw['trusted_proxy_header'] ) : '',
 		);
 	}

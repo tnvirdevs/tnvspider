@@ -10,7 +10,7 @@ Everything is under **Translator** in the WordPress admin menu.
 2. **Translator → Languages:** choose the default language (usually your site language), the target language and the URL prefix (`bn` gives `/bn/…`). Save.
 3. **Translator → Translation:** choose a main provider, enter its key, press **Test connection**, and set limits (section 3). Until a provider is chosen and tested, nothing is sent anywhere and translated pages show the original text.
 4. **Add the language switcher:** Translator → Language switcher. Use the floating button, the block, the shortcode `[wst_switcher]`, or a menu item (Appearance → Menus).
-5. **Translate:** visit translated pages (new texts are queued on the first visit), or use **Translate entire site** on the Overview, which scans every page and shows the estimated characters against your monthly budget before anything is queued.
+5. **Translate:** nothing more to do. With **Translation → Translate every page automatically** (on by default) the plugin checks every post, page, archive and the home page in the background, about ten pages a minute, and queues their texts; new and updated posts follow within minutes. The Overview shows the progress. Without it, a page is queued the first time a visitor opens it (your own visits while logged in do not count), or with **Translate entire site**, which shows the estimated characters against your monthly budget before anything is queued.
 
 The **Overview** shows what is left to do, the queue and the coverage per page. If WP-Cron is slow on your host, **Process queue now** runs the queue at once.
 
@@ -41,6 +41,8 @@ Daily limits reset at midnight in the provider's time zone, shown on the card.
 - **Translator → Pages** sets a mode per page: **Default** (follow the path rules and site mode), **Automatic**, **Manual only** or **Off (not translated)**. The same setting is in the post editor's sidebar. **Path rules** (for example `/shop/*`) set the mode for whole sections.
 - **Off** pages have no translated version: visitors to `/bn/that-page/` are sent to the original page, or shown it untranslated (Translation → "When a visitor opens the translated address of a page that is off"), and the page gets no hreflang link and is left out of the translated sitemap.
 - Cart, checkout and account pages are never recorded, because they can show personal data.
+- **Text in a third language** is never translated when its element says so with a `lang` attribute: on a Bengali → English site, `<p lang="ar">…</p>` (a Qur'an verse or du'a) is shown exactly as written. For text without such a marker, add its CSS class to **Advanced → Exclude selectors**.
+- **Digits:** Advanced → Digits can write numbers in the target's digits in either direction, for example Bengali ২০২৪ as 2024 on an English page (automatic for a Bengali, Arabic, Persian or Urdu site translated into a language that uses 0–9).
 
 ## 5. The translation editor
 

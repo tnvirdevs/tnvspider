@@ -118,7 +118,8 @@ final class MatchReport {
 	 * @return array<string, string> Normalised original => kind.
 	 */
 	private function strings( string $html ): array {
-		$segments  = ( new Extractor( new Selectors( $this->settings->excludeSelectors() ) ) )->extract( $html );
+		$languages = array_values( array_filter( array( $this->settings->defaultLanguage()->isoCode(), $this->settings->targetLanguage()?->isoCode() ?? '' ) ) );
+		$segments  = ( new Extractor( new Selectors( $this->settings->excludeSelectors() ), $languages ) )->extract( $html );
 		$maxLength = $this->settings->number( 'max_string_length' );
 		$strings   = array();
 		foreach ( $segments as $segment ) {

@@ -13,6 +13,7 @@ Translate the whole site between two languages with queued machine translation a
 
 WP Site Translator serves your site in two languages: the default language and one target language, in either direction (for example English and Bengali, or Arabic and English). The translated site lives under a language prefix such as `/bn/`, so page caches keep working.
 
+* **Every page, automatically.** Posts, pages, archives and the home page are checked in the background and queued for translation, without waiting for visitors; new and updated posts follow within minutes.
 * **Machine translation through a queue.** Strings found on pages are queued and translated in the background by TranslateX, Microsoft Translator or Google Gemini, within the rate limits and monthly character budget you set, with an optional fallback provider. Pages never wait for a translation service; untranslated text shows in the original language until its translation arrives.
 * **Translation editor.** Scan a page, then edit its strings in a list with autosave, filters and bulk actions, next to a safe preview. The editor runs outside your theme and other plugins' scripts, so their errors cannot break it.
 * **Page modes.** Each page, path or the whole site can be automatic, manual (only your own translations) or off (not translated).
@@ -49,7 +50,7 @@ The plugin sets one first-party cookie, `wst_lang_choice` (180 days), only when 
 1. Upload the plugin zip in Plugins → Add New → Upload Plugin and activate it.
 2. Translator → Languages: choose the default and the target language and the URL prefix.
 3. Translator → Translation: enter a provider key, press "Test connection" and set limits and a monthly budget.
-4. Visit a translated page or use "Translate entire site" on the Overview; translations arrive through the queue (WP-Cron, or `wp wst queue run`).
+4. Translations arrive on their own: every page is checked in the background and its texts are queued (WP-Cron, or `wp wst queue run`). The Overview shows the progress.
 5. Add the language switcher (block, shortcode `[wst_switcher]`, menu item or floating button).
 
 Moving from TranslatePress: Translator → Migration imports its dictionary and settings while TranslatePress is still active (our front end stays off until you deactivate it) and walks you through going live.

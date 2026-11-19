@@ -55,7 +55,99 @@ function Checklist( { checklist } ) {
 	);
 }
 
-function Coverage( { coverage } ) {
+function SiteScan( { scan } ) {
+	if ( ! scan || ! scan.on ) {
+		return (
+			<p className="wst-note">
+				{ __(
+					'Pages are translated when a visitor opens them (your own visits while logged in do not count), or with Translate entire site. Turn on automatic translation of every page under Translation.',
+					'wp-site-translator'
+				) }
+			</p>
+		);
+	}
+	if ( scan.blocked ) {
+		return (
+			<p className="wst-note wst-note--error">
+				{ 'manual_site' === scan.blocked
+					? __(
+							'Automatic translation of every page is waiting: the site mode is Manually.',
+							'wp-site-translator'
+						)
+					: __(
+							'Automatic translation of every page is waiting for a translation provider that can translate now (see Translation).',
+							'wp-site-translator'
+						) }
+			</p>
+		);
+	}
+	const lines = [];
+	if ( ! scan.finished ) {
+		lines.push(
+			sprintf(
+				/* translators: 1: pages checked, 2: all pages */
+				__(
+					'Checking every page in the background: %1$s of %2$s so far.',
+					'wp-site-translator'
+				),
+				number( scan.checked ),
+				scan.total ? number( scan.total ) : '…'
+			)
+		);
+	} else {
+		lines.push(
+			sprintf(
+				/* translators: 1: number of pages, 2: date and time */
+				__(
+					'All %1$s pages checked (%2$s); they are checked again daily, and new or updated posts within minutes.',
+					'wp-site-translator'
+				),
+				number( scan.total ),
+				dateTime( scan.finished )
+			)
+		);
+	}
+	if ( scan.changed ) {
+		lines.push(
+			sprintf(
+				/* translators: %s: number of posts */
+				_n(
+					'%s new or updated post waiting to be checked.',
+					'%s new or updated posts waiting to be checked.',
+					scan.changed,
+					'wp-site-translator'
+				),
+				number( scan.changed )
+			)
+		);
+	}
+	return (
+		<>
+			{ lines.map( ( line ) => (
+				<p key={ line } className="wst-note">
+					{ line }
+				</p>
+			) ) }
+			{ scan.failed > 0 && (
+				<p className="wst-note wst-note--error">
+					{ sprintf(
+						/* translators: 1: number of pages, 2: last error */
+						_n(
+							'%1$s page could not be checked. Last: %2$s',
+							'%1$s pages could not be checked. Last: %2$s',
+							scan.failed,
+							'wp-site-translator'
+						),
+						number( scan.failed ),
+						scan.last_error
+					) }
+				</p>
+			) }
+		</>
+	);
+}
+
+function Coverage( { coverage, pagesKnown } ) {
 	if ( ! coverage ) {
 		return (
 			<p className="wst-empty">
@@ -70,7 +162,7 @@ function Coverage( { coverage } ) {
 		return (
 			<p className="wst-empty">
 				{ __(
-					'No strings recorded yet. Visit a translated page to start.',
+					'No strings recorded yet. Pages are found by visitors, by automatic translation of every page, or with Translate entire site.',
 					'wp-site-translator'
 				) }
 			</p>
@@ -82,15 +174,18 @@ function Coverage( { coverage } ) {
 		<div className="wst-coverage">
 			<label htmlFor="wst-coverage">
 				{ sprintf(
-					/* translators: 1: percent, 2: translated, 3: total, 4: manual */
-					__(
-						'%1$d %% translated: %2$s of %3$s strings (%4$s manual).',
+					/* translators: 1: percent, 2: translated, 3: total, 4: manual, 5: number of pages */
+					_n(
+						'%1$d %% of the strings found so far are translated: %2$s of %3$s strings (%4$s manual) on %5$s page.',
+						'%1$d %% of the strings found so far are translated: %2$s of %3$s strings (%4$s manual) on %5$s pages.',
+						pagesKnown,
 						'wp-site-translator'
 					),
 					percent,
 					number( done ),
 					number( coverage.total ),
-					number( coverage.manual )
+					number( coverage.manual ),
+					number( pagesKnown )
 				) }
 			</label>
 			<progress id="wst-coverage" max={ coverage.total } value={ done } />
@@ -476,7 +571,13 @@ export default function Overview( {
 				</Section>
 				<Section title={ __( 'Coverage', 'wp-site-translator' ) }>
 					{ overview ? (
-						<Coverage coverage={ overview.coverage } />
+						<>
+							<Coverage
+								coverage={ overview.coverage }
+								pagesKnown={ overview.pages_known || 0 }
+							/>
+							<SiteScan scan={ overview.site_scan } />
+						</>
 					) : (
 						! error && <Spinner />
 					) }

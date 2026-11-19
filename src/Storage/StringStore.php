@@ -971,6 +971,13 @@ final class StringStore {
 	}
 
 	/**
+	 * Number of pages with recorded strings (visited or scanned).
+	 */
+	public function pageCount(): int {
+		return (int) $this->value( $this->prepare( 'SELECT COUNT(*) FROM %i', $this->schema->table( 'pages' ) ) );
+	}
+
+	/**
 	 * Orphan strings (plan §4): no occurrence, not global, no manual
 	 * translation, recorded more than $days ago.
 	 *

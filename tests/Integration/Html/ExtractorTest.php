@@ -75,6 +75,21 @@ final class ExtractorTest extends WP_UnitTestCase {
 		$this->assertSame( array( array( 'text', 'Kept' ) ), $this->extract( $html ) );
 	}
 
+	public function test_elements_in_a_third_language_are_left_untranslated(): void {
+		$html  = '<html lang="en-GB"><body><p>বৃষ্টির সময় দু\'আ</p>'
+			. '<p class="dua-arabic" dir="rtl" lang="ar">اللَّهُمَّ صَيِّبًا نَافِعًا</p>'
+			. '<blockquote lang="ar-SA" title="আয়াত">قَالَ <b>نَعَمْ</b></blockquote>'
+			. '<p lang="en">Already English</p><p lang="bn-BD">বাংলা</p><p lang="">খালি</p></body></html>';
+		$texts = static fn( Extractor $extractor ): array => array_map( static fn( Segment $s ): string => $s->text, $extractor->extract( $html ) );
+
+		$this->assertSame(
+			array( 'বৃষ্টির সময় দু\'আ', 'Already English', 'বাংলা', 'খালি' ),
+			$texts( new Extractor( null, array( 'bn', 'en' ) ) ),
+			'Arabic (lang="ar", "ar-SA") and its attributes are skipped; the site languages, the page\'s own <html lang> and an empty lang are not.'
+		);
+		$this->assertContains( 'اللَّهُمَّ صَيِّبًا نَافِعًا', $texts( new Extractor() ), 'Without the site languages lang is not read.' );
+	}
+
 	public function test_self_closing_svg_children_do_not_swallow_the_document(): void {
 		$this->assertSame(
 			array( array( 'text', 'After' ) ),

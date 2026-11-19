@@ -180,6 +180,18 @@ export default function Translation( props ) {
 						'wp-site-translator'
 					) }
 				/>
+				<Toggle
+					{ ...fields }
+					name="auto_site_scan"
+					label={ __(
+						'Translate every page automatically, without waiting for visitors',
+						'wp-site-translator'
+					) }
+					help={ __(
+						'Posts, pages, archives and the home page are checked in the background (about ten a minute) and their texts are queued; new and updated posts follow within minutes. This uses your provider quota; the monthly budget still applies. Off: pages are translated when a visitor opens them, or with Translate entire site.',
+						'wp-site-translator'
+					) }
+				/>
 			</Section>
 			<Section
 				title={ __( 'Translation providers', 'wp-site-translator' ) }

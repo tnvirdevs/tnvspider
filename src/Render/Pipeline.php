@@ -167,7 +167,7 @@ final class Pipeline {
 	 */
 	public function process( string $html, PageContext $context ): string {
 		$this->pending = 0;
-		$extractor     = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
+		$extractor     = new Extractor( new Selectors( $this->settings->excludeSelectors() ), $this->languageCodes() );
 		$segments      = $extractor->extract( $html );
 		if ( Tokens::SCAN === $context->editor && Settings::MODE_OFF === $context->mode ) {
 			return (string) wp_json_encode( $this->summary( $context, array( 'strings' => 0 ) ) );
@@ -210,7 +210,7 @@ final class Pipeline {
 	 * @param string $html Fragment.
 	 */
 	public function translateFragment( string $html ): string {
-		$extractor           = new Extractor( new Selectors( $this->settings->excludeSelectors() ) );
+		$extractor           = new Extractor( new Selectors( $this->settings->excludeSelectors() ), $this->languageCodes() );
 		$segments            = $extractor->extract( $html );
 		[ $kinds, $neutral ] = $this->neutralKinds( $segments );
 		$found               = $this->store->lookup( array_map( 'strval', array_keys( $kinds ) ), $this->target->locale() );
@@ -254,6 +254,16 @@ final class Pipeline {
 	}
 
 	/**
+	 * Primary subtags of the default and target language: elements marked
+	 * with any other language are not translated (lang="ar" on a Bengali site).
+	 *
+	 * @return list<string>
+	 */
+	private function languageCodes(): array {
+		return array( $this->settings->defaultLanguage()->isoCode(), $this->target->isoCode() );
+	}
+
+	/**
 	 * Digit conversion for target output, or null when it is off.
 	 */
 	private function digits(): ?DigitConverter {
@@ -267,7 +277,8 @@ final class Pipeline {
 				$mode,
 				$this->settings->flag( 'digits_skip_prices' ) ? array_values( array_merge( $selectors, DigitConverter::PRICE_SELECTORS ) ) : $selectors,
 				$this->settings->neverTranslateTerms(),
-				$this->settings->flag( 'terms_case_insensitive' )
+				$this->settings->flag( 'terms_case_insensitive' ),
+				$this->languageCodes()
 			);
 		}
 

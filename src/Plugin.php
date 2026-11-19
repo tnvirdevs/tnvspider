@@ -23,13 +23,14 @@ use WST\Dynamic\Client;
 use WST\Dynamic\Fragments;
 use WST\Editor\AdminBar;
 use WST\Editor\EditorRequest;
+use WST\Editor\LoopbackScan;
 use WST\Editor\PageTarget;
 use WST\Editor\Preview;
 use WST\Languages\Registry;
 use WST\Log\Logger;
-use WST\Modes\OffPages;
 use WST\Migration\Guard;
 use WST\Migration\TranslatePress;
+use WST\Modes\OffPages;
 use WST\Modes\Resolver;
 use WST\Providers\ProviderRegistry;
 use WST\Providers\ProviderState;
@@ -61,15 +62,16 @@ use WST\Rest\StringsController;
 use WST\Routing\LanguageUrls;
 use WST\Routing\Router;
 use WST\Routing\Urls;
+use WST\Site\BackgroundScan;
 use WST\Site\SitePages;
 use WST\Sitemap\SeoPlugins;
 use WST\Sitemap\Sitemaps;
 use WST\Sitemap\TargetProvider;
 use WST\Storage\StringStore;
-use WST\Transfer\Exporter;
-use WST\Transfer\Importer;
 use WST\Switcher\Suggestion;
 use WST\Switcher\Switcher;
+use WST\Transfer\Exporter;
+use WST\Transfer\Importer;
 
 /**
  * Plugin bootstrap. Keeps hook registration in one place.
@@ -125,7 +127,6 @@ final class Plugin {
 		$settingsSaver = new SettingsController( $secrets, $queue, $scheduler );
 		$settingsSaver->boot();
 		( new ProvidersController( $status, $tester, $secrets ) )->boot();
-		( new HealthController( $settings, new Health( $settings, $wpdb, self::schema(), $queue, $status, $selector, $logger ), $logger, self::strings(), $status ) )->boot();
 		if ( is_admin() ) {
 			( new AdminPage( $file, new Isolation( $file ) ) )->boot();
 		}
@@ -136,6 +137,7 @@ final class Plugin {
 			( new Guard() )->boot();
 		}
 
+		$siteScan = null;
 		if ( null !== $target ) {
 			$home   = (string) get_option( 'home' );
 			$urls   = Urls::fromHome( $home, rest_get_url_prefix(), $settings->defaultPrefix() );
@@ -171,13 +173,21 @@ final class Plugin {
 				( new DynamicController( $settings, $pipeline, self::strings(), $pageTarget, $modes, $auto, $target ) )->boot();
 			}
 			( new ImportController( new Importer( self::strings(), $target ) ) )->boot();
-			( new SiteController( new SitePages( $settings, $modes, $urls, $target ), self::strings(), $requests, $queue, $status, $target ) )->boot();
+			$sitePages = new SitePages( $settings, $modes, $urls, $target );
+			( new SiteController( $sitePages, self::strings(), $requests, $queue, $status, $target ) )->boot();
+			if ( ! $frontEndOff ) {
+				// Every page translated without waiting for visitors (scans need our front end).
+				$siteScan = new BackgroundScan( $settings, $sitePages, $pageTarget, self::strings(), $auto, $target, new LoopbackScan(), $modes, $wpdb );
+				$siteScan->boot();
+			}
 			( new Exporter( self::strings(), $target ) )->boot();
 			if ( is_admin() ) {
 				( new PostPanel( self::strings(), $modes, $requests, $target, $file, $settings->flag( 'editor_mt_on_manual' ) ) )->boot();
 				( new EditorPage( $settings, $target, $selector, new Isolation( $file ), $file ) )->boot();
 			}
 		}
+
+		( new HealthController( $settings, new Health( $settings, $wpdb, self::schema(), $queue, $status, $selector, $logger ), $logger, self::strings(), $status, $siteScan ) )->boot();
 
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			\WP_CLI::add_command( 'wst string', new StringCommand( self::strings(), $settings ) );
