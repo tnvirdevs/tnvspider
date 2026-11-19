@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       WP Site Translator
  * Description:       Translate the whole site between two languages with queued machine translation and a conflict-proof editor.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Requires at least: 6.7
  * Requires PHP:      8.0
  * License:           GPL-2.0-or-later

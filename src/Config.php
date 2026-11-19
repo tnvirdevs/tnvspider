@@ -16,7 +16,7 @@ namespace WST;
 final class Config {
 
 	public const NAME           = 'WP Site Translator';
-	public const VERSION        = '0.1.0';
+	public const VERSION        = '0.1.1';
 	public const SLUG           = 'wp-site-translator';
 	public const TEXT_DOMAIN    = 'wp-site-translator';
 	public const PREFIX         = 'wst_';

@@ -3,7 +3,7 @@ Tags: translation, multilingual, machine translation, bilingual, language switch
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 0.1.0
+Stable tag: 0.1.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -70,6 +70,12 @@ They stay, unless you turn on Advanced → Data → "Delete all translator data 
 Google publishes Gemini limits per project in AI Studio only; enter them on the Gemini card. Microsoft's free tier (F0) allows 2 million characters a month. TranslateX shows its limit in each response.
 
 == Changelog ==
+
+= 0.1.1 =
+* Every post, page, archive and the home page is translated automatically in the background, without waiting for visitors (Translation → Site mode; on by default).
+* Text marked as a third language with a lang attribute (for example Arabic du'as on a Bengali site) is never sent for translation.
+* New digit option 0–9: Bengali, Arabic-Indic and Persian digits are written as 0–9 on translated pages (automatic for such sites translated into English).
+* The Overview's coverage now counts the strings found so far and shows the background progress.
 
 = 0.1.0 =
 * First release.
