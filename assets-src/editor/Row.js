@@ -68,6 +68,8 @@ function Row(
 		onFocus,
 		onAction,
 		selected,
+		source,
+		visual = false,
 	},
 	ref
 ) {
@@ -98,7 +100,20 @@ function Row(
 			className={ `wst-row${ selected ? ' is-selected' : '' }${ state && state.error ? ' has-error' : '' }` }
 			data-id={ item.id }
 		>
-			<div className="wst-row__original">
+			{ visual && (
+				<h3 className="wst-row__label">
+					{ sprintf(
+						/* translators: %s: language name */
+						__( 'From %s', 'wp-site-translator' ),
+						source.name
+					) }
+				</h3>
+			) }
+			<div
+				className="wst-row__original"
+				lang={ visual ? source.tag : undefined }
+				dir={ visual ? source.dir : undefined }
+			>
 				<span className="wst-kind" title={ item.kind }>
 					{ item.kind === 'inline' ? '</>' : 'T' }
 				</span>
@@ -110,6 +125,15 @@ function Row(
 				) }
 			</div>
 			<div className="wst-row__translation">
+				{ visual && (
+					<h3 className="wst-row__label" aria-hidden="true">
+						{ sprintf(
+							/* translators: %s: language name */
+							__( 'To %s', 'wp-site-translator' ),
+							language.name
+						) }
+					</h3>
+				) }
 				<label className="screen-reader-text" htmlFor={ fieldId }>
 					{ sprintf(
 						/* translators: %s: original text */
@@ -123,7 +147,7 @@ function Row(
 					dir="auto"
 					lang={ language.tag }
 					rows={ Math.min(
-						8,
+						visual ? 14 : 8,
 						Math.max(
 							1,
 							Math.ceil( value.length / 60 ),

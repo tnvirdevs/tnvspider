@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP Site Translator 0.1.0\n"
+"Project-Id-Version: WP Site Translator 0.1.1\n"
 "Report-Msgid-Bugs-To: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-19T12:41:39+00:00\n"
+"POT-Creation-Date: 2026-11-19T13:03:03+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: wp-site-translator\n"
@@ -49,7 +49,7 @@ msgstr ""
 
 #: src/Admin/EditorPage.php:98
 #: src/Editor/AdminBar.php:106
-#: build/editor.js:4
+#: build/editor.js:6
 msgid "Translation editor"
 msgstr ""
 
@@ -267,13 +267,13 @@ msgstr ""
 #: src/Admin/PostPanel.php:219
 #: build/admin.js:11
 #: build/admin.js:23
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Manual only"
 msgstr ""
 
 #: src/Admin/PostPanel.php:220
 #: build/admin.js:23
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Off (not translated)"
 msgstr ""
 
@@ -1228,7 +1228,7 @@ msgstr ""
 #: build/admin.js:25
 #: build/admin.js:67
 #: build/admin.js:71
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Cancel"
 msgstr ""
 
@@ -1329,7 +1329,7 @@ msgstr ""
 #: build/admin.js:27
 #: build/admin.js:66
 #: build/editor.js:1
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Machine"
 msgstr ""
 
@@ -1383,7 +1383,7 @@ msgid "Download strings and their translations as a CSV file (UTF-8). Columns: o
 msgstr ""
 
 #: build/admin.js:27
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Strings"
 msgstr ""
 
@@ -1537,12 +1537,12 @@ msgid "Check file (dry run)"
 msgstr ""
 
 #: build/admin.js:38
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "The page did not answer with a scan result."
 msgstr ""
 
 #: build/admin.js:38
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "A cached copy of the page came back instead of a scan."
 msgstr ""
 
@@ -1820,9 +1820,9 @@ msgstr ""
 #: build/admin.js:57
 #: build/admin.js:66
 #: build/admin.js:78
-#: build/editor.js:2
 #: build/editor.js:4
-#: build/editor.js:8
+#: build/editor.js:6
+#: build/editor.js:10
 msgid "Try again"
 msgstr ""
 
@@ -2247,7 +2247,7 @@ msgid "Page setting"
 msgstr ""
 
 #: build/admin.js:57
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "All"
 msgstr ""
 
@@ -2333,7 +2333,7 @@ msgid "Edit translations"
 msgstr ""
 
 #: build/admin.js:61
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Previous"
 msgstr ""
 
@@ -2344,7 +2344,7 @@ msgid "Page %1$d of %2$d (%3$d items)"
 msgstr ""
 
 #: build/admin.js:62
-#: build/editor.js:9
+#: build/editor.js:11
 msgid "Next"
 msgstr ""
 
@@ -2682,7 +2682,7 @@ msgstr ""
 
 #: build/admin.js:66
 #: build/editor.js:1
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Manual"
 msgstr ""
 
@@ -2963,7 +2963,7 @@ msgid "Translated page preview"
 msgstr ""
 
 #: build/editor.js:1
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Untranslated"
 msgstr ""
 
@@ -2979,202 +2979,258 @@ msgstr ""
 msgid "Machine translation failed:"
 msgstr ""
 
-#: build/editor.js:1
+#. translators: %s: language name
+#: build/editor.js:2
+#, js-format
+msgid "From %s"
+msgstr ""
+
+#: build/editor.js:2
 msgid "Site-wide"
 msgstr ""
 
+#. translators: %s: language name
+#: build/editor.js:3
+#, js-format
+msgid "To %s"
+msgstr ""
+
 #. translators: %s: original text
-#: build/editor.js:2
+#: build/editor.js:4
 #, js-format
 msgid "Translation of: %s"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Type the translation…"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Keep every tag exactly as in the original; you may move tags with their words."
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Waiting for machine translation"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Saving…"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Saved"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Translate with provider"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Keep as manual"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Revert to machine translation"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Remove translation"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "This address shows the site’s “not found” page (HTTP 404), so there is nothing to scan here. Texts of the not-found template are translated wherever they also appear; choose a page below."
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Search results are built from your other pages, so they cannot be scanned as one page. Translate the pages they show; choose one below."
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Has warning"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "Automatic translation"
 msgstr ""
 
-#: build/editor.js:2
+#: build/editor.js:4
 msgid "This page is set to “off”: it is not translated, so nothing was recorded."
 msgstr ""
 
 #. translators: 1: strings found, 2: new strings, 3: queued strings
-#: build/editor.js:3
+#: build/editor.js:5
 #, js-format
 msgid "Scan finished: %1$s strings on the page, %2$s new, %3$s queued for machine translation."
 msgstr ""
 
 #. translators: %s: error
-#: build/editor.js:4
+#: build/editor.js:6
 #, js-format
 msgid "The scan failed: %s"
 msgstr ""
 
-#: build/editor.js:4
+#: build/editor.js:6
 msgid "Empty translations are not saved. Use “Remove translation” to show the original."
 msgstr ""
 
-#: build/editor.js:4
+#: build/editor.js:6
 msgid "Loading the page…"
 msgstr ""
 
+#: build/editor.js:6
+msgid "Filter"
+msgstr ""
+
 #. translators: %s: language name
-#: build/editor.js:5
+#: build/editor.js:7
 #, js-format
 msgid "View in %s"
 msgstr ""
 
 #. translators: %s: date and time
-#: build/editor.js:6
+#: build/editor.js:8
 #, js-format
 msgid "Last scanned %s"
 msgstr ""
 
-#: build/editor.js:6
+#: build/editor.js:8
 msgid "Not scanned yet"
 msgstr ""
 
 #. translators: %s: number of strings
-#: build/editor.js:7
+#: build/editor.js:9
 #, js-format
 msgid "%s string waiting for machine translation"
 msgid_plural "%s strings waiting for machine translation"
 msgstr[0] ""
 msgstr[1] ""
 
-#: build/editor.js:7
+#: build/editor.js:9
 msgid "Scan page"
 msgstr ""
 
-#: build/editor.js:7
+#: build/editor.js:9
 msgid "Opens the page in a new tab; texts that its scripts add (menus, mini-cart, tabs, popups) are collected while you use it."
 msgstr ""
 
-#: build/editor.js:7
+#: build/editor.js:9
 msgid "Scan dynamic content"
 msgstr ""
 
 #. translators: %s: number of strings
-#: build/editor.js:8
+#: build/editor.js:10
 #, js-format
 msgid "%s string queued for machine translation."
 msgid_plural "%s strings queued for machine translation."
 msgstr[0] ""
 msgstr[1] ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Translate untranslated with provider"
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
+msgid "Layout"
+msgstr ""
+
+#: build/editor.js:10
+msgid "List"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Visual"
+msgstr ""
+
+#: build/editor.js:10
 msgid "Show preview"
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "TranslatePress is active, so the translated front end is paused: scanning and the preview are unavailable. The string list and your edits work; they show on the site once TranslatePress is deactivated."
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "This page is set to “off”: visitors see it untranslated, so it is not scanned. Strings listed here come from earlier scans; translations you make apply wherever the text appears."
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "No translation provider is ready, so machine translation is unavailable here. Manual translation works."
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Set up a provider"
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Machine translation is turned off for manual pages."
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Scanning the translated page…"
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "This page may show personal data (search results, cart, checkout or account). Its strings will be recorded but never sent for machine translation automatically. Scan it anyway?"
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "Scan anyway"
 msgstr ""
 
-#: build/editor.js:8
-msgid "Filter"
+#: build/editor.js:10
+msgid "Selected string"
 msgstr ""
 
-#: build/editor.js:8
-msgid "Search strings"
-msgstr ""
-
-#: build/editor.js:8
-msgid "Include site-wide strings (menus, footer)"
-msgstr ""
-
-#: build/editor.js:8
-msgid "Changes save when you leave a field. Ctrl+Enter saves and moves on, Esc undoes, Alt+↑/↓ moves between strings. A translation applies everywhere the text appears."
-msgstr ""
-
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "No strings match."
 msgstr ""
 
-#: build/editor.js:8
+#: build/editor.js:10
 msgid "No strings yet: scan the page to find them."
 msgstr ""
 
+#: build/editor.js:10
+msgid "String on this page"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Choose a string…"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Previous string"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Next string"
+msgstr ""
+
+#: build/editor.js:10
+msgid "This text is not among the strings loaded here. Use a filter or the list layout to find it."
+msgstr ""
+
+#: build/editor.js:10
+msgid "Click a text on the page, or choose a string above."
+msgstr ""
+
+#: build/editor.js:10
+msgid "Click any outlined text on the page to edit it. Changes save when you leave the field; Ctrl+Enter saves and goes to the next string. • marks untranslated strings."
+msgstr ""
+
+#: build/editor.js:10
+msgid "Search strings"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Include site-wide strings (menus, footer)"
+msgstr ""
+
+#: build/editor.js:10
+msgid "Changes save when you leave a field. Ctrl+Enter saves and moves on, Esc undoes, Alt+↑/↓ moves between strings. A translation applies everywhere the text appears."
+msgstr ""
+
 #. translators: 1: page, 2: pages
-#: build/editor.js:9
+#: build/editor.js:11
 #, js-format
 msgid "Page %1$d of %2$d"
 msgstr ""

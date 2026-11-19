@@ -1,12 +1,14 @@
 /**
  * The translation editor: page header with scan and queue state, filters,
  * the string list with autosave, bulk machine translation, and the
- * optional preview.
+ * optional preview. Two layouts: List (every string, preview beside it) and
+ * Visual (the page fills the screen; click a text to edit it in the sidebar).
  */
 import {
 	Button,
 	CheckboxControl,
 	Notice,
+	SelectControl,
 	Spinner,
 	TextControl,
 } from '@wordpress/components';
@@ -24,6 +26,7 @@ import PagePicker from './PagePicker';
 import Preview from './Preview';
 import Row from './Row';
 import { scanPage } from './scan';
+import { plainText } from './text';
 
 const config = window.wstEditor || {
 	postId: null,
@@ -47,6 +50,24 @@ const CONTEXT_MESSAGES = {
 };
 
 const PER_PAGE = 50;
+
+/** Strings loaded at once in the visual layout (the REST maximum). */
+const VISUAL_PER_PAGE = 200;
+
+const LAYOUT_KEY = 'wst-editor-layout';
+
+/**
+ * The layout chosen last time (per browser).
+ */
+function storedLayout() {
+	try {
+		return window.localStorage.getItem( LAYOUT_KEY ) === 'visual'
+			? 'visual'
+			: 'list';
+	} catch {
+		return 'list';
+	}
+}
 const POLL_MS = 8000;
 const MAX_IDS = 500;
 
@@ -107,7 +128,18 @@ export default function Editor() {
 		() => ! config.paused && window.innerWidth >= 1200
 	);
 	const [ previewKey, setPreviewKey ] = useState( 0 );
+	const [ layout, setLayoutState ] = useState( storedLayout );
 	const fields = useRef( {} );
+	// The visual layout needs the page itself, which is off while TranslatePress is active.
+	const visual = layout === 'visual' && ! config.paused;
+	const setLayout = ( value ) => {
+		setLayoutState( value );
+		try {
+			window.localStorage.setItem( LAYOUT_KEY, value );
+		} catch {
+			// Private mode or blocked storage: the choice lasts for this visit only.
+		}
+	};
 
 	const canMt =
 		config.providerReady &&
@@ -137,7 +169,7 @@ export default function Editor() {
 			search: query.search,
 			include_global: query.includeGlobal,
 			page: query.page,
-			per_page: PER_PAGE,
+			per_page: visual ? VISUAL_PER_PAGE : PER_PAGE,
 		} )
 			.then( ( result ) =>
 				setList( {
@@ -147,7 +179,7 @@ export default function Editor() {
 				} )
 			)
 			.catch( ( e ) => setListError( errorText( e ) ) );
-	}, [ page, query ] );
+	}, [ page, query, visual ] );
 
 	const scanDynamic = () => {
 		// Opened before the request so popup blockers allow it.
@@ -407,22 +439,45 @@ export default function Editor() {
 		}
 	};
 
-	const items = list ? list.items : [];
+	const items = useMemo( () => ( list ? list.items : [] ), [ list ] );
 	const move = ( item, step ) => {
 		const index = items.findIndex( ( row ) => row.id === item.id );
 		const next = items[ index + step ];
-		if ( next && fields.current[ next.id ] ) {
+		if ( ! next ) {
+			return;
+		}
+		if ( visual ) {
+			setSelectedId( next.id );
+		} else if ( fields.current[ next.id ] ) {
 			fields.current[ next.id ].focus();
 		}
 	};
-	const selectFromPreview = useCallback( ( id ) => {
-		setSelectedId( id );
-		const field = fields.current[ id ];
-		if ( field ) {
-			field.scrollIntoView( { block: 'center' } );
-			field.focus();
+	const selectFromPreview = useCallback(
+		( id ) => {
+			setSelectedId( id );
+			const field = fields.current[ id ];
+			if ( ! visual && field ) {
+				field.scrollIntoView( { block: 'center' } );
+				field.focus();
+			}
+		},
+		[ visual ]
+	);
+	const selectedItem = visual
+		? items.find( ( row ) => row.id === selectedId ) || null
+		: null;
+
+	// Visual layout: start on the first string; focus the field of the chosen one.
+	useEffect( () => {
+		if ( visual && items.length > 0 && null === selectedId ) {
+			setSelectedId( items[ 0 ].id );
 		}
-	}, [] );
+	}, [ visual, items, selectedId ] );
+	useEffect( () => {
+		if ( visual && selectedItem && fields.current[ selectedItem.id ] ) {
+			fields.current[ selectedItem.id ].focus( { preventScroll: true } );
+		}
+	}, [ visual, selectedItem ] );
 
 	if ( ! pageRef ) {
 		return (
@@ -461,9 +516,70 @@ export default function Editor() {
 	}
 
 	const counts = list ? list.counts : null;
+	const filterChips = (
+		<div
+			className="wst-filter-chips"
+			role="group"
+			aria-label={ __( 'Filter', 'wp-site-translator' ) }
+		>
+			{ FILTERS.map( ( [ id, label ] ) => (
+				<Button
+					key={ id }
+					variant={ query.filter === id ? 'primary' : 'secondary' }
+					size="small"
+					aria-pressed={ query.filter === id }
+					onClick={ () =>
+						setQuery( {
+							...query,
+							filter: id,
+							page: 1,
+						} )
+					}
+				>
+					{ label }
+					{ counts && ` (${ number( counts[ id ] ) })` }
+				</Button>
+			) ) }
+		</div>
+	);
+	const renderRow = ( item ) => (
+		<Row
+			key={ item.id }
+			ref={ ( el ) => ( fields.current[ item.id ] = el ) }
+			item={ item }
+			language={ config.language }
+			draft={ drafts[ item.id ] }
+			state={ rowState[ item.id ] }
+			canMt={ canMt && page.mode !== 'off' }
+			selected={ selectedId === item.id }
+			source={ config.source }
+			visual={ visual }
+			onDraft={ ( row, value ) => {
+				setDrafts( ( current ) => ( {
+					...current,
+					[ row.id ]: value,
+				} ) );
+				if ( rowState[ row.id ] ) {
+					setRow( row.id, {} );
+				}
+			} }
+			onSave={ save }
+			onReset={ ( row ) => {
+				clearDraft( row.id );
+				setRow( row.id, {} );
+			} }
+			onMove={ move }
+			onFocus={ ( row ) => setSelectedId( row.id ) }
+			onAction={ action }
+		/>
+	);
 
 	return (
-		<div className={ `wst-editor${ showPreview ? ' has-preview' : '' }` }>
+		<div
+			className={ `wst-editor${
+				showPreview || visual ? ' has-preview' : ''
+			}${ visual ? ' is-visual' : '' }` }
+		>
 			<header className="wst-editor__header">
 				<div>
 					<h1>{ page.title }</h1>
@@ -557,6 +673,30 @@ export default function Editor() {
 						</Button>
 					) }
 					{ ! config.paused && (
+						<div
+							className="wst-layout-switch"
+							role="group"
+							aria-label={ __( 'Layout', 'wp-site-translator' ) }
+						>
+							<Button
+								variant={ visual ? 'secondary' : 'primary' }
+								size="small"
+								aria-pressed={ ! visual }
+								onClick={ () => setLayout( 'list' ) }
+							>
+								{ __( 'List', 'wp-site-translator' ) }
+							</Button>
+							<Button
+								variant={ visual ? 'primary' : 'secondary' }
+								size="small"
+								aria-pressed={ visual }
+								onClick={ () => setLayout( 'visual' ) }
+							>
+								{ __( 'Visual', 'wp-site-translator' ) }
+							</Button>
+						</div>
+					) }
+					{ ! config.paused && ! visual && (
 						<CheckboxControl
 							__nextHasNoMarginBottom
 							label={ __( 'Show preview', 'wp-site-translator' ) }
@@ -655,176 +795,148 @@ export default function Editor() {
 					{ bulk.text }
 				</Notice>
 			) }
-			<div className="wst-editor__body">
-				<section
-					className="wst-editor__list"
-					aria-label={ __( 'Strings', 'wp-site-translator' ) }
-				>
-					<div className="wst-editor__filters">
-						<div
-							className="wst-filter-chips"
-							role="group"
-							aria-label={ __( 'Filter', 'wp-site-translator' ) }
-						>
-							{ FILTERS.map( ( [ id, label ] ) => (
+			{ visual && (
+				<div className="wst-editor__body wst-editor__body--visual">
+					<aside
+						className="wst-visual"
+						aria-label={ __(
+							'Selected string',
+							'wp-site-translator'
+						) }
+					>
+						{ filterChips }
+						{ listError && (
+							<Notice status="error" isDismissible={ false }>
+								<p>{ listError }</p>
 								<Button
-									key={ id }
-									variant={
-										query.filter === id
-											? 'primary'
-											: 'secondary'
-									}
-									size="small"
-									aria-pressed={ query.filter === id }
-									onClick={ () =>
-										setQuery( {
-											...query,
-											filter: id,
-											page: 1,
-										} )
-									}
+									variant="secondary"
+									onClick={ loadList }
 								>
-									{ label }
-									{ counts &&
-										` (${ number( counts[ id ] ) })` }
+									{ __( 'Try again', 'wp-site-translator' ) }
 								</Button>
-							) ) }
-						</div>
-						<TextControl
-							__nextHasNoMarginBottom
-							__next40pxDefaultSize
-							type="search"
-							label={ __(
-								'Search strings',
-								'wp-site-translator'
-							) }
-							value={ search }
-							onChange={ setSearch }
-						/>
-						<CheckboxControl
-							__nextHasNoMarginBottom
-							label={ __(
-								'Include site-wide strings (menus, footer)',
-								'wp-site-translator'
-							) }
-							checked={ query.includeGlobal }
-							onChange={ ( value ) =>
-								setQuery( {
-									...query,
-									includeGlobal: value,
-									page: 1,
-								} )
-							}
-						/>
-						<p className="wst-hint">
-							{ __(
-								'Changes save when you leave a field. Ctrl+Enter saves and moves on, Esc undoes, Alt+↑/↓ moves between strings. A translation applies everywhere the text appears.',
-								'wp-site-translator'
-							) }
-						</p>
-					</div>
-					{ listError && (
-						<Notice status="error" isDismissible={ false }>
-							<p>{ listError }</p>
-							<Button variant="secondary" onClick={ loadList }>
-								{ __( 'Try again', 'wp-site-translator' ) }
-							</Button>
-						</Notice>
-					) }
-					{ ! list && ! listError && <Spinner /> }
-					{ list && items.length === 0 && (
-						<p className="wst-empty">
-							{ page.last_scan ||
-							query.filter !== 'all' ||
-							query.search
-								? __(
-										'No strings match.',
-										'wp-site-translator'
-									)
-								: __(
-										'No strings yet: scan the page to find them.',
+							</Notice>
+						) }
+						{ ! list && ! listError && <Spinner /> }
+						{ list && items.length === 0 && (
+							<p className="wst-empty">
+								{ page.last_scan || query.filter !== 'all'
+									? __(
+											'No strings match.',
+											'wp-site-translator'
+										)
+									: __(
+											'No strings yet: scan the page to find them.',
+											'wp-site-translator'
+										) }
+							</p>
+						) }
+						{ items.length > 0 && (
+							<>
+								<div className="wst-visual__nav">
+									<SelectControl
+										__nextHasNoMarginBottom
+										__next40pxDefaultSize
+										label={ __(
+											'String on this page',
+											'wp-site-translator'
+										) }
+										value={
+											selectedItem
+												? String( selectedItem.id )
+												: ''
+										}
+										options={ [
+											...( selectedItem
+												? []
+												: [
+														{
+															value: '',
+															label: __(
+																'Choose a string…',
+																'wp-site-translator'
+															),
+														},
+													] ),
+											...items.map( ( item ) => ( {
+												value: String( item.id ),
+												label:
+													plainText( item.original )
+														.replace( /\s+/g, ' ' )
+														.slice( 0, 70 ) +
+													( item.status === 'none'
+														? ' •'
+														: '' ),
+											} ) ),
+										] }
+										onChange={ ( value ) =>
+											setSelectedId( Number( value ) )
+										}
+									/>
+									<div className="wst-visual__arrows">
+										<Button
+											variant="secondary"
+											size="small"
+											disabled={
+												! selectedItem ||
+												items[ 0 ].id ===
+													selectedItem.id
+											}
+											onClick={ () =>
+												move( selectedItem, -1 )
+											}
+											aria-label={ __(
+												'Previous string',
+												'wp-site-translator'
+											) }
+										>
+											←
+										</Button>
+										<Button
+											variant="secondary"
+											size="small"
+											disabled={
+												! selectedItem ||
+												items[ items.length - 1 ].id ===
+													selectedItem.id
+											}
+											onClick={ () =>
+												move( selectedItem, 1 )
+											}
+											aria-label={ __(
+												'Next string',
+												'wp-site-translator'
+											) }
+										>
+											→
+										</Button>
+									</div>
+								</div>
+								{ selectedItem ? (
+									<ul className="wst-rows wst-rows--visual">
+										{ renderRow( selectedItem ) }
+									</ul>
+								) : (
+									<p className="wst-note">
+										{ list.pages > 1
+											? __(
+													'This text is not among the strings loaded here. Use a filter or the list layout to find it.',
+													'wp-site-translator'
+												)
+											: __(
+													'Click a text on the page, or choose a string above.',
+													'wp-site-translator'
+												) }
+									</p>
+								) }
+								<p className="wst-hint">
+									{ __(
+										'Click any outlined text on the page to edit it. Changes save when you leave the field; Ctrl+Enter saves and goes to the next string. • marks untranslated strings.',
 										'wp-site-translator'
 									) }
-						</p>
-					) }
-					{ items.length > 0 && (
-						<ul className="wst-rows">
-							{ items.map( ( item ) => (
-								<Row
-									key={ item.id }
-									ref={ ( el ) =>
-										( fields.current[ item.id ] = el )
-									}
-									item={ item }
-									language={ config.language }
-									draft={ drafts[ item.id ] }
-									state={ rowState[ item.id ] }
-									canMt={ canMt && page.mode !== 'off' }
-									selected={ selectedId === item.id }
-									onDraft={ ( row, value ) => {
-										setDrafts( ( current ) => ( {
-											...current,
-											[ row.id ]: value,
-										} ) );
-										if ( rowState[ row.id ] ) {
-											setRow( row.id, {} );
-										}
-									} }
-									onSave={ save }
-									onReset={ ( row ) => {
-										clearDraft( row.id );
-										setRow( row.id, {} );
-									} }
-									onMove={ move }
-									onFocus={ ( row ) =>
-										setSelectedId( row.id )
-									}
-									onAction={ action }
-								/>
-							) ) }
-						</ul>
-					) }
-					{ list && list.pages > 1 && (
-						<div className="wst-pagination">
-							<Button
-								variant="secondary"
-								disabled={ query.page <= 1 }
-								onClick={ () =>
-									setQuery( {
-										...query,
-										page: query.page - 1,
-									} )
-								}
-							>
-								{ __( 'Previous', 'wp-site-translator' ) }
-							</Button>
-							<span>
-								{ sprintf(
-									/* translators: 1: page, 2: pages */
-									__(
-										'Page %1$d of %2$d',
-										'wp-site-translator'
-									),
-									query.page,
-									list.pages
-								) }
-							</span>
-							<Button
-								variant="secondary"
-								disabled={ query.page >= list.pages }
-								onClick={ () =>
-									setQuery( {
-										...query,
-										page: query.page + 1,
-									} )
-								}
-							>
-								{ __( 'Next', 'wp-site-translator' ) }
-							</Button>
-						</div>
-					) }
-				</section>
-				{ showPreview && (
+								</p>
+							</>
+						) }
+					</aside>
 					<Preview
 						pageRef={ pageRef }
 						items={ items }
@@ -832,8 +944,132 @@ export default function Editor() {
 						onSelect={ selectFromPreview }
 						reloadKey={ previewKey }
 					/>
-				) }
-			</div>
+				</div>
+			) }
+			{ ! visual && (
+				<div className="wst-editor__body">
+					<section
+						className="wst-editor__list"
+						aria-label={ __( 'Strings', 'wp-site-translator' ) }
+					>
+						<div className="wst-editor__filters">
+							{ filterChips }
+							<TextControl
+								__nextHasNoMarginBottom
+								__next40pxDefaultSize
+								type="search"
+								label={ __(
+									'Search strings',
+									'wp-site-translator'
+								) }
+								value={ search }
+								onChange={ setSearch }
+							/>
+							<CheckboxControl
+								__nextHasNoMarginBottom
+								label={ __(
+									'Include site-wide strings (menus, footer)',
+									'wp-site-translator'
+								) }
+								checked={ query.includeGlobal }
+								onChange={ ( value ) =>
+									setQuery( {
+										...query,
+										includeGlobal: value,
+										page: 1,
+									} )
+								}
+							/>
+							<p className="wst-hint">
+								{ __(
+									'Changes save when you leave a field. Ctrl+Enter saves and moves on, Esc undoes, Alt+↑/↓ moves between strings. A translation applies everywhere the text appears.',
+									'wp-site-translator'
+								) }
+							</p>
+						</div>
+						{ listError && (
+							<Notice status="error" isDismissible={ false }>
+								<p>{ listError }</p>
+								<Button
+									variant="secondary"
+									onClick={ loadList }
+								>
+									{ __( 'Try again', 'wp-site-translator' ) }
+								</Button>
+							</Notice>
+						) }
+						{ ! list && ! listError && <Spinner /> }
+						{ list && items.length === 0 && (
+							<p className="wst-empty">
+								{ page.last_scan ||
+								query.filter !== 'all' ||
+								query.search
+									? __(
+											'No strings match.',
+											'wp-site-translator'
+										)
+									: __(
+											'No strings yet: scan the page to find them.',
+											'wp-site-translator'
+										) }
+							</p>
+						) }
+						{ items.length > 0 && (
+							<ul className="wst-rows">
+								{ items.map( ( item ) => renderRow( item ) ) }
+							</ul>
+						) }
+						{ list && list.pages > 1 && (
+							<div className="wst-pagination">
+								<Button
+									variant="secondary"
+									disabled={ query.page <= 1 }
+									onClick={ () =>
+										setQuery( {
+											...query,
+											page: query.page - 1,
+										} )
+									}
+								>
+									{ __( 'Previous', 'wp-site-translator' ) }
+								</Button>
+								<span>
+									{ sprintf(
+										/* translators: 1: page, 2: pages */
+										__(
+											'Page %1$d of %2$d',
+											'wp-site-translator'
+										),
+										query.page,
+										list.pages
+									) }
+								</span>
+								<Button
+									variant="secondary"
+									disabled={ query.page >= list.pages }
+									onClick={ () =>
+										setQuery( {
+											...query,
+											page: query.page + 1,
+										} )
+									}
+								>
+									{ __( 'Next', 'wp-site-translator' ) }
+								</Button>
+							</div>
+						) }
+					</section>
+					{ showPreview && (
+						<Preview
+							pageRef={ pageRef }
+							items={ items }
+							selectedId={ selectedId }
+							onSelect={ selectFromPreview }
+							reloadKey={ previewKey }
+						/>
+					) }
+				</div>
+			) }
 		</div>
 	);
 }

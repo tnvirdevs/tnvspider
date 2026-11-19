@@ -52,6 +52,7 @@ Open it from **Translator → Editor**, from Pages, from the **Translate** item 
 2. Click a translation to edit it; it saves when you leave the field (**Saved** appears). Edited translations are **manual** and are never overwritten by machine translation.
 3. Use the filters (untranslated, machine, manual) and the bulk actions, for example **Translate untranslated with provider** or **Keep as manual**.
 4. **Show preview** opens a safe preview of the translated page; click a text there to jump to its row. If the preview cannot load, the list still works.
+5. **Visual layout** (the **List | Visual** switch at the top right): the translated page fills the screen. Hover a text to see its outline and a pencil, click it, and edit it in the sidebar (**From** the original, **To** your translation). Use the dropdown or the arrows to go through every text of the page. A paragraph is one string, links and bold words included, and the page shows your change as soon as it is saved. The editor remembers the layout you used last.
 
 Users with the **Editor** role can translate; settings stay with administrators.
 

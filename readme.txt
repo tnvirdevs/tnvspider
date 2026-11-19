@@ -3,7 +3,7 @@ Tags: translation, multilingual, machine translation, bilingual, language switch
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -15,7 +15,7 @@ WP Site Translator serves your site in two languages: the default language and o
 
 * **Every page, automatically.** Posts, pages, archives and the home page are checked in the background and queued for translation, without waiting for visitors; new and updated posts follow within minutes.
 * **Machine translation through a queue.** Strings found on pages are queued and translated in the background by TranslateX, Microsoft Translator or Google Gemini, within the rate limits and monthly character budget you set, with an optional fallback provider. Pages never wait for a translation service; untranslated text shows in the original language until its translation arrives.
-* **Translation editor.** Scan a page, then edit its strings in a list with autosave, filters and bulk actions, next to a safe preview. The editor runs outside your theme and other plugins' scripts, so their errors cannot break it.
+* **Translation editor.** Scan a page, then edit its strings in a list with autosave, filters and bulk actions, or click texts on the page itself in the Visual layout. The editor runs outside your theme and other plugins' scripts, so their errors cannot break it.
 * **Page modes.** Each page, path or the whole site can be automatic, manual (only your own translations) or off (not translated).
 * **Language switcher** as a shortcode, block, menu item or floating button, with hreflang links, translated titles and descriptions and a translated XML sitemap (also listed in Yoast SEO and Rank Math sitemaps).
 * **Extras:** CSV import and export, an importer for TranslatePress dictionaries, translation of AJAX and REST responses (WooCommerce cart fragments), digits in the target script, a browser-language suggestion bar and never-translate terms.
@@ -70,6 +70,9 @@ They stay, unless you turn on Advanced → Data → "Delete all translator data 
 Google publishes Gemini limits per project in AI Studio only; enter them on the Gemini card. Microsoft's free tier (F0) allows 2 million characters a month. TranslateX shows its limit in each response.
 
 == Changelog ==
+
+= 0.1.2 =
+* Translation editor: new Visual layout. The translated page fills the screen; click any text (outlined, with a pencil) and edit it in the sidebar, from the original to your translation. The page shows the change at once. The List layout stays.
 
 = 0.1.1 =
 * Every post, page, archive and the home page is translated automatically in the background, without waiting for visitors (Translation → Site mode; on by default).

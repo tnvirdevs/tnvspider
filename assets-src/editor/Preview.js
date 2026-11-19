@@ -91,6 +91,11 @@ export default function Preview( {
 					items: items.map( ( item ) => ( {
 						id: item.id,
 						text: plainText( item.translation || item.original ),
+						// Inline strings carry their tags; the frame shows them as HTML.
+						html:
+							item.kind === 'inline'
+								? item.translation || item.original
+								: null,
 					} ) ),
 				},
 				'*'

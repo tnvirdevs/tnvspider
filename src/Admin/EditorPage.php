@@ -159,6 +159,12 @@ final class EditorPage {
 				'tag'    => $this->target->tag(),
 				'dir'    => $this->target->dir(),
 				'native' => $this->target->nativeName(),
+				'name'   => $this->target->englishName(),
+			),
+			'source'        => array(
+				'tag'  => $this->settings->defaultLanguage()->tag(),
+				'dir'  => $this->settings->defaultLanguage()->dir(),
+				'name' => $this->settings->defaultLanguage()->englishName(),
 			),
 			'providerReady' => $mt,
 			'mtOnManual'    => $this->settings->flag( 'editor_mt_on_manual' ),
