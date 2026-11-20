@@ -367,6 +367,78 @@ function digitsSuggestion( locale ) {
 	return '';
 }
 
+/** Languages that write their own digits (as in Settings::NATIVE_DIGIT_LANGUAGES). */
+const NATIVE_DIGIT_LANGUAGES = [ 'bn', 'ar', 'fa', 'ur' ];
+
+/**
+ * Digit choices that make sense for the target: its own digits for a
+ * Bengali, Arabic, Persian or Urdu target, 0–9 for any other.
+ *
+ * @param {string} locale Target locale.
+ */
+function digitOptions( locale ) {
+	const native = NATIVE_DIGIT_LANGUAGES.includes(
+		( locale || '' ).split( '_' )[ 0 ]
+	);
+	const options = [
+		{
+			value: 'auto',
+			label: native
+				? __(
+						'Automatic: Arabic-Indic digits for Arabic, otherwise as on the original page',
+						'wp-site-translator'
+					)
+				: __(
+						'Automatic: 0–9 when the original page uses Bengali, Arabic or Persian digits',
+						'wp-site-translator'
+					),
+		},
+		{
+			value: 'off',
+			label: __(
+				'Unchanged: digits as on the original page',
+				'wp-site-translator'
+			),
+		},
+	];
+	if ( ! native ) {
+		return [
+			...options,
+			{
+				value: 'latin',
+				label: __(
+					'Always 0–9 (from Bengali, Arabic-Indic or Persian digits)',
+					'wp-site-translator'
+				),
+			},
+		];
+	}
+	return [
+		...options,
+		{
+			value: 'bengali',
+			label: __(
+				'Write numbers in Bengali digits (০১২৩৪৫৬৭৮৯)',
+				'wp-site-translator'
+			),
+		},
+		{
+			value: 'arabic_indic',
+			label: __(
+				'Write numbers in Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩)',
+				'wp-site-translator'
+			),
+		},
+		{
+			value: 'persian',
+			label: __(
+				'Write numbers in Persian digits, also used for Urdu (۰۱۲۳۴۵۶۷۸۹)',
+				'wp-site-translator'
+			),
+		},
+	];
+}
+
 export default function Advanced( {
 	draft,
 	update,
@@ -577,50 +649,7 @@ export default function Advanced( {
 						'wp-site-translator'
 					) }
 					help={ digitsSuggestion( fields.draft.target_language ) }
-					options={ [
-						{
-							value: 'auto',
-							label: __(
-								'Automatic: Arabic-Indic digits for an Arabic target; 0–9 when the default language writes Bengali, Arabic or Persian digits and the target does not; otherwise unchanged',
-								'wp-site-translator'
-							),
-						},
-						{
-							value: 'off',
-							label: __(
-								'Unchanged (as on the original page)',
-								'wp-site-translator'
-							),
-						},
-						{
-							value: 'bengali',
-							label: __(
-								'Bengali (০১২৩৪৫৬৭৮৯)',
-								'wp-site-translator'
-							),
-						},
-						{
-							value: 'arabic_indic',
-							label: __(
-								'Arabic-Indic (٠١٢٣٤٥٦٧٨٩)',
-								'wp-site-translator'
-							),
-						},
-						{
-							value: 'persian',
-							label: __(
-								'Persian, also used for Urdu (۰۱۲۳۴۵۶۷۸۹)',
-								'wp-site-translator'
-							),
-						},
-						{
-							value: 'latin',
-							label: __(
-								'0–9, from Bengali, Arabic-Indic or Persian digits (for English and other Latin-script targets)',
-								'wp-site-translator'
-							),
-						},
-					] }
+					options={ digitOptions( fields.draft.target_language ) }
 				/>
 				<Toggle
 					{ ...fields }

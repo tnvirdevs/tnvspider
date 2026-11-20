@@ -122,6 +122,42 @@ final class DigitConverterTest extends WP_UnitTestCase {
 		$this->assertSame( 'latin', ( new Settings( array( 'target_language' => 'en_US' ), 'ar', $registry ) )->digitsMode() );
 		$this->assertSame( 'off', ( new Settings( array( 'target_language' => 'fa_IR' ), 'bn_BD', $registry ) )->digitsMode(), 'Both languages write their own digits: unchanged.' );
 		$this->assertSame(
+			'latin',
+			( new Settings(
+				array(
+					'target_language' => 'en_GB',
+					'digits_mode'     => 'bengali',
+				),
+				'bn_BD',
+				$registry
+			) )->digitsMode(),
+			'Field report: Bengali digits chosen for English pages turned the translations\' 0–9 back into Bengali; such a choice counts as automatic.'
+		);
+		$this->assertSame(
+			'auto',
+			( new Settings(
+				array(
+					'target_language' => 'en_GB',
+					'digits_mode'     => 'persian',
+				),
+				'bn_BD',
+				$registry
+			) )->toArray()['digits_mode'],
+			'Stored and shown as Automatic.'
+		);
+		$this->assertSame(
+			'off',
+			( new Settings(
+				array(
+					'target_language' => 'bn_BD',
+					'digits_mode'     => 'latin',
+				),
+				'en_US',
+				$registry
+			) )->digitsMode(),
+			'0–9 is no choice for a Bengali target either: automatic, which leaves English digits alone.'
+		);
+		$this->assertSame(
 			'off',
 			$mode(
 				array(

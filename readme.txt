@@ -3,7 +3,7 @@ Tags: translation, multilingual, machine translation, bilingual, language switch
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -70,6 +70,9 @@ They stay, unless you turn on Advanced → Data → "Delete all translator data 
 Google publishes Gemini limits per project in AI Studio only; enter them on the Gemini card. Microsoft's free tier (F0) allows 2 million characters a month. TranslateX shows its limit in each response.
 
 == Changelog ==
+
+= 0.1.3 =
+* Digits: only choices that fit the target language are offered. A setting that wrote Bengali digits on English pages (turning 0–9 back into ০–৯, even in manual translations) now counts as Automatic.
 
 = 0.1.2 =
 * Translation editor: new Visual layout. The translated page fills the screen; click any text (outlined, with a pencil) and edit it in the sidebar, from the original to your translation. The page shows the change at once. The List layout stays.

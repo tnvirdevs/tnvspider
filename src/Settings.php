@@ -530,7 +530,7 @@ final class Settings {
 			'dynamic_json_keys'       => array_values( array_filter( self::readList( $raw, 'dynamic_json_keys', self::DYNAMIC_JSON_KEYS ), static fn( string $key ): bool => 1 === preg_match( self::KEY_PATTERN, $key ) ) ),
 			'dynamic_lookup'          => self::readBool( $raw, 'dynamic_lookup', false ),
 			'trusted_proxy'           => self::readChoice( $raw, 'trusted_proxy', self::TRUSTED_PROXIES ),
-			'digits_mode'             => self::readChoice( $raw, 'digits_mode', self::DIGITS_MODES ),
+			'digits_mode'             => self::readDigitsMode( $raw, $target === $default ? '' : $target ),
 			'digits_skip_prices'      => self::readBool( $raw, 'digits_skip_prices', true ),
 			'lang_suggestion'         => self::readChoice( $raw, 'lang_suggestion', self::SUGGESTION_MODES ),
 			'suggestion_position'     => self::readChoice( $raw, 'suggestion_position', array( 'bottom', 'top' ) ),
@@ -580,6 +580,25 @@ final class Settings {
 		$value = $raw[ $key ] ?? null;
 
 		return is_string( $value ) && in_array( $value, $choices, true ) ? $value : $choices[0];
+	}
+
+	/**
+	 * Digit mode that fits the target language: Bengali, Arabic-Indic or
+	 * Persian digits only for a target that writes them, 0–9 only for one
+	 * that does not. Anything else (Bengali digits on English pages) is
+	 * "auto", like any other invalid value.
+	 *
+	 * @param array<string, mixed> $raw    Raw values.
+	 * @param string               $target Target locale ('' when none).
+	 */
+	private static function readDigitsMode( array $raw, string $target ): string {
+		$mode = self::readChoice( $raw, 'digits_mode', self::DIGITS_MODES );
+		if ( '' === $target || 'auto' === $mode || 'off' === $mode ) {
+			return $mode;
+		}
+		$native = in_array( strtolower( (string) strtok( $target, '_' ) ), self::NATIVE_DIGIT_LANGUAGES, true );
+
+		return ( 'latin' === $mode ) === $native ? 'auto' : $mode;
 	}
 
 	/**
