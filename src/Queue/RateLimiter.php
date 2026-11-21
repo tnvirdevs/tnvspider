@@ -34,11 +34,21 @@ final class RateLimiter {
 	private const EPSILON = 0.001;
 
 	/**
+	 * Current Unix time, read once the lock is held.
+	 *
+	 * @var \Closure(): float
+	 */
+	private \Closure $clock;
+
+	/**
 	 * Create the limiter.
 	 *
-	 * @param \wpdb $db Database connection.
+	 * @param \wpdb         $db    Database connection.
+	 * @param \Closure|null $clock Current Unix time (microtime by default); read under the lock, so its last value is the grant time.
+	 * @phpstan-param (\Closure(): float)|null $clock
 	 */
-	public function __construct( private \wpdb $db ) {
+	public function __construct( private \wpdb $db, ?\Closure $clock = null ) {
+		$this->clock = $clock ?? static fn(): float => microtime( true );
 	}
 
 	/**
@@ -57,7 +67,7 @@ final class RateLimiter {
 				// Read the clock only once the lock is held: a time taken before
 				// waiting for the lock is stale and would let two grants come
 				// closer together than the rate allows.
-				$now  = $now ?? microtime( true );
+				$now  = $now ?? ( $this->clock )();
 				$day  = $this->day( $now, $limits->dayTimezone );
 				$wait = max( 0.0, $state['blocked_until'] - $now );
 				if ( $limits->rpm > 0 ) {

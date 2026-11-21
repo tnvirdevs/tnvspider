@@ -123,7 +123,12 @@ final class RateLimiterTest extends WP_UnitTestCase {
 			pcntl_waitpid( $pid, $status );
 		}
 
-		$grants = array_map( 'floatval', array_filter( explode( "\n", (string) file_get_contents( (string) $file ) ) ) );
+		$grants = array();
+		foreach ( array_filter( explode( "\n", (string) file_get_contents( (string) $file ) ) ) as $line ) {
+			[ $locked, $granted ] = array_map( 'floatval', explode( ' ', $line ) );
+			$this->assertGreaterThanOrEqual( $locked, $granted, 'The limiter read its clock before it held the lock.' );
+			$grants[] = $granted;
+		}
 		unlink( (string) $file );
 		$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE option_name = %s', $wpdb->options, 'wst_rl_state_' . $provider ) );
 		sort( $grants );
@@ -142,16 +147,48 @@ final class RateLimiterTest extends WP_UnitTestCase {
 	 * @param string $file     Result file.
 	 */
 	private function worker( string $provider, string $file ): void {
-		$db         = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		// Records when GET_LOCK returned: the limiter must read its clock
+		// after that, while it holds the lock.
+		$db         = new class( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ) extends \wpdb {
+			/** When the last GET_LOCK returned. */
+			public float $locked = 0.0;
+
+			/**
+			 * @param string|null $query Query.
+			 * @param int         $x     Column.
+			 * @param int         $y     Row.
+			 * @return string|null
+			 */
+			public function get_var( $query = null, $x = 0, $y = 0 ) {
+				$value = parent::get_var( $query, $x, $y );
+				if ( is_string( $query ) && str_contains( $query, 'GET_LOCK(' ) ) {
+					$this->locked = microtime( true );
+				}
+
+				return $value;
+			}
+		};
 		$db->prefix = $GLOBALS['wpdb']->prefix;
 		$db->set_prefix( $GLOBALS['wpdb']->prefix );
-		$limiter = new RateLimiter( $db );
+		// Record the time the limiter reads under its lock: that is the grant
+		// time it spaces. A clock read after acquire() returns also measures
+		// RELEASE_LOCK and process scheduling, which on a busy CI runner
+		// delayed one grant's record by 64 ms (known issue 20, P112).
+		$granted = 0.0;
+		$limiter = new RateLimiter(
+			$db,
+			static function () use ( &$granted ): float {
+				$granted = microtime( true );
+
+				return $granted;
+			}
+		);
 		$limits  = $this->limits( 120 );
 		$end     = microtime( true ) + 3;
 		while ( microtime( true ) < $end ) {
 			$wait = $limiter->acquire( $provider, $limits, 1 );
 			if ( 0.0 === $wait ) {
-				file_put_contents( $file, sprintf( "%.6F\n", microtime( true ) ), FILE_APPEND | LOCK_EX );
+				file_put_contents( $file, sprintf( "%.6F %.6F\n", $db->locked, $granted ), FILE_APPEND | LOCK_EX );
 				continue;
 			}
 			usleep( (int) min( 200000, $wait * 1e6 ) );
