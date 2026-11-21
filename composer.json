@@ -1,0 +1,43 @@
+{
+    "name": "tnvirdevs/wp-site-translator",
+    "description": "Translate a WordPress site between two languages with queued machine translation and a conflict-proof editor.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "johnpbloch/wordpress-core": "^7.1",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^9.6",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-coding-standards/wpcs": "^3.1",
+        "wp-phpunit/wp-phpunit": "^7.1",
+        "yoast/phpunit-polyfills": "^4.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WST\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "lint": "phpcs",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "test:unit": "phpunit",
+        "test:integration": "phpunit -c phpunit-integration.xml.dist",
+        "test": [
+            "@test:unit",
+            "@test:integration"
+        ]
+    }
+}

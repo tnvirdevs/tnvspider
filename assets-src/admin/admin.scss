@@ -1,0 +1,656 @@
+// Translator admin app. Logical properties keep RTL correct; accents use the
+// admin colour scheme's --wp-admin-theme-color, so every scheme (including
+// the dark Midnight, Ectoplasm and Coffee menus) stays consistent.
+
+.wst-admin {
+	--wst-gap: 16px;
+	--wst-muted: #50575e;
+	--wst-ok: #00a32a;
+	--wst-ok-bg: #edfaef;
+	--wst-warning: #996800;
+	--wst-warning-bg: #fcf9e8;
+	--wst-error: #d63638;
+	--wst-error-bg: #fcf0f1;
+	max-inline-size: 1200px;
+	padding-block-end: 80px; // room for the save bar
+
+	h1 {
+		margin: 0;
+		font-size: 23px;
+		font-weight: 400;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1.15em;
+	}
+
+	h3 {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+		margin-block: 1em 0.5em;
+		font-size: 1em;
+	}
+
+	code,
+	pre {
+		direction: ltr;
+		unicode-bidi: embed;
+	}
+}
+
+.wst-admin--loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-block: 24px;
+}
+
+.wst-admin__header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--wst-gap);
+	padding-block: 12px;
+}
+
+.wst-admin__status {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.wst-admin__nav {
+	margin-block-end: var(--wst-gap);
+	border-block-end: 1px solid #c3c4c7;
+
+	ul {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+		margin: 0;
+	}
+
+	li {
+		margin: 0;
+	}
+
+	a {
+		display: block;
+		padding-block: 10px;
+		padding-inline: 12px;
+		color: inherit;
+		text-decoration: none;
+		border-block-end: 3px solid transparent;
+
+		&:hover {
+			color: var(--wp-admin-theme-color, #2271b1);
+		}
+
+		&:focus {
+			box-shadow: 0 0 0 2px var(--wp-admin-theme-color, #2271b1);
+			outline: 2px solid transparent;
+		}
+
+		&[aria-current="page"] {
+			font-weight: 600;
+			border-block-end-color: var(--wp-admin-theme-color, #2271b1);
+		}
+	}
+}
+
+.wst-admin__screen > * + * {
+	margin-block-start: var(--wst-gap);
+}
+
+.wst-section {
+	margin-block-end: var(--wst-gap);
+}
+
+.wst-section__description,
+.wst-note {
+	color: var(--wst-muted);
+}
+
+.wst-note--error,
+.wst-field-error {
+	color: var(--wst-error);
+}
+
+.wst-field-error {
+	margin-block: 4px 0;
+	font-weight: 600;
+}
+
+.wst-muted {
+	color: var(--wst-muted);
+}
+
+.wst-empty {
+	font-style: italic;
+	color: var(--wst-muted);
+}
+
+.wst-field {
+	margin-block-end: var(--wst-gap);
+}
+
+.wst-fieldset {
+	margin-block: var(--wst-gap);
+	padding: 12px var(--wst-gap);
+	border: 1px solid #dcdcde;
+	border-radius: 2px;
+
+	legend {
+		padding-inline: 4px;
+		font-weight: 600;
+	}
+
+	> * + * {
+		margin-block-start: 12px;
+	}
+}
+
+.wst-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--wst-gap);
+	align-items: start;
+}
+
+.wst-columns {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+	gap: var(--wst-gap);
+
+	> .wst-section {
+		margin-block-end: 0;
+	}
+}
+
+.wst-file-label {
+	display: block;
+	margin-block-end: 8px;
+	font-weight: 600;
+}
+
+.wst-progress {
+	margin-block: 12px;
+
+	progress {
+		display: block;
+		inline-size: 100%;
+		margin-block-start: 4px;
+	}
+}
+
+.wst-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 8px var(--wst-gap);
+	margin-block: 12px;
+}
+
+.wst-chip {
+	display: inline-block;
+	padding-block: 2px;
+	padding-inline: 8px;
+	border: 1px solid currentcolor;
+	border-radius: 2px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+.wst-chip--ok {
+	color: #007017;
+	background: var(--wst-ok-bg);
+}
+
+.wst-chip--warning {
+	color: var(--wst-warning);
+	background: var(--wst-warning-bg);
+}
+
+.wst-chip--error {
+	color: #b32d2e;
+	background: var(--wst-error-bg);
+}
+
+.wst-chip--neutral {
+	color: #3c434a;
+	background: #f6f7f7;
+}
+
+.wst-providers {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+	gap: var(--wst-gap);
+	margin-block-start: var(--wst-gap);
+}
+
+.wst-provider .components-card__header {
+	flex-wrap: wrap;
+	gap: 8px;
+
+	h3 {
+		margin: 0;
+	}
+}
+
+.wst-provider__test {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.wst-secret__state {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-block: 4px 0;
+}
+
+.wst-details {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 2px 12px;
+	margin: 8px 0 0;
+
+	> div {
+		display: contents;
+	}
+
+	dt {
+		font-weight: 600;
+	}
+
+	dd {
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+}
+
+.wst-disclosure {
+	margin-block: 8px;
+
+	summary {
+		cursor: pointer;
+	}
+
+	ul {
+		margin-block: 8px 0;
+		padding-inline-start: 20px;
+		list-style: disc;
+	}
+}
+
+.wst-usage {
+
+	label {
+		display: block;
+		margin-block-end: 4px;
+	}
+
+	meter {
+		inline-size: 100%;
+		block-size: 12px;
+	}
+}
+
+.wst-coverage progress {
+	inline-size: 100%;
+	block-size: 14px;
+	margin-block-start: 6px;
+	accent-color: var(--wp-admin-theme-color, #2271b1);
+}
+
+.wst-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: var(--wst-gap);
+	margin: 0 0 var(--wst-gap);
+
+	dt {
+		color: var(--wst-muted);
+	}
+
+	dd {
+		margin: 0;
+		font-size: 1.6em;
+		font-weight: 600;
+	}
+}
+
+.wst-checklist,
+.wst-checks,
+.wst-recent,
+.wst-provider-summaries {
+	margin: 0;
+	list-style: none;
+
+	li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 8px;
+		padding-block: 8px;
+		border-block-end: 1px solid #f0f0f1;
+	}
+}
+
+.wst-provider-summaries li {
+	display: block;
+
+	> * + * {
+		margin-block-start: 6px;
+	}
+}
+
+.wst-checks .wst-check span {
+	flex-basis: 100%;
+}
+
+.wst-rules {
+	margin: 0 0 12px;
+	list-style: none;
+}
+
+.wst-rules__row {
+	display: grid;
+	grid-template-columns: minmax(180px, 2fr) minmax(140px, 1fr) auto;
+	align-items: end;
+	gap: 8px;
+	margin-block-end: 8px;
+}
+
+.wst-switcher-settings {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: var(--wst-gap);
+}
+
+.wst-preview {
+	padding: var(--wst-gap);
+	border: 1px dashed #c3c4c7;
+	background: #fff;
+
+	h3 {
+		margin-block-start: 0;
+	}
+}
+
+.wst-preview__inline {
+	padding: 12px;
+	border: 1px solid #f0f0f1;
+}
+
+// A stand-in page: the floating switcher is placed inside it,
+// not on the screen.
+.wst-preview__page {
+	position: relative;
+	block-size: 160px;
+	margin-block-start: 12px;
+	background: repeating-linear-gradient(to bottom, #f6f7f7 0, #f6f7f7 12px, #fff 12px, #fff 24px);
+	border: 1px solid #dcdcde;
+	overflow: hidden;
+
+	.wst-switcher--floating {
+		position: absolute;
+	}
+}
+
+.wst-colors {
+	display: grid;
+	gap: 8px;
+}
+
+.wst-color {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+
+	label {
+		min-inline-size: 12em;
+	}
+
+	input[type="color"] {
+		inline-size: 48px;
+		block-size: 32px;
+		padding: 0;
+		border: 1px solid #8c8f94;
+	}
+}
+
+.wst-copy {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.wst-code {
+	padding: 8px 12px;
+	background: #f6f7f7;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.wst-table-wrap {
+	overflow-x: auto;
+}
+
+// Our own table styles: WordPress's .wp-list-table / .widefat phone rules
+// expect its list-table markup (column-primary, toggle-row) and collapse
+// anything else, so they are not used here.
+.wst-table {
+	inline-size: 100%;
+	border-collapse: collapse;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+
+	th,
+	td {
+		padding: 8px 10px;
+		border-block-end: 1px solid #f0f0f1;
+		text-align: start;
+		vertical-align: top;
+		overflow-wrap: anywhere;
+	}
+
+	thead th,
+	thead td {
+		border-block-end: 1px solid #c3c4c7;
+		font-weight: 600;
+	}
+
+	tbody tr:nth-child(odd) {
+		background: #f6f7f7;
+	}
+
+	tbody th {
+		font-weight: 400;
+	}
+
+	pre {
+		max-inline-size: 60ch;
+		white-space: pre-wrap;
+	}
+}
+
+.wst-table__check {
+	inline-size: 2.5em;
+
+	input[type="checkbox"] {
+		margin: 0;
+	}
+}
+
+.wst-table__action {
+	display: block;
+	margin-block-start: 4px;
+	font-size: 13px;
+}
+
+// Narrow screens: every row becomes a card; each cell shows its column
+// name from data-label. The header row stays for screen readers only.
+@media screen and (max-width: 782px) {
+
+	.wst-table--cards {
+		border: 0;
+		background: transparent;
+
+		thead {
+			position: absolute;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+
+		tbody,
+		tr,
+		th,
+		td {
+			display: block;
+		}
+
+		tr {
+			position: relative;
+			margin-block-end: 8px;
+			padding-block: 10px;
+			padding-inline: 12px;
+			border: 1px solid #dcdcde;
+			background: #fff;
+		}
+
+		tbody tr:nth-child(odd) {
+			background: #fff;
+		}
+
+		th,
+		td {
+			padding: 2px 0;
+			border: 0;
+		}
+
+		td[data-label] {
+			display: grid;
+			grid-template-columns: minmax(7em, 35%) minmax(0, 1fr);
+			gap: 8px;
+
+			&::before {
+				content: attr(data-label);
+				color: var(--wst-muted);
+				font-weight: 600;
+			}
+		}
+
+		.wst-table__primary {
+			margin-block-end: 6px;
+			font-size: 15px;
+		}
+
+		.wst-table__check {
+			position: absolute;
+			inset-block-start: 10px;
+			inset-inline-end: 12px;
+			inline-size: auto;
+
+			input[type="checkbox"] {
+				inline-size: 24px;
+				block-size: 24px;
+			}
+		}
+
+		tr:has(.wst-table__check) .wst-table__primary {
+			padding-inline-end: 36px;
+		}
+	}
+}
+
+.wst-pagination {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-block-start: 12px;
+}
+
+.wst-danger__confirm {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 12px;
+	border-inline-start: 4px solid var(--wst-error);
+	background: var(--wst-error-bg);
+
+	p {
+		flex-basis: 100%;
+		margin: 0;
+	}
+}
+
+.wst-error-list {
+	margin-block: 4px 0;
+	padding-inline-start: 1.5em;
+	list-style: disc;
+}
+
+.wst-admin__savebar {
+	position: fixed;
+	z-index: 9990;
+	inset-block-end: 0;
+	inset-inline: 160px 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px var(--wst-gap);
+	padding: 12px 24px;
+	background: #fff;
+	border-block-start: 1px solid #c3c4c7;
+	box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+
+	span {
+		margin-inline-end: auto;
+		font-weight: 600;
+	}
+}
+
+.folded .wst-admin__savebar {
+	inset-inline-start: 36px;
+}
+
+@media screen and (max-width: 960px) {
+
+	.auto-fold .wst-admin__savebar {
+		inset-inline-start: 36px;
+	}
+}
+
+@media screen and (max-width: 782px) {
+
+	.auto-fold .wst-admin__savebar {
+		inset-inline-start: 0;
+	}
+
+	.wst-rules__row {
+		grid-template-columns: 1fr;
+	}
+
+	.wst-providers {
+		grid-template-columns: 1fr;
+	}
+}

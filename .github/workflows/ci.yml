@@ -1,0 +1,105 @@
+# Checks for every push and pull request: PHPCS, PHPStan level 8, the PHP unit
+# and integration suites (WordPress test suite on MariaDB), JS/CSS lint, JS
+# tests and the committed build. No secrets are used and no test calls a
+# translation provider: provider tests replay recorded responses.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php:
+    name: PHP (PHPCS, PHPStan, unit, integration)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: wst_tests
+          MARIADB_USER: wst
+          MARIADB_PASSWORD: wst
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      WST_TEST_DB_NAME: wst_tests
+      WST_TEST_DB_USER: wst
+      WST_TEST_DB_PASSWORD: wst
+      WST_TEST_DB_HOST: 127.0.0.1:3306
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, mbstring, intl, dom, simplexml, libxml
+          tools: composer:v2
+          coverage: none
+
+      - name: Composer cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install PHP dev tools
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHPCS (WordPress Coding Standards, PHP 8.0+ compatibility)
+        run: composer lint
+
+      - name: PHPStan level 8
+        run: composer analyse -- --no-progress
+
+      - name: Unit tests
+        run: composer test:unit
+
+      - name: html5lib inputs for the round-trip test
+        run: bin/fetch-html5lib-tests.sh
+
+      - name: Integration tests (WordPress test suite)
+        run: composer test:integration
+
+  js:
+    name: JS (lint, tests, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: ESLint
+        run: npm run lint:js
+
+      - name: Stylelint
+        run: npm run lint:css -- 'assets-src/**/*.scss'
+
+      - name: JS tests
+        run: npm run test:js
+
+      - name: Committed build is up to date
+        run: |
+          npm run build
+          git diff --exit-code -- build

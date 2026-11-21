@@ -1,0 +1,26 @@
+{
+    "case": "rate-limited",
+    "captured_at": "2026-10-06T16:30:37+00:00",
+    "request": {
+        "method": "POST",
+        "path": "/translate",
+        "query": {
+            "sl": "en",
+            "tl": "bn"
+        },
+        "key": "valid",
+        "burst_index": 51
+    },
+    "response": {
+        "status": 429,
+        "headers": {
+            "content-type": "application/json",
+            "x-tx-ratelimit": "50/min"
+        },
+        "body_json": {
+            "err": "too many requests"
+        },
+        "body_raw": null,
+        "ms": 254
+    }
+}

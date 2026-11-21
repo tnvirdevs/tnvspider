@@ -1,0 +1,109 @@
+/* WP Site Translator language switcher. Colours come from CSS variables;
+   "inherit" follows the theme. Logical properties keep RTL correct. */
+.wst-switcher {
+	--wst-switcher-text: currentcolor;
+	--wst-switcher-bg: transparent;
+	--wst-switcher-accent: currentcolor;
+	color: var(--wst-switcher-text);
+	background: var(--wst-switcher-bg);
+}
+
+.wst-switcher--light {
+	--wst-switcher-text: #1e1e1e;
+	--wst-switcher-bg: #fff;
+	--wst-switcher-accent: #2271b1;
+}
+
+.wst-switcher--dark {
+	--wst-switcher-text: #f0f0f0;
+	--wst-switcher-bg: #1e1e1e;
+	--wst-switcher-accent: #72aee6;
+}
+
+.wst-switcher__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25em 0.75em;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wst-switcher__link {
+	color: inherit;
+	text-decoration: none;
+	padding-block: 0.25em;
+	padding-inline: 0.5em;
+	border-radius: 3px;
+}
+
+.wst-switcher__link:hover {
+	text-decoration: underline;
+}
+
+.wst-switcher__link:focus-visible {
+	outline: 2px solid var(--wst-switcher-accent);
+	outline-offset: 2px;
+}
+
+.wst-switcher__item.is-current .wst-switcher__link {
+	font-weight: 600;
+	box-shadow: inset 0 -2px 0 var(--wst-switcher-accent);
+}
+
+.wst-switcher--floating {
+	position: fixed;
+	z-index: 99990;
+	padding: 0.5em 0.75em;
+	border-radius: 6px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	font-size: 0.9375rem;
+	line-height: 1.4;
+}
+
+.wst-switcher--floating.wst-switcher--inherit {
+	--wst-switcher-bg: #fff;
+	--wst-switcher-text: #1e1e1e;
+}
+
+/* Vertical distance from the edge: the "offset" setting (default 16px).
+   Left and right are logical, so they swap on right-to-left pages. */
+.wst-switcher--bottom-right {
+	inset-block-end: var(--wst-switcher-offset, 16px);
+	inset-inline-end: 1rem;
+}
+
+.wst-switcher--bottom-left {
+	inset-block-end: var(--wst-switcher-offset, 16px);
+	inset-inline-start: 1rem;
+}
+
+.wst-switcher--top-right {
+	inset-block-start: var(--wst-switcher-offset, 16px);
+	inset-inline-end: 1rem;
+}
+
+.wst-switcher--top-left {
+	inset-block-start: var(--wst-switcher-offset, 16px);
+	inset-inline-start: 1rem;
+}
+
+.admin-bar .wst-switcher--top-right,
+.admin-bar .wst-switcher--top-left {
+	inset-block-start: calc(var(--wst-switcher-offset, 16px) + 32px);
+}
+
+@media screen and (max-width: 782px) {
+
+	.admin-bar .wst-switcher--top-right,
+	.admin-bar .wst-switcher--top-left {
+		inset-block-start: calc(var(--wst-switcher-offset, 16px) + 46px);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+
+	.wst-switcher__link {
+		transition: box-shadow 0.15s ease;
+	}
+}

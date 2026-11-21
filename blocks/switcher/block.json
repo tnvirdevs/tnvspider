@@ -1,0 +1,15 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "wst/switcher",
+	"title": "Language switcher",
+	"description": "Links to this page in each language.",
+	"category": "widgets",
+	"icon": "translation",
+	"textdomain": "wp-site-translator",
+	"supports": {
+		"html": false
+	},
+	"editorScript": "wst-switcher-block",
+	"style": "wst-switcher"
+}
